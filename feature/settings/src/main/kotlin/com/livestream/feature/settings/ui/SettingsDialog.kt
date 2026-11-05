@@ -68,9 +68,15 @@ fun SettingsDialog(
     modifier: Modifier = Modifier
 ) {
     val firstFocusRequester = remember { FocusRequester() }
+    val importCancelFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(uiState.isSettingsOpen) {
-        if (uiState.isSettingsOpen && !uiState.isImportDialogOpen) {
+    LaunchedEffect(uiState.isSettingsOpen, uiState.isImportDialogOpen) {
+        if (uiState.isImportDialogOpen) {
+            kotlinx.coroutines.delay(150)
+            try {
+                importCancelFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        } else if (uiState.isSettingsOpen) {
             firstFocusRequester.requestFocus()
         }
     }
@@ -296,19 +302,20 @@ fun SettingsDialog(
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OneUiShapes.pill)
-                                        .background(OneUiTheme.colors.surfacePill)
-                                        .clickable { onCloseImportDialog() }
-                                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                TvFocusableBox(
+                                    onClick = onCloseImportDialog,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = OneUiTheme.colors.accent,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp
+                                ) { isFocused ->
                                     Text(
                                         text = "关闭",
-                                        color = OneUiTheme.colors.textSecondary,
+                                        color = if (isFocused) Color.White else OneUiTheme.colors.textSecondary,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                                     )
                                 }
                             }
@@ -425,39 +432,40 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OneUiShapes.pill)
-                                        .background(OneUiTheme.colors.surfacePill)
-                                        .clickable { onCloseImportDialog() }
-                                        .padding(horizontal = 16.dp, vertical = 7.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                TvFocusableBox(
+                                    onClick = onCloseImportDialog,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp,
+                                    modifier = Modifier.focusRequester(importCancelFocusRequester)
+                                ) { isFocused ->
                                     Text(
                                         text = "取消",
-                                        color = OneUiTheme.colors.textSecondary,
+                                        color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
                                     )
                                 }
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
-                                Button(
-                                    onClick = onConfirmImport,
-                                    enabled = !uiState.isImporting,
+                                TvFocusableBox(
+                                    onClick = { if (!uiState.isImporting) onConfirmImport() },
                                     shape = OneUiShapes.pill,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = OneUiTheme.colors.accent,
-                                        disabledContainerColor = OneUiTheme.colors.accent.copy(alpha = 0.5f)
-                                    )
-                                ) {
+                                    unfocusedBackgroundColor = if (uiState.isImporting) OneUiTheme.colors.accent.copy(alpha = 0.5f) else OneUiTheme.colors.accent,
+                                    focusedBackgroundColor = OneUiTheme.colors.accent,
+                                    focusedBorderColor = Color.White,
+                                    focusedBorderWidth = 2.dp
+                                ) { _ ->
                                     Text(
                                         text = if (uiState.isImporting) "正在导入..." else "确认导入",
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
                                     )
                                 }
                             }

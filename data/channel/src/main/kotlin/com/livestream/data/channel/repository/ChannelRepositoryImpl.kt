@@ -64,6 +64,12 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getAllChannelsSync(): List<Channel> {
+        return withContext(dispatchers.io) {
+            channelDao.getAllChannelsSync().map { it.toDomain() }
+        }
+    }
+
     override suspend fun toggleFavorite(channelId: String, isFavorite: Boolean) {
         withContext(dispatchers.io) {
             channelDao.updateFavoriteStatus(channelId, isFavorite)

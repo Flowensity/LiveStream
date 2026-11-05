@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +55,7 @@ import com.livestream.playback.api.web.WebPlaybackController
  * 3. 遥控器数字键直接选台防抖
  * 4. 焦点记忆与远距离高对比度识别
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun TvLayout(
     playerUiState: PlayerUiState,
@@ -89,10 +93,17 @@ fun TvLayout(
     webPlaybackController: WebPlaybackController? = null
 ) {
     val focusRequester = remember { FocusRequester() }
+    var osdFocusIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(settingsUiState.isSettingsOpen, channelUiState.isDrawerOpen, playerUiState.isEpgSheetVisible) {
         if (!settingsUiState.isSettingsOpen && !channelUiState.isDrawerOpen && !playerUiState.isEpgSheetVisible) {
             focusRequester.requestFocus()
+        }
+    }
+
+    LaunchedEffect(playerUiState.isOsdVisible) {
+        if (playerUiState.isOsdVisible) {
+            osdFocusIndex = 0
         }
     }
 
@@ -115,10 +126,14 @@ fun TvLayout(
                     return@onKeyEvent false
                 }
 
-                // 设置展开时交由弹窗
+                // 设置展开时交由弹窗，若内嵌导入弹窗打开则先关闭导入
                 if (settingsUiState.isSettingsOpen) {
                     if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                        onCloseSettings()
+                        if (settingsUiState.isImportDialogOpen) {
+                            onCloseImportDialog()
+                        } else {
+                            onCloseSettings()
+                        }
                         focusRequester.requestFocus()
                         return@onKeyEvent true
                     }
@@ -134,6 +149,51 @@ fun TvLayout(
                     return@onKeyEvent false
                 }
 
+                // OSD 悬浮条显示时：左右键在 [线路] 与 [节目单] 并排按钮之间切换选择
+                if (playerUiState.isOsdVisible) {
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            if (osdFocusIndex == 1) {
+                                osdFocusIndex = 0
+                            } else {
+                                onSwitchSource()
+                            }
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionRight -> {
+                            osdFocusIndex = 1
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionCenter, Key.Enter -> {
+                            if (osdFocusIndex == 0) {
+                                onSwitchSource()
+                            } else {
+                                onToggleEpgSheet()
+                            }
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionUp, Key.PageUp -> {
+                            onSwitchPreviousChannel()
+                            onShowOsd()
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionDown, Key.PageDown -> {
+                            onSwitchNextChannel()
+                            onShowOsd()
+                            return@onKeyEvent true
+                        }
+                        Key.Menu -> {
+                            onToggleSettings()
+                            return@onKeyEvent true
+                        }
+                        Key.Back, Key.Escape -> {
+                            onHideOsd()
+                            return@onKeyEvent true
+                        }
+                        else -> {}
+                    }
+                }
+
                 when (keyEvent.key) {
                     Key.DirectionUp, Key.PageUp -> {
                         onSwitchPreviousChannel()
@@ -146,11 +206,14 @@ fun TvLayout(
                         true
                     }
                     Key.DirectionLeft -> {
+                        onShowOsd()
+                        osdFocusIndex = 0
                         onSwitchSource()
                         true
                     }
                     Key.DirectionRight -> {
                         onShowOsd()
+                        osdFocusIndex = 1
                         true
                     }
                     Key.DirectionCenter, Key.Enter -> {
@@ -213,69 +276,14 @@ fun TvLayout(
             )
         }
 
-        // 2. 中层：OSD 状态、指标与错误卡片
+        // 2. 中层：OSD 状态、指标与错误卡片 (带并排线路与节目单按钮)
         PlayerOverlay(
             uiState = playerUiState,
             onRetry = onRetry,
             onSwitchSource = onSwitchSource,
-            onOpenEpgSchedule = onToggleEpgSheet
+            onOpenEpgSchedule = onToggleEpgSheet,
+            osdFocusedIndex = if (playerUiState.isOsdVisible) osdFocusIndex else -1
         )
-
-        // 快捷入口操作条
-        if (playerUiState.isOsdVisible && !channelUiState.isDrawerOpen && !settingsUiState.isSettingsOpen) {
-            val pillShape = RoundedCornerShape(50)
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TvFocusableBox(
-                    onClick = onOpenDrawer,
-                    shape = pillShape
-                ) { isFocused ->
-                    Text(
-                        text = "频道菜单",
-                        color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                    )
-                }
-
-                if (playerUiState.activeChannel != null) {
-                    Box(modifier = Modifier.padding(start = 10.dp)) {
-                        TvFocusableBox(
-                            onClick = onToggleEpgSheet,
-                            shape = pillShape
-                        ) { isFocused ->
-                            Text(
-                                text = "节目单",
-                                color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                            )
-                        }
-                    }
-                }
-
-                Box(modifier = Modifier.padding(start = 10.dp)) {
-                    TvFocusableBox(
-                        onClick = onOpenSettings,
-                        shape = pillShape
-                    ) { isFocused ->
-                        Text(
-                            text = "设置",
-                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                        )
-                    }
-                }
-            }
-        }
 
         // 3. 顶层侧边栏：频道分类与列表抽屉
         ChannelDrawer(

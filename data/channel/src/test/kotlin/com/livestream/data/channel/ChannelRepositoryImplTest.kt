@@ -98,6 +98,24 @@ class ChannelRepositoryImplTest {
     }
 
     @Test
+    fun `test getAllChannelsSync returns domain models`() = runTest(testDispatcher) {
+        val channelEntity = ChannelEntity(
+            id = "cctv1",
+            name = "CCTV-1",
+            channelNumber = 1,
+            categoryId = "cctv"
+        )
+        coEvery { channelDao.getAllChannelsSync() } returns listOf(channelEntity)
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        val result = repo.getAllChannelsSync()
+
+        assertEquals(1, result.size)
+        assertEquals("cctv1", result.first().id)
+        assertEquals("CCTV-1", result.first().name)
+    }
+
+    @Test
     fun `test checkAndSeedDefaultChannels preserves user favorites on existing channels`() = runTest(testDispatcher) {
         val existingCctv1 = ChannelEntity(
             id = "cctv_600001859",

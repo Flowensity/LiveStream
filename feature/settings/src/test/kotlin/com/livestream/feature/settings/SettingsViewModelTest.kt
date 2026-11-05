@@ -113,6 +113,38 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `importM3uContent matches preset channels and saves merged sources`() = runTest(testDispatcher) {
+        val presetChannels = listOf(
+            com.livestream.core.model.Channel(
+                id = "cctv_preset_1",
+                name = "CCTV-1 综合",
+                channelNumber = 1,
+                categoryId = "cctv"
+            )
+        )
+        coEvery { channelRepository.getAllChannelsSync() } returns presetChannels
+
+        val validM3u = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="cctv1" group-title="央视",CCTV-1 高清
+            http://example.com/live/cctv1_custom.m3u8
+        """.trimIndent()
+
+        val capturedSources = mutableListOf<List<com.livestream.core.model.LiveSource>>()
+        coEvery { channelRepository.saveSources(capture(capturedSources)) } returns Unit
+
+        viewModel.onImportTextChanged(validM3u)
+        viewModel.importM3uContent()
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.importSuccessCount)
+        assertTrue(capturedSources.isNotEmpty())
+        val saved = capturedSources.first()
+        // There should be the parsed source and the matched source attached to cctv_preset_1
+        assertTrue(saved.any { it.channelId == "cctv_preset_1" && it.name == "网络线路 1" })
+    }
+
+    @Test
     fun `closeImportDialog stops local server and clears url`() = runTest(testDispatcher) {
         viewModel.closeImportDialog()
         advanceUntilIdle()

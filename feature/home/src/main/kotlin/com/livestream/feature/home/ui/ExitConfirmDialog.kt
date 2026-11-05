@@ -78,23 +78,16 @@ fun ExitConfirmDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "LiveStream",
+                        text = "退出应用",
                         color = OneUiTheme.colors.textPrimary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "电视直播 · 官方高清源",
-                        color = OneUiTheme.colors.textSecondary,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "是否确定退出应用程序？",
-                        color = OneUiTheme.colors.textMuted,
-                        fontSize = 11.sp,
+                        color = OneUiTheme.colors.textSecondary,
+                        fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
 

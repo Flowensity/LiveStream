@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.core.ui.component.StreamLoadingIndicator
+import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.OneUiDimensions
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
@@ -44,6 +46,9 @@ import java.util.Locale
 
 /**
  * Samsung One UI / TeleflowTv 规范播放器控制浮层 (ChannelBarView HUD)
+ * 极致紧凑双行排版：
+ * 第 1 行：频道序号与名称 + 线路与节目单并排胶囊按钮
+ * 第 2 行：正在播出与稍后节目简明预告
  */
 @Composable
 fun PlayerOverlay(
@@ -51,7 +56,8 @@ fun PlayerOverlay(
     onRetry: () -> Unit,
     onSwitchSource: () -> Unit,
     onOpenEpgSchedule: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    osdFocusedIndex: Int = -1 // 0: 线路聚焦, 1: 节目单聚焦, -1: 无遥控强制聚焦
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         // 1. 中间加载与切台状态 (Waiting Indicator)
@@ -157,7 +163,7 @@ fun PlayerOverlay(
             }
         }
 
-        // 4. TeleflowTv 规范底部浮动 HUD (ChannelBarView)
+        // 4. 紧凑浮动 HUD (ChannelBarView - 压缩高度，删除冗余分辨率行)
         AnimatedVisibility(
             visible = uiState.isOsdVisible && uiState.activeChannel != null,
             enter = fadeIn(),
@@ -171,23 +177,24 @@ fun PlayerOverlay(
 
             Box(
                 modifier = Modifier
-                    .padding(bottom = 24.dp, start = 16.dp, end = 16.dp)
+                    .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
                     .widthIn(max = OneUiDimensions.hudChannelBarWidth)
                     .fillMaxWidth()
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), panelShape)
                     .background(OneUiTheme.colors.panelBackground, panelShape)
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                    .padding(horizontal = 18.dp, vertical = 8.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    // 第 1 行：频道名称 + 状态/线路胶囊标签
+                    // 第 1 行：频道名称 + 并排显示的 [线路] 与 [节目单] 胶囊按钮
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        // 频道编号与标题
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.weight(1f)
@@ -195,9 +202,9 @@ fun PlayerOverlay(
                             val numStr = "%02d".format(channel.channelNumber)
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(OneUiTheme.colors.accentSoft)
-                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                                    .size(width = 34.dp, height = 24.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(OneUiTheme.colors.accentSoft),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -207,7 +214,7 @@ fun PlayerOverlay(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = channel.name,
                                 color = OneUiTheme.colors.textPrimary,
@@ -218,101 +225,100 @@ fun PlayerOverlay(
                             )
                         }
 
-                        // 右侧线路/比例胶囊徽章
-                        Box(
-                            modifier = Modifier
-                                .clip(OneUiShapes.pill)
-                                .background(OneUiTheme.colors.surfacePill)
-                                .clickable { onSwitchSource() }
-                                .padding(horizontal = 10.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "线路 $currentIdx/$totalSrc",
-                                color = OneUiTheme.colors.accent,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    // 第 2 行：源详情与分辨率（仅当存在真实分辨率时展示，绝无空占位）
-                    val sourceName = uiState.activeSource?.name ?: "官方源"
-                    val metrics = uiState.metrics
-                    val resolutionText = if (metrics.videoWidth > 0 && metrics.videoHeight > 0) {
-                        val badge = when {
-                            metrics.videoWidth >= 7680 || metrics.videoHeight >= 4320 -> "8K UHD"
-                            metrics.videoWidth >= 3840 || metrics.videoHeight >= 2160 -> "4K UHD"
-                            metrics.videoWidth >= 1920 || metrics.videoHeight >= 1080 -> "1080P FHD"
-                            metrics.videoWidth >= 1280 || metrics.videoHeight >= 720 -> "720P HD"
-                            else -> "SD"
-                        }
-                        " · $badge (${metrics.videoWidth}×${metrics.videoHeight})"
-                    } else ""
-
-                    val sourceSubText = "$sourceName$resolutionText"
-                    Text(
-                        text = sourceSubText,
-                        color = OneUiTheme.colors.textSecondary,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-
-                    // 第 3 行：当前正在播出节目 (EPG Now)
-                    val currentProg = uiState.currentProgram
-                    if (currentProg != null) {
-                        val startTime = formatTime(currentProg.startTimestamp)
-                        val endTime = formatTime(currentProg.endTimestamp)
-                        val nowText = "▶ 正在播出  $startTime-$endTime  ${currentProg.title}"
+                        // 并排快捷操作区：[线路] 与 [节目单]
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = nowText,
-                                color = OneUiTheme.colors.textPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (onOpenEpgSchedule != null) {
-                                Spacer(modifier = Modifier.width(8.dp))
+                            // 线路切换胶囊 (支持触控与遥控器高亮)
+                            val isSourceFocused = osdFocusedIndex == 0
+                            TvFocusableBox(
+                                onClick = onSwitchSource,
+                                shape = OneUiShapes.pill,
+                                unfocusedBackgroundColor = if (isSourceFocused) OneUiTheme.colors.accentSoft else OneUiTheme.colors.surfacePill,
+                                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                focusedBorderColor = OneUiTheme.colors.accent,
+                                focusedBorderWidth = 1.5.dp
+                            ) { isFocused ->
                                 Box(
                                     modifier = Modifier
-                                        .clip(OneUiShapes.pill)
-                                        .background(OneUiTheme.colors.accentSoft)
-                                        .clickable { onOpenEpgSchedule() }
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "节目单",
-                                        color = OneUiTheme.colors.accent,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        text = "线路 $currentIdx/$totalSrc",
+                                        color = if (isFocused || isSourceFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isFocused || isSourceFocused) FontWeight.Bold else FontWeight.Medium
                                     )
+                                }
+                            }
+
+                            // 节目单胶囊 (全应用唯一定位入口)
+                            if (onOpenEpgSchedule != null) {
+                                val isEpgFocused = osdFocusedIndex == 1
+                                TvFocusableBox(
+                                    onClick = onOpenEpgSchedule,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = if (isEpgFocused) OneUiTheme.colors.accentSoft else OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp
+                                ) { isFocused ->
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "节目单",
+                                            color = if (isFocused || isEpgFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (isFocused || isEpgFocused) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // 第 4 行：稍后预告节目 (EPG Next)
+                    // 第 2 行：正在播出与下期预告节目信息 (单行流式排版，长标题自适应截断)
+                    val currentProg = uiState.currentProgram
                     val nextProg = uiState.nextProgram
-                    if (nextProg != null) {
-                        val nextTime = formatTime(nextProg.startTimestamp)
-                        val nextText = "稍后播出  $nextTime  ${nextProg.title}"
-                        Text(
-                            text = nextText,
-                            color = OneUiTheme.colors.textSecondary,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 1.dp)
-                        )
+                    if (currentProg != null || nextProg != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 1.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (currentProg != null) {
+                                val startTime = formatTime(currentProg.startTimestamp)
+                                val endTime = formatTime(currentProg.endTimestamp)
+                                Text(
+                                    text = "▶ 正在播出  $startTime-$endTime  ${currentProg.title}",
+                                    color = OneUiTheme.colors.textPrimary,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                            }
+                            if (nextProg != null) {
+                                if (currentProg != null) {
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                }
+                                val nextTime = formatTime(nextProg.startTimestamp)
+                                Text(
+                                    text = "稍后播出  $nextTime  ${nextProg.title}",
+                                    color = OneUiTheme.colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
             }

@@ -21,6 +21,8 @@ interface ChannelRepository {
 
     suspend fun getChannelByNumber(number: Int): Channel?
 
+    suspend fun getAllChannelsSync(): List<Channel>
+
     suspend fun toggleFavorite(channelId: String, isFavorite: Boolean)
 
     suspend fun setChannelHidden(channelId: String, isHidden: Boolean)

@@ -202,26 +202,6 @@ fun PhonePortraitLayout(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 节目单药丸胶囊
-                        if (playerUiState.activeChannel != null) {
-                            val epgPillShape = RoundedCornerShape(50)
-                            Box(
-                                modifier = Modifier
-                                    .clip(epgPillShape)
-                                    .background(OneUiTheme.colors.accentSoft)
-                                    .clickable { onToggleEpgSheet() }
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "节目单",
-                                    color = OneUiTheme.colors.accent,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
                         // 设置胶囊
                         val settingsPillShape = RoundedCornerShape(50)
                         Box(
@@ -342,7 +322,7 @@ fun PhonePortraitLayout(
                         modifier = Modifier
                             .clip(activePillShape)
                             .background(OneUiTheme.colors.accentSoft)
-                            .padding(horizontal = 22.dp, vertical = 8.dp),
+                            .padding(horizontal = 28.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -353,29 +333,13 @@ fun PhonePortraitLayout(
                         )
                     }
 
-                    // Tab 2: 节目单
+                    // Tab 2: 设置
                     val inactivePillShape = RoundedCornerShape(50)
                     Box(
                         modifier = Modifier
                             .clip(inactivePillShape)
-                            .clickable { onToggleEpgSheet() }
-                            .padding(horizontal = 22.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "节目单",
-                            color = OneUiTheme.colors.textSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    // Tab 3: 设置
-                    Box(
-                        modifier = Modifier
-                            .clip(inactivePillShape)
                             .clickable { onOpenSettings() }
-                            .padding(horizontal = 22.dp, vertical = 8.dp),
+                            .padding(horizontal = 28.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

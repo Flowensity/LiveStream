@@ -185,19 +185,6 @@ fun PhoneLandscapeLayout(
                     Text(text = "退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
 
-                if (playerUiState.activeChannel != null) {
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .border(btnBorder, pillShape)
-                            .background(btnBg, pillShape)
-                            .clickable { onToggleEpgSheet() }
-                            .padding(horizontal = 14.dp, vertical = 7.dp)
-                    ) {
-                        Text(text = "节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Box(
