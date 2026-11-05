@@ -50,6 +50,8 @@ interface PlaybackOrchestrator {
 
     fun playChannel(channel: Channel, preferredSourceId: String? = null)
 
+    fun previewChannel(channel: Channel) {}
+
     fun switchChannel(direction: SwitchDirection)
 
     fun switchNextSource()

@@ -68,8 +68,9 @@ class PlayerViewModel @Inject constructor(
                     if (channelId != null) {
                         val chName = state.currentChannel?.name.orEmpty()
                         epgJob = viewModelScope.launch {
-                            // 1. 异步触发网络拉取真实 CNTV 节目单入库
+                            // 1. 异步触发网络拉取真实 CNTV 节目单入库（增加防抖，避免切台过程中高频触发网络拉取）
                             launch {
+                                delay(300L)
                                 refreshEpgUseCase(channelId, chName)
                             }
                             // 2. 观察当前节目

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -101,6 +102,7 @@ fun TvLayout(
 ) {
     val focusRequester = remember { FocusRequester() }
     var osdFocusIndex by remember { mutableIntStateOf(0) }
+    var lastChannelSwitchTime by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(settingsUiState.isSettingsOpen, channelUiState.isDrawerOpen, playerUiState.isEpgSheetVisible) {
         if (!settingsUiState.isSettingsOpen && !channelUiState.isDrawerOpen && !playerUiState.isEpgSheetVisible) {
@@ -176,6 +178,26 @@ fun TvLayout(
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
+                }
+
+                // 遥控器上下键切台节流保护：防止长按上/下键时硬件产生密集高频事件 (40ms/次) 导致应用崩溃
+                if (keyEvent.key == Key.DirectionUp || keyEvent.key == Key.DirectionDown ||
+                    keyEvent.key == Key.PageUp || keyEvent.key == Key.PageDown
+                ) {
+                    val isRepeat = keyEvent.nativeKeyEvent.repeatCount > 0
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (isRepeat) {
+                        // 长按连击节流保护：限制为每 250ms 最多响应一次换台
+                        if (now - lastChannelSwitchTime < 250L) {
+                            return@onKeyEvent true
+                        }
+                    } else {
+                        // 单击防抖保护：至少间隔 100ms
+                        if (now - lastChannelSwitchTime < 100L) {
+                            return@onKeyEvent true
+                        }
+                    }
+                    lastChannelSwitchTime = now
                 }
 
                 // OSD 悬浮条显示时：左右键在 [线路] 与 [节目单] 并排按钮之间切换选择

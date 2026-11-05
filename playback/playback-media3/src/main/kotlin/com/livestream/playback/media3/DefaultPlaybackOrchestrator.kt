@@ -243,62 +243,72 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             errorInfo = null
         )
 
-        // 通过 SourceAdapter 插件解析真实媒体流
-        val adapter = sourceAdapterRegistry.getAdapter(source.adapterProviderId)
-        val resolution = adapter?.resolve(channel, source)
-            ?: SourceResolution.Unavailable("未找到对应直播源适配器 (${source.adapterProviderId})")
+        try {
+            // 通过 SourceAdapter 插件解析真实媒体流
+            val adapter = sourceAdapterRegistry.getAdapter(source.adapterProviderId)
+            val resolution = adapter?.resolve(channel, source)
+                ?: SourceResolution.Unavailable("未找到对应直播源适配器 (${source.adapterProviderId})")
 
-        if (sessionToken != activeSessionToken) return
+            if (sessionToken != activeSessionToken) return
 
-        val now = System.currentTimeMillis()
-        networkResolutionMs = if (switchStartTimeMs > 0L) (now - switchStartTimeMs).coerceAtLeast(0L) else 0L
-        enginePrepareStartTimeMs = now
+            val now = System.currentTimeMillis()
+            networkResolutionMs = if (switchStartTimeMs > 0L) (now - switchStartTimeMs).coerceAtLeast(0L) else 0L
+            enginePrepareStartTimeMs = now
 
-        when (resolution) {
-            is SourceResolution.NativeMedia -> {
-                // 停止并清理任何残留的 Web 容器
-                webPlaybackController.stopAndDestroy()
+            when (resolution) {
+                is SourceResolution.NativeMedia -> {
+                    // 停止并清理任何残留的 Web 容器
+                    webPlaybackController.stopAndDestroy()
 
-                _orchestratorState.value = _orchestratorState.value.copy(
-                    status = PlaybackStatus.PREPARING,
-                    currentSource = source,
-                    errorInfo = null,
-                    isOfficialWeb = false,
-                    officialWebUrl = null
-                )
+                    _orchestratorState.value = _orchestratorState.value.copy(
+                        status = PlaybackStatus.PREPARING,
+                        currentSource = source,
+                        errorInfo = null,
+                        isOfficialWeb = false,
+                        officialWebUrl = null
+                    )
 
-                val mediaItem = PlaybackMediaItem(
-                    uri = resolution.uri,
-                    protocol = source.protocol,
-                    title = "${channel.name} - ${source.name}",
-                    channelId = channel.id,
-                    sourceId = source.id,
-                    headersProfileId = resolution.headersProfileId ?: source.headersProfileId,
-                    drmProfileId = resolution.drmProfileId ?: source.drmProfileId
-                )
+                    val mediaItem = PlaybackMediaItem(
+                        uri = resolution.uri,
+                        protocol = source.protocol,
+                        title = "${channel.name} - ${source.name}",
+                        channelId = channel.id,
+                        sourceId = source.id,
+                        headersProfileId = resolution.headersProfileId ?: source.headersProfileId,
+                        drmProfileId = resolution.drmProfileId ?: source.drmProfileId
+                    )
 
-                engine.prepare(mediaItem, playWhenReady = true)
+                    engine.prepare(mediaItem, playWhenReady = true)
+                }
+                is SourceResolution.OfficialWeb -> {
+                    // 原生播放引擎停止，转入官方合规网页模式
+                    engine.stop()
+
+                    _orchestratorState.value = _orchestratorState.value.copy(
+                        status = PlaybackStatus.PREPARING,
+                        currentSource = source,
+                        errorInfo = null,
+                        isOfficialWeb = true,
+                        officialWebUrl = resolution.uri
+                    )
+                }
+                is SourceResolution.Unavailable -> {
+                    val error = PlaybackErrorInfo(
+                        errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
+                        message = resolution.reason,
+                        canRetry = true
+                    )
+                    handlePlaybackFailure(error)
+                }
             }
-            is SourceResolution.OfficialWeb -> {
-                // 原生播放引擎停止，转入官方合规网页模式
-                engine.stop()
-
-                _orchestratorState.value = _orchestratorState.value.copy(
-                    status = PlaybackStatus.PREPARING,
-                    currentSource = source,
-                    errorInfo = null,
-                    isOfficialWeb = true,
-                    officialWebUrl = resolution.uri
-                )
-            }
-            is SourceResolution.Unavailable -> {
-                val error = PlaybackErrorInfo(
-                    errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
-                    message = resolution.reason,
-                    canRetry = true
-                )
-                handlePlaybackFailure(error)
-            }
+        } catch (e: Throwable) {
+            if (sessionToken != activeSessionToken) return
+            val error = PlaybackErrorInfo(
+                errorType = PlaybackErrorType.UNKNOWN,
+                message = "播放源启动异常: ${e.message}",
+                canRetry = true
+            )
+            handlePlaybackFailure(error)
         }
     }
 
@@ -431,6 +441,15 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         } else {
             _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PLAYING)
         }
+    }
+
+    override fun previewChannel(channel: Channel) {
+        _orchestratorState.value = _orchestratorState.value.copy(
+            status = PlaybackStatus.SWITCHING,
+            currentChannel = channel,
+            currentSource = null,
+            errorInfo = null
+        )
     }
 
     override fun switchChannel(direction: SwitchDirection) {

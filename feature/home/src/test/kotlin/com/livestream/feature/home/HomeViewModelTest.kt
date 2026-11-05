@@ -97,4 +97,21 @@ class HomeViewModelTest {
 
         coVerify(exactly = 1) { playbackOrchestrator.playChannel(channel2) }
     }
+
+    @Test
+    fun `rapid continuous switching debounces and only plays final target channel`() = runTest(testDispatcher) {
+        orchestratorStateFlow.value = OrchestratorState(currentChannel = channel1)
+
+        // 快速连续触发 3 次切换，模拟长按快速连击
+        viewModel.switchNextChannel()
+        testScheduler.advanceTimeBy(100)
+        viewModel.switchNextChannel()
+        testScheduler.advanceTimeBy(100)
+        viewModel.switchNextChannel()
+
+        advanceUntilIdle()
+
+        // 最终只执行 1 次实际播放
+        coVerify(exactly = 1) { playbackOrchestrator.playChannel(any()) }
+    }
 }

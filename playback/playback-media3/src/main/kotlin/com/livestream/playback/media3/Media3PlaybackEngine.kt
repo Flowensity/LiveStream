@@ -16,6 +16,8 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.livestream.core.model.PlaybackErrorInfo
+import com.livestream.core.model.PlaybackErrorType
 import com.livestream.core.model.StreamProtocol
 import com.livestream.playback.api.PlaybackEngine
 import com.livestream.playback.api.model.EngineState
@@ -114,46 +116,70 @@ class Media3PlaybackEngine @Inject constructor(
 
         val builtItem = mediaItemBuilder.build()
 
-        // 实例复用：直接 setMediaItem 而非销毁播放器重新创建
-        player.stop()
-        player.clearMediaItems()
-        player.setMediaItem(builtItem)
-        player.playWhenReady = playWhenReady
-        player.prepare()
+        try {
+            // 实例复用：直接 setMediaItem 而非销毁播放器重新创建
+            player.stop()
+            player.clearMediaItems()
+            player.setMediaItem(builtItem)
+            player.playWhenReady = playWhenReady
+            player.prepare()
+        } catch (e: Throwable) {
+            _engineState.value = EngineState.Error(
+                PlaybackErrorInfo(
+                    errorType = PlaybackErrorType.DECODER_INIT_FAILED,
+                    message = "播放引擎准备异常: ${e.message}",
+                    canRetry = true
+                )
+            )
+        }
     }
 
     override fun play() {
-        player.play()
+        try {
+            player.play()
+        } catch (_: Throwable) {}
     }
 
     override fun pause() {
-        player.pause()
+        try {
+            player.pause()
+        } catch (_: Throwable) {}
     }
 
     override fun stop() {
-        player.stop()
+        try {
+            player.stop()
+        } catch (_: Throwable) {}
         _engineState.value = EngineState.Idle
     }
 
     override fun release() {
-        player.release()
+        try {
+            player.release()
+        } catch (_: Throwable) {}
         _engineState.value = EngineState.Idle
     }
 
     override fun setVolume(volume: Float) {
-        player.volume = volume.coerceIn(0f, 1f)
+        try {
+            player.volume = volume.coerceIn(0f, 1f)
+        } catch (_: Throwable) {}
     }
 
     override fun attachSurface(surfaceView: Any?) {
-        when (surfaceView) {
-            is SurfaceView -> player.setVideoSurfaceView(surfaceView)
-            is TextureView -> player.setVideoTextureView(surfaceView)
-            null -> player.clearVideoSurface()
-        }
+        try {
+            when (surfaceView) {
+                is SurfaceView -> player.setVideoSurfaceView(surfaceView)
+                is TextureView -> player.setVideoTextureView(surfaceView)
+                null -> player.clearVideoSurface()
+            }
+        } catch (_: Throwable) {}
     }
 
     override fun detachSurface() {
-        player.clearVideoSurface()
+        try {
+            player.clearVideoSurface()
+        } catch (_: Throwable) {}
     }
 
     private inner class PlayerEventListener : Player.Listener {
