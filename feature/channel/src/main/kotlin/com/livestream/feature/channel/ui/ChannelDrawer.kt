@@ -17,14 +17,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +43,7 @@ import com.livestream.core.ui.theme.TextMuted
 import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.core.ui.theme.TextSecondary
 import com.livestream.feature.channel.ChannelUiState
+import kotlinx.coroutines.delay
 
 @Composable
 fun ChannelDrawer(
@@ -50,6 +55,16 @@ fun ChannelDrawer(
     onCloseDrawer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeItemFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(uiState.isDrawerOpen) {
+        if (uiState.isDrawerOpen) {
+            delay(150)
+            try {
+                activeItemFocusRequester.requestFocus()
+            } catch (e: Exception) {}
+        }
+    }
     AnimatedVisibility(
         visible = uiState.isDrawerOpen,
         enter = slideInHorizontally(initialOffsetX = { -it }),
@@ -141,15 +156,23 @@ fun ChannelDrawer(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(
+                        itemsIndexed(
                             items = uiState.channels,
-                            key = { it.id }
-                        ) { channel ->
+                            key = { _, ch -> ch.id }
+                        ) { index, channel ->
+                            val isActive = channel.id == uiState.activeChannelId
+                            val isFirstOrActive = isActive || (uiState.activeChannelId == null && index == 0)
+                            val itemModifier = if (isFirstOrActive) {
+                                Modifier.focusRequester(activeItemFocusRequester)
+                            } else {
+                                Modifier
+                            }
                             ChannelListItem(
                                 channel = channel,
-                                isActive = channel.id == uiState.activeChannelId,
+                                isActive = isActive,
                                 onChannelClick = onChannelSelected,
-                                onFavoriteToggle = onFavoriteToggle
+                                onFavoriteToggle = onFavoriteToggle,
+                                modifier = itemModifier
                             )
                         }
                     }

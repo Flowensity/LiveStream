@@ -6,6 +6,8 @@ import com.livestream.core.model.PlaybackStatus
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.usecase.GetCurrentProgramUseCase
 import com.livestream.domain.channel.usecase.GetNextProgramUseCase
+import com.livestream.domain.channel.usecase.GetProgramsForChannelUseCase
+import com.livestream.domain.channel.usecase.RefreshEpgUseCase
 import com.livestream.playback.api.OrchestratorState
 import com.livestream.playback.api.PlaybackOrchestrator
 import io.mockk.coEvery
@@ -41,6 +43,8 @@ class PlayerViewModelTest {
     private val channelRepository = mockk<ChannelRepository>(relaxed = true)
     private val getCurrentProgramUseCase = mockk<GetCurrentProgramUseCase>(relaxed = true)
     private val getNextProgramUseCase = mockk<GetNextProgramUseCase>(relaxed = true)
+    private val getProgramsForChannelUseCase = mockk<GetProgramsForChannelUseCase>(relaxed = true)
+    private val refreshEpgUseCase = mockk<RefreshEpgUseCase>(relaxed = true)
 
     private lateinit var viewModel: PlayerViewModel
 
@@ -49,11 +53,14 @@ class PlayerViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { getCurrentProgramUseCase(any(), any()) } returns flowOf(null)
         every { getNextProgramUseCase(any(), any()) } returns flowOf(null)
+        every { getProgramsForChannelUseCase(any(), any(), any()) } returns flowOf(emptyList())
         viewModel = PlayerViewModel(
             playbackOrchestrator,
             channelRepository,
             getCurrentProgramUseCase,
-            getNextProgramUseCase
+            getNextProgramUseCase,
+            getProgramsForChannelUseCase,
+            refreshEpgUseCase
         )
     }
 

@@ -18,3 +18,12 @@ val TextMuted = Color(0xFF6B7280)
 val StatusError = Color(0xFFEB5757)
 val StatusWarning = Color(0xFFF2994A)
 val StatusSuccess = Color(0xFF27AE60)
+
+// 浅色主题色彩设计（适配日间高亮度环境与常规手机使用习惯）
+val LightBackground = Color(0xFFF6F8FA)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceElevated = Color(0xFFEDF2F7)
+
+val TextPrimaryLight = Color(0xFF1F2328)
+val TextSecondaryLight = Color(0xFF57606A)
+val TextMutedLight = Color(0xFF8C959F)

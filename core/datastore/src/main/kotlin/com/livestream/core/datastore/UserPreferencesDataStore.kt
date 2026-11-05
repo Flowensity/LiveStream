@@ -28,6 +28,7 @@ class UserPreferencesDataStore @Inject constructor(
         val SURFACE_VIEW_PREFERRED = booleanPreferencesKey("surface_view_preferred")
         val SWITCH_CHANNEL_TIMEOUT_MS = longPreferencesKey("switch_channel_timeout_ms")
         val TV_KEY_MAPPING_SCHEME = stringPreferencesKey("tv_key_mapping_scheme")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val userPreferences: Flow<UserPreferences> = dataStore.data
@@ -49,6 +50,12 @@ class UserPreferencesDataStore @Inject constructor(
                 TvKeyMappingScheme.MINIMAL.name -> TvKeyMappingScheme.MINIMAL
                 else -> TvKeyMappingScheme.CLASSIC
             }
+            val themeModeStr = preferences[PreferencesKeys.THEME_MODE]
+            val themeMode = when (themeModeStr) {
+                com.livestream.core.model.ThemeMode.DARK.name -> com.livestream.core.model.ThemeMode.DARK
+                com.livestream.core.model.ThemeMode.LIGHT.name -> com.livestream.core.model.ThemeMode.LIGHT
+                else -> com.livestream.core.model.ThemeMode.SYSTEM
+            }
 
             UserPreferences(
                 defaultCategoryId = defaultCategory,
@@ -56,7 +63,8 @@ class UserPreferencesDataStore @Inject constructor(
                 isHardwareDecodePreferred = hwDecode,
                 isSurfaceViewPreferred = surfaceView,
                 channelSwitchTimeoutMs = timeout,
-                tvKeyMappingScheme = mappingScheme
+                tvKeyMappingScheme = mappingScheme,
+                themeMode = themeMode
             )
         }
 
@@ -93,6 +101,12 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun setTvKeyMappingScheme(scheme: TvKeyMappingScheme) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.TV_KEY_MAPPING_SCHEME] = scheme.name
+        }
+    }
+
+    suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.THEME_MODE] = mode.name
         }
     }
 }

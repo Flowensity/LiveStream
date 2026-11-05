@@ -22,4 +22,6 @@ interface UserPreferencesRepository {
     suspend fun setSwitchChannelTimeoutMs(timeoutMs: Long)
 
     suspend fun setTvKeyMappingScheme(scheme: TvKeyMappingScheme)
+
+    suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode)
 }

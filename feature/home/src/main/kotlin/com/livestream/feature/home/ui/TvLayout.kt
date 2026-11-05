@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.DarkBackground
 import com.livestream.core.ui.theme.FocusHighlight
@@ -33,6 +34,7 @@ import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.player.PlayerUiState
+import com.livestream.feature.player.ui.EpgScheduleDialog
 import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
 import com.livestream.feature.player.ui.WebPlaybackContainer
@@ -77,6 +79,9 @@ fun TvLayout(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
+    onToggleEpgSheet: () -> Unit = {},
+    onHideEpgSheet: () -> Unit = {},
+    onThemeModeSelected: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -95,8 +100,32 @@ fun TvLayout(
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                // 侧边栏或设置展开时，优先将焦点交给子组件
-                if (settingsUiState.isSettingsOpen || channelUiState.isDrawerOpen) {
+                // 侧边栏展开时，右键或返回键便捷退出
+                if (channelUiState.isDrawerOpen) {
+                    if (keyEvent.key == Key.DirectionRight || keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
+                        onCloseDrawer()
+                        focusRequester.requestFocus()
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+
+                // 设置展开时交由弹窗
+                if (settingsUiState.isSettingsOpen) {
+                    if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
+                        onCloseSettings()
+                        focusRequester.requestFocus()
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+
+                if (playerUiState.isEpgSheetVisible) {
+                    if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
+                        onHideEpgSheet()
+                        focusRequester.requestFocus()
+                        return@onKeyEvent true
+                    }
                     return@onKeyEvent false
                 }
 
@@ -147,7 +176,16 @@ fun TvLayout(
             WebPlaybackContainer(
                 controller = webPlaybackController,
                 url = webUrl,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onContainerClick = {
+                    if (channelUiState.isDrawerOpen) {
+                        onCloseDrawer()
+                    } else if (settingsUiState.isSettingsOpen) {
+                        onCloseSettings()
+                    } else {
+                        onToggleOsd()
+                    }
+                }
             )
         } else {
             LiveVideoSurface(
@@ -174,7 +212,8 @@ fun TvLayout(
         PlayerOverlay(
             uiState = playerUiState,
             onRetry = onRetry,
-            onSwitchSource = onSwitchSource
+            onSwitchSource = onSwitchSource,
+            onOpenEpgSchedule = onToggleEpgSheet
         )
 
         // 快捷入口操作条
@@ -230,7 +269,16 @@ fun TvLayout(
             onOpenImportDialog = onOpenImportDialog,
             onCloseImportDialog = onCloseImportDialog,
             onImportTextChanged = onImportTextChanged,
-            onConfirmImport = onConfirmImport
+            onConfirmImport = onConfirmImport,
+            onThemeModeSelected = onThemeModeSelected
+        )
+
+        // 5. 模态浮层：真实 EPG 节目单完整排期弹窗
+        EpgScheduleDialog(
+            visible = playerUiState.isEpgSheetVisible,
+            channel = playerUiState.activeChannel,
+            programs = playerUiState.dayPrograms,
+            onDismiss = onHideEpgSheet
         )
     }
 }

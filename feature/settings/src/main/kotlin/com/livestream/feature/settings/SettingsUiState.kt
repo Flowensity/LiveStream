@@ -1,5 +1,6 @@
 package com.livestream.feature.settings
 
+import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
 
 data class SettingsUiState(
@@ -7,6 +8,7 @@ data class SettingsUiState(
     val isSurfaceViewPreferred: Boolean = true,
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val isSettingsOpen: Boolean = false,
     val isImportDialogOpen: Boolean = false,
     val importText: String = "",

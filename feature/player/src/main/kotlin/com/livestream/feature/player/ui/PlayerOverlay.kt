@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,7 @@ fun PlayerOverlay(
     uiState: PlayerUiState,
     onRetry: () -> Unit,
     onSwitchSource: () -> Unit,
+    onOpenEpgSchedule: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -198,11 +200,11 @@ fun PlayerOverlay(
                             }
 
                             // EPG 节目单展示
-                            if (uiState.currentProgram != null || uiState.nextProgram != null) {
+                            if (uiState.currentProgram != null || uiState.nextProgram != null || uiState.dayPrograms.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     uiState.currentProgram?.let { prog ->
                                         val timeStr = "${formatTime(prog.startTimestamp)} - ${formatTime(prog.endTimestamp)}"
@@ -219,6 +221,21 @@ fun PlayerOverlay(
                                             color = TextMuted,
                                             fontSize = 13.sp
                                         )
+                                    }
+                                    if (onOpenEpgSchedule != null && uiState.dayPrograms.isNotEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
+                                                .clickable { onOpenEpgSchedule() }
+                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "📅 节目单",
+                                                color = FocusHighlight,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -240,37 +257,44 @@ fun PlayerOverlay(
                     }
                 }
 
-                // 底部性能指标统计渐变栏
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                // 底部性能指标统计渐变栏（仅在能真实获取到指标时展示，未获取到的项绝不显示占位符）
+                val metrics = uiState.metrics
+                val statItems = mutableListOf<String>()
+                if (metrics.videoWidth > 0 && metrics.videoHeight > 0) {
+                    statItems.add("分辨率: ${metrics.videoWidth}x${metrics.videoHeight}")
+                }
+                if (metrics.frameRate > 0) {
+                    statItems.add("帧率: %.1f fps".format(metrics.frameRate))
+                }
+                if (metrics.bitrateBps > 0) {
+                    statItems.add("码率: %.1f Mbps".format(metrics.bitrateBps / 1_000_000.0))
+                }
+                if (metrics.bufferedDurationMs > 0) {
+                    statItems.add("缓冲: %.1fs".format(metrics.bufferedDurationMs / 1000.0))
+                }
+                if (metrics.switchDurationMs > 0) {
+                    statItems.add("切台: ${metrics.switchDurationMs}ms")
+                }
+
+                if (statItems.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                                )
                             )
+                            .padding(horizontal = 28.dp, vertical = 16.dp)
+                    ) {
+                        Text(
+                            text = statItems.joinToString(" | "),
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
-                        .padding(horizontal = 28.dp, vertical = 16.dp)
-                ) {
-                    val metrics = uiState.metrics
-                    val resolution = if (metrics.videoWidth > 0 && metrics.videoHeight > 0) {
-                        "${metrics.videoWidth}x${metrics.videoHeight}"
-                    } else {
-                        "--"
                     }
-                    val fps = if (metrics.frameRate > 0) "%.1f fps".format(metrics.frameRate) else "--"
-                    val bitrate = if (metrics.bitrateBps > 0) "%.1f Mbps".format(metrics.bitrateBps / 1_000_000.0) else "--"
-                    val bufferSec = "%.1fs".format(metrics.bufferedDurationMs / 1000.0)
-                    val switchTime = if (metrics.switchDurationMs > 0) "${metrics.switchDurationMs}ms" else "--"
-
-                    val statsText = "分辨率: $resolution | 帧率: $fps | 码率: $bitrate | 缓冲: $bufferSec | 切台: $switchTime"
-
-                    Text(
-                        text = statsText,
-                        color = TextMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
                 }
             }
         }

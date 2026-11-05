@@ -5,6 +5,7 @@ import com.livestream.core.database.dao.EpgDao
 import com.livestream.core.model.EpgProgram
 import com.livestream.data.epg.mapper.toDomain
 import com.livestream.data.epg.mapper.toEntity
+import com.livestream.data.epg.service.CntvEpgService
 import com.livestream.domain.channel.repository.EpgRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -16,6 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class EpgRepositoryImpl @Inject constructor(
     private val epgDao: EpgDao,
+    private val cntvEpgService: CntvEpgService,
     private val dispatchers: AppDispatchers
 ) : EpgRepository {
 
@@ -56,6 +58,15 @@ class EpgRepositoryImpl @Inject constructor(
     override suspend fun deleteExpiredPrograms(beforeTimestamp: Long) {
         withContext(dispatchers.io) {
             epgDao.deleteExpiredPrograms(beforeTimestamp)
+        }
+    }
+
+    override suspend fun refreshEpgForChannel(channelId: String, channelName: String) {
+        withContext(dispatchers.io) {
+            val programs = cntvEpgService.fetchDayPrograms(channelId, channelName)
+            if (programs.isNotEmpty()) {
+                epgDao.insertPrograms(programs.map { it.toEntity() })
+            }
         }
     }
 }

@@ -1,11 +1,16 @@
 package com.livestream.feature.home.ui
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.livestream.core.ui.device.DeviceType
 import com.livestream.core.ui.device.rememberDeviceType
 import com.livestream.feature.channel.ChannelViewModel
@@ -34,23 +39,27 @@ fun HomeScreen(
     val settingsUiState by settingsViewModel.uiState.collectAsState()
 
     val deviceType = rememberDeviceType()
+    val activity = LocalContext.current as? Activity
+
+    var showExitDialog by remember { mutableStateOf(false) }
 
     // 启动自动播放
     LaunchedEffect(Unit) {
         homeViewModel.initStartupPlayback()
     }
 
-    // 系统返回键分级消费
-    BackHandler(
-        enabled = settingsUiState.isSettingsOpen ||
-            channelUiState.isDrawerOpen ||
-            playerUiState.isOsdVisible
-    ) {
+    // 系统返回键分级消费与二次退出确认弹窗
+    BackHandler(enabled = true) {
         when {
+            showExitDialog -> showExitDialog = false
             settingsUiState.isImportDialogOpen -> settingsViewModel.closeImportDialog()
             settingsUiState.isSettingsOpen -> settingsViewModel.closeSettings()
             channelUiState.isDrawerOpen -> channelViewModel.closeDrawer()
+            playerUiState.isEpgSheetVisible -> playerViewModel.hideEpgSheet()
             playerUiState.isOsdVisible -> playerViewModel.hideOsd()
+            else -> {
+                showExitDialog = true
+            }
         }
     }
 
@@ -80,6 +89,9 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -111,6 +123,9 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -140,6 +155,9 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -183,9 +201,19 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
         }
     }
+
+    // 退出确认二次弹窗
+    ExitConfirmDialog(
+        visible = showExitDialog,
+        onConfirm = { activity?.finish() },
+        onDismiss = { showExitDialog = false }
+    )
 }

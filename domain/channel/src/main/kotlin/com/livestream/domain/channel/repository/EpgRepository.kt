@@ -17,4 +17,6 @@ interface EpgRepository {
     suspend fun savePrograms(programs: List<EpgProgram>)
 
     suspend fun deleteExpiredPrograms(beforeTimestamp: Long)
+
+    suspend fun refreshEpgForChannel(channelId: String, channelName: String)
 }

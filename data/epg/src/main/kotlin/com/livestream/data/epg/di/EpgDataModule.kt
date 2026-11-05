@@ -5,6 +5,7 @@ import com.livestream.domain.channel.repository.EpgRepository
 import com.livestream.domain.channel.usecase.GetCurrentProgramUseCase
 import com.livestream.domain.channel.usecase.GetNextProgramUseCase
 import com.livestream.domain.channel.usecase.GetProgramsForChannelUseCase
+import com.livestream.domain.channel.usecase.RefreshEpgUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -40,5 +41,11 @@ abstract class EpgDataModule {
         fun provideGetProgramsForChannelUseCase(
             epgRepository: EpgRepository
         ): GetProgramsForChannelUseCase = GetProgramsForChannelUseCase(epgRepository)
+
+        @Provides
+        @Singleton
+        fun provideRefreshEpgUseCase(
+            epgRepository: EpgRepository
+        ): RefreshEpgUseCase = RefreshEpgUseCase(epgRepository)
     }
 }

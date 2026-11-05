@@ -3,6 +3,16 @@ package com.livestream.core.model
 import kotlinx.serialization.Serializable
 
 /**
+ * 界面主题显示模式
+ */
+@Serializable
+enum class ThemeMode {
+    SYSTEM, // 跟随系统
+    DARK,   // 深色模式
+    LIGHT   // 浅色模式
+}
+
+/**
  * 电视遥控器按键映射策略
  */
 @Serializable
@@ -21,5 +31,6 @@ data class UserPreferences(
     val isHardwareDecodePreferred: Boolean = true,
     val isSurfaceViewPreferred: Boolean = true,
     val channelSwitchTimeoutMs: Long = 5000L,
-    val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC
+    val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )

@@ -4,7 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
+import com.livestream.core.model.ThemeMode
 import kotlinx.coroutines.launch
 import com.livestream.core.ui.theme.LiveStreamTheme
 import com.livestream.domain.channel.repository.ChannelRepository
@@ -49,7 +53,13 @@ class MainActivity : ComponentActivity() {
             channelRepository.checkAndSeedDefaultChannels()
         }
         setContent {
-            LiveStreamTheme {
+            val settingsUiState by settingsViewModel.uiState.collectAsState()
+            val isDarkTheme = when (settingsUiState.themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            LiveStreamTheme(darkTheme = isDarkTheme) {
                 HomeScreen(
                     homeViewModel = homeViewModel,
                     playerViewModel = playerViewModel,

@@ -22,5 +22,7 @@ data class PlayerUiState(
     val isOfficialWeb: Boolean = false,
     val officialWebUrl: String? = null,
     val currentProgram: EpgProgram? = null,
-    val nextProgram: EpgProgram? = null
+    val nextProgram: EpgProgram? = null,
+    val dayPrograms: List<EpgProgram> = emptyList(),
+    val isEpgSheetVisible: Boolean = false
 )

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.DarkBackground
 import com.livestream.core.ui.theme.DarkSurface
@@ -44,6 +45,7 @@ import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
+import com.livestream.feature.player.ui.EpgScheduleDialog
 import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
 import com.livestream.feature.player.ui.WebPlaybackContainer
@@ -78,6 +80,9 @@ fun PhonePortraitLayout(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
+    onToggleEpgSheet: () -> Unit = {},
+    onHideEpgSheet: () -> Unit = {},
+    onThemeModeSelected: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -101,7 +106,8 @@ fun PhonePortraitLayout(
                 WebPlaybackContainer(
                     controller = webPlaybackController,
                     url = webUrl,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onContainerClick = onToggleOsd
                 )
             } else {
                 LiveVideoSurface(
@@ -120,44 +126,27 @@ fun PhonePortraitLayout(
             PlayerOverlay(
                 uiState = playerUiState,
                 onRetry = onRetry,
-                onSwitchSource = onSwitchSource
+                onSwitchSource = onSwitchSource,
+                onOpenEpgSchedule = onToggleEpgSheet
             )
 
-            // 右下角进入横屏全屏按钮
+            // 右下角进入横屏全屏按钮（点击画面即可唤出 OSD 看到本按钮）
             if (playerUiState.isOsdVisible) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(12.dp)
-                        .background(DarkSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .padding(14.dp)
+                        .background(DarkSurfaceElevated.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
                         .clickable {
                             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = "⛶ 全屏",
                         color = FocusHighlight,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // 右上角设置入口按钮
-            if (playerUiState.isOsdVisible) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .background(DarkSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
-                        .clickable { onOpenSettings() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "⚙ 设置",
-                        color = TextPrimary,
-                        fontSize = 12.sp
                     )
                 }
             }
@@ -168,8 +157,60 @@ fun PhonePortraitLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = 10.dp)
+                .padding(top = 8.dp)
         ) {
+            // 顶部常驻操作工具栏：包含标题、节目单入口与设置入口
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "频道列表 (${channelUiState.channels.size})",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (playerUiState.dayPrograms.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .background(DarkSurfaceElevated, RoundedCornerShape(6.dp))
+                                .clickable { onToggleEpgSheet() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "📅 节目单",
+                                color = FocusHighlight,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .background(DarkSurfaceElevated, RoundedCornerShape(6.dp))
+                            .clickable { onOpenSettings() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "⚙ 设置",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
             // 搜索框
             OutlinedTextField(
                 value = channelUiState.searchQuery,
@@ -232,6 +273,15 @@ fun PhonePortraitLayout(
         onOpenImportDialog = onOpenImportDialog,
         onCloseImportDialog = onCloseImportDialog,
         onImportTextChanged = onImportTextChanged,
-        onConfirmImport = onConfirmImport
+        onConfirmImport = onConfirmImport,
+        onThemeModeSelected = onThemeModeSelected
+    )
+
+    // EPG 节目单排期弹窗
+    EpgScheduleDialog(
+        visible = playerUiState.isEpgSheetVisible,
+        channel = playerUiState.activeChannel,
+        programs = playerUiState.dayPrograms,
+        onDismiss = onHideEpgSheet
     )
 }

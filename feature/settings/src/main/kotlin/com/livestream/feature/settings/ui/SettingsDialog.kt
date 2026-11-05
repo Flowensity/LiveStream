@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.DarkBackground
 import com.livestream.core.ui.theme.DarkSurface
@@ -51,6 +52,7 @@ fun SettingsDialog(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
+    onThemeModeSelected: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -118,9 +120,54 @@ fun SettingsDialog(
                         onCheckedChange = onToggleSurfaceView
                     )
 
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // 3. 主题模式切换
+                    Text(
+                        text = "显示主题模式",
+                        color = TextSecondary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ThemeMode.values().forEach { mode ->
+                            val isSelected = uiState.themeMode == mode
+                            val label = when (mode) {
+                                ThemeMode.SYSTEM -> "跟随系统"
+                                ThemeMode.DARK -> "深色模式"
+                                ThemeMode.LIGHT -> "浅色模式"
+                            }
+                            TvFocusableBox(
+                                onClick = { onThemeModeSelected(mode) },
+                                unfocusedBackgroundColor = if (isSelected) DarkSurfaceElevated else DarkSurface,
+                                focusedBackgroundColor = DarkSurfaceElevated,
+                                focusedBorderColor = FocusHighlight,
+                                modifier = Modifier.weight(1f)
+                            ) { isFocused ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (isSelected || isFocused) FocusHighlight else TextMuted,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // 3. 自定义源管理
+                    // 4. 自定义源管理
                     Text(
                         text = "自定义资源管理",
                         color = TextSecondary,

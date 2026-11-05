@@ -8,6 +8,7 @@ import com.livestream.core.model.EpgProgram
 import com.livestream.data.epg.mapper.toDomain
 import com.livestream.data.epg.mapper.toEntity
 import com.livestream.data.epg.repository.EpgRepositoryImpl
+import com.livestream.data.epg.service.CntvEpgService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -22,6 +23,7 @@ import org.junit.Test
 class EpgRepositoryImplTest {
 
     private val epgDao = mockk<EpgDao>(relaxed = true)
+    private val cntvEpgService = mockk<CntvEpgService>(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     private val testDispatchers = object : AppDispatchers {
@@ -60,7 +62,7 @@ class EpgRepositoryImplTest {
         )
         every { epgDao.observeCurrentProgram("cctv1", 1910L) } returns flowOf(entity)
 
-        val repo = EpgRepositoryImpl(epgDao, testDispatchers)
+        val repo = EpgRepositoryImpl(epgDao, cntvEpgService, testDispatchers)
 
         repo.observeCurrentProgram("cctv1", 1910L).test {
             val item = awaitItem()
@@ -76,7 +78,7 @@ class EpgRepositoryImplTest {
         )
         coEvery { epgDao.insertPrograms(any()) } returns Unit
 
-        val repo = EpgRepositoryImpl(epgDao, testDispatchers)
+        val repo = EpgRepositoryImpl(epgDao, cntvEpgService, testDispatchers)
         repo.savePrograms(programs)
 
         coVerify(exactly = 1) { epgDao.insertPrograms(any()) }

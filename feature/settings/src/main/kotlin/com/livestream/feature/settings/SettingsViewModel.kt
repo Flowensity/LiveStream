@@ -32,7 +32,8 @@ class SettingsViewModel @Inject constructor(
                         isHardwareDecodePreferred = prefs.isHardwareDecodePreferred,
                         isSurfaceViewPreferred = prefs.isSurfaceViewPreferred,
                         channelSwitchTimeoutMs = prefs.channelSwitchTimeoutMs,
-                        tvKeyMappingScheme = prefs.tvKeyMappingScheme
+                        tvKeyMappingScheme = prefs.tvKeyMappingScheme,
+                        themeMode = prefs.themeMode
                     )
                 }
             }
@@ -72,6 +73,12 @@ class SettingsViewModel @Inject constructor(
     fun setTvKeyMappingScheme(scheme: TvKeyMappingScheme) {
         viewModelScope.launch {
             userPreferencesRepository.setTvKeyMappingScheme(scheme)
+        }
+    }
+
+    fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
+        viewModelScope.launch {
+            userPreferencesRepository.setThemeMode(mode)
         }
     }
 

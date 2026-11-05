@@ -38,4 +38,8 @@ class UserPreferencesRepositoryImpl @Inject constructor(
     override suspend fun setTvKeyMappingScheme(scheme: TvKeyMappingScheme) {
         dataStore.setTvKeyMappingScheme(scheme)
     }
+
+    override suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
+        dataStore.setThemeMode(mode)
+    }
 }
