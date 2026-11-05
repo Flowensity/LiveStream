@@ -1,4 +1,4 @@
-# LiveStream - 高性能 Android 多端直播应用
+# LiveStream - Android 多端电视直播 App
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)](https://kotlinlang.org)
 [![Android Gradle Plugin](https://img.shields.io/badge/AGP-8.2.2-green.svg)](https://developer.android.com/studio/releases/gradle-plugin)
@@ -6,126 +6,73 @@
 [![Jetpack Compose](https://img.shields.io/badge/Compose-2024.02.00-brightgreen.svg)](https://developer.android.com/jetpack/compose)
 [![MinSdk](https://img.shields.io/badge/minSdk-23-orange.svg)](https://developer.android.com/about/dashboards)
 [![TargetSdk](https://img.shields.io/badge/targetSdk-34-purple.svg)](https://developer.android.com)
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-751%20Passed-success.svg)]()
 
-`LiveStream` 是一款基于 **AndroidX Media3 (ExoPlayer)** 和 **Jetpack Compose** 打造的高性能、高稳定性、模块化 Android 直播应用。面向中国大陆用户，完整适配 **Android TV / 电视盒子**、**Android 智能手机** 和 **Android 平板电脑**。
+`LiveStream` 是一款专为 **Android TV / 电视机顶盒**、**智能手机** 与 **平板电脑** 量身打造的多端自适应电视直播应用。基于 **AndroidX Media3 (ExoPlayer)** 原生内核与 **Jetpack Compose** 现代响应式 UI 构建。
 
 ---
 
-## 一、核心设计与产品原则
-
-1. **全新独立设计**：从零构建清晰的数据模型、领域模型与播放调度架构，杜绝堆砌代码于单个 Activity。
-2. **原生播放引擎优先**：默认采用 AndroidX Media3 ExoPlayer 作为核心播放器，硬件解码优先，SurfaceView 优先渲染；严禁将 WebView 作为默认播放引擎。
-3. **单活跃播放器保证**：前台会话全局仅保留一个活跃原生播放器实例，通过 `setMediaItem()` 实例复用技术实现毫秒级快速切台，杜绝内存与解码器泄露。
-4. **WebView 隔离合规**：独立构建 `:playback:playback-web` 兼容容器，仅在官方直播流明确要求网页播放且使用条款允许时按需创建；具备 `onRenderProcessGone` 崩溃隔离与销毁闭环。
-5. **频道与播放源解耦**：频道实体（`Channel`）与播放源（`LiveSource`）彻底分离（1:N），频道绝不硬编码流地址；支持多源健康探测与自动故障转移。
-6. **全链路合规与真实性**：不逆向、不破解、不绕过 DRM/鉴权/地域限制，绝不虚构直播源与节目单数据；支持用户导入合法的自定义 M3U / XMLTV 资源。
-7. **安全与内网 IPTV 兼容**：在自定义直播源与订阅导入层对 URL 执行严格的协议校验，防御本机回环 SSRF 攻击（拒绝 `localhost`/`127.0.0.1` 及 `file://`/`javascript://` 危险协议），同时全面支持家庭局域网 IPTV/UDPXY 路由器代理（`192.168.x.x`、`10.x.x.x`）。
-
----
-
-## 二、架构设计与模块分层
-
-项目遵循 **Clean Architecture + MVVM + UDF (Unidirectional Data Flow) + 模块化架构**：
+## 🛠️ 技术栈与工程架构
 
 ```
-                              ┌───────────────────────┐
-                              │          app          │
-                              └───────────┬───────────┘
-                                          │
-            ┌─────────────────────────────┼─────────────────────────────┐
-            ▼                             ▼                             ▼
-   ┌─────────────────┐           ┌─────────────────┐           ┌─────────────────┐
-   │  feature-home   │           │ feature-player  │           │ feature-channel │
-   └────────┬────────┘           └────────┬────────┘           └────────┬────────┘
-            │                             │                             │
-            └─────────────────────────────┼─────────────────────────────┘
-                                          ▼
-                               ┌─────────────────────┐
-                               │       core-ui       │
-                               └──────────┬──────────┘
-                                          │
-            ┌─────────────────────────────┴─────────────────────────────┐
-            ▼                                                           ▼
-┌───────────────────────┐                                   ┌───────────────────────┐
-│     domain-channel    │                                   │     playback-api      │
-└───────────┬───────────┘                                   └───────────┬───────────┘
-            │                                                           │
-            ├─────────────────────────────┬─────────────────────────────┤
-            ▼                             ▼                             ▼
-┌───────────────────────┐     ┌───────────────────────┐     ┌───────────────────────┐
-│     data-channel      │     │  playback-media3      │     │     playback-web      │
-│      data-epg         │     │ (ExoPlayer + Watchdog)│     │  (Compliant Sandbox)  │
-└───────────┬───────────┘     └───────────┬───────────┘     └───────────────────────┘
-            │                             │
-            ├─────────────────────────────┼─────────────────────────────┐
-            ▼                             ▼                             ▼
-┌───────────────────────┐     ┌───────────────────────┐     ┌───────────────────────┐
-│     core-database     │     │     core-network      │     │      source-api       │
-│     core-datastore    │     │(Connectivity Monitor) │     │ (Custom / Official)   │
-└───────────┬───────────┘     └───────────┬───────────┘     └───────────────────────┘
-            │                             │
-            └─────────────────────────────┴─────────────────────────────┐
-                                                                        ▼
-                                                            ┌───────────────────────┐
-                                                            │ core-model / common   │
-                                                            └───────────────────────┘
+                      ┌───────────────────────┐
+                      │      :app (总装)       │
+                      └───────────┬───────────┘
+                                  │
+      ┌───────────────────────────┼───────────────────────────┐
+      ▼                           ▼                           ▼
+:feature:home              :feature:player            :feature:channel
+(多端自适应布局)            (OSD/手势/手柄)            (分类/抽屉/收藏)
+      │                           │                           │
+      └───────────────────────────┼───────────────────────────┘
+                                  ▼
+                            :core:ui (主题/形态)
+                                  │
+      ┌───────────────────────────┴───────────────────────────┐
+      ▼                                                       ▼
+:domain:channel (业务用例)                               :playback:playback-api (调度契约)
+      │                                                       │
+      ├───────────────────────────┬───────────────────────────┤
+      ▼                           ▼                           ▼
+:data:channel / :data:epg    :playback:playback-media3   :playback:playback-web
+(Room/CNTV/XMLTV)            (ExoPlayer/Watchdog)        (合规隔离容器)
+      │                           │                           │
+      └───────────────────────────┴───────────────────────────┘
+                                  ▼
+                  :core:database / :core:network / :core:model
 ```
 
-### 模块职责明细
-
-| 模块类别 | 模块路径 | 职责与技术说明 |
-|---|---|---|
-| **应用装配** | `:app` | 全局 Application、Hilt 依赖注入装配、多形态 Activity 入口、ProGuard 规则与 APK 打包 |
-| **基础核心** | `:core:common` | 通用并发调度器 (`AppDispatchers`)、网络连通监听契约 (`NetworkMonitor`)、通用扩展函数 |
-| | `:core:model` | 纯 Kotlin 领域数据模型 (`Channel`, `LiveSource`, `EpgProgram`, `PlaybackState`) |
-| | `:core:network` | OkHttp 客户端工厂、`ConnectivityNetworkMonitor` 网络状态监听与自愈 |
-| | `:core:database` | Room 数据库 (`AppDatabase`)、频道/源/EPG/收藏/历史 DAO、自动数据迁移策略 |
-| | `:core:datastore` | Preferences DataStore 用户偏好持久化（最后播放频道、切台模式、硬件解码策略） |
-| | `:core:ui` | Compose 调色板、统一主题、设备形态判定 (`DeviceCategory`)、通用组件 |
-| **领域层** | `:domain:channel` | 业务用例 (`GetChannelsUseCase`, `SwitchChannelUseCase`, `GetNextProgramUseCase` 等) |
-| **数据层** | `:data:channel` | 频道与直播源数据仓库实现，支持 Room 缓存与跨源聚合 |
-| | `:data:epg` | EPG 节目单仓库，内置 **$O(1)$ 内存流式 XMLTV SAX 解析器** |
-| **播放层** | `:playback:playback-api` | 播放调度器契约 (`PlaybackOrchestrator`)、滑动窗口耗时统计 (`LatencyTracker`) |
-| | `:playback:playback-media3` | AndroidX Media3 ExoPlayer 封装、**播放看门狗 (`PlaybackWatchdog`)**、网络断线自愈重试 |
-| | `:playback:playback-web` | 官方网页合规播放器 (`DefaultWebPlaybackController`)，沙箱化安全与防崩溃隔离 |
-| **资源层** | `:source:source-api` | `SourceAdapter` 插件化标准契约与多协议解析定义 (`HLS`, `DASH`, `Progressive`) |
-| | `:source:source-custom` | 用户自定义直播源适配器，内置 **SSRF 内网安全防御验证器** 与 M3U 解析引擎 |
-| | `:source:source-official` | 官方合规公开源适配器 |
-| **业务特性** | `:feature:player` | 播放器视图、手势调节、OSD 控制面板、官方 Web 渲染容器 |
-| | `:feature:channel` | 频道分类列表、遥控器焦点高亮组件、收藏与排序管理 |
-| | `:feature:home` | 跨端响应式布局总装（TV D-pad 模式 / 手机竖屏 / 手机横屏手势 / 平板双栏 Master-Detail） |
-| | `:feature:settings` | 系统设置、解码偏好、自定义 M3U/XMLTV 订阅管理 |
+* **界面与渲染**：Jetpack Compose、Material 3、One UI 自定义组件库、Media3 UI (SurfaceView)
+* **核心播放引擎**：AndroidX Media3 (ExoPlayer 1.2.1)、Playback Watchdog 自愈监控
+* **依赖注入**：Dagger Hilt 2.50
+* **异步并发与数据流**：Kotlin Coroutines、StateFlow、SharedFlow
+* **本地持久化**：Room 2.6 (SQLite)、Jetpack Preferences DataStore
+* **网络与探测**：OkHttp 4.12、Retrofit 2.9、轻量 Range GET 网络探针
 
 ---
 
-## 三、多端设备形态深度适配
+## 📦 编译与运行
 
-### 1. Android TV / 机顶盒（遥控器 D-pad 原生体验）
-- **D-pad 导航**：上下键切台、左右键切换分类、确定键唤出 OSD 节目面板、返回键两段式安全退出。
-- **焦点记忆与动效**：列表唤出时自动定位至当前播放频道，高亮呼吸光圈与轻微放大动效（`scale(1.05f)`）。
-- **数字键切台与同步**：原生监听遥控器数字键（0~9），支持多位频道号叠加与 1.2 秒防抖自动跳转，并与后台台号索引及偏好持久化完全同步。
-- **全屏沉浸播放**：无操作 3.5 秒后 OSD 自动淡出，保持纯净大屏体验。
+### 环境要求
+* **操作系统**：Linux / macOS / Windows
+* **JDK**：OpenJDK 17
+* **Android SDK**：API 34 (Android 14)
+* **Gradle**：8.5 (AGP 8.2.2)
 
-### 2. Android 智能手机（符合触控习惯）
-- **竖屏模式**：上部锁定 16:9 原生播放器，下部聚合 One UI 频道分类、自研 Web 扫码局域网导入与当日 EPG 时间轴。
-- **横屏沉浸与重力自适应**：
-  - 点击全屏按钮启用 `SENSOR_LANDSCAPE` 旋转，支持左右反向横屏。
-  - 退出全屏时平滑释放方向锁定，恢复系统重力感应自适应。
-  - 左侧边缘滑动唤起抽屉式选台面板。
-  - 左半屏垂直手势无级调节屏幕亮度，右半屏垂直手势调节媒体音量。
+### 快速构建
 
-### 3. Android 平板电脑（双栏 Master-Detail）
-- 充分利用平板横向宽屏（$\ge 840\text{dp}$）：
-  - 左侧常驻分类与频道导航列表（320dp）。
-  - 右侧主舞台自适应渲染视频画面与 EPG 详细信息。
-  - 退出全屏自动重置方向约束，无缝回归大屏分栏排版。
+```bash
+# 1. 编译并打包 Release APK (已集成签名与 ProGuard 混淆优化)
+./gradlew assembleRelease
+
+# 产物输出路径: app/build/outputs/apk/release/app-release.apk
+
+# 2. 安装至连接的 Android TV 或手机
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
 
 ---
 
-## 四、开源与免责声明
+## 📄 开源与免责声明
 
-- 本项目采用自研架构开发，旨在为 Android 多端设备提供高质量、纯净、合规的流媒体播放体验。
-- 本项目不提供、不分发任何非法的 IPTV 直播源或盗版流媒体资源。
-- 用户通过自定义方式导入的播放源由用户自行承担合法性与合规性责任。
+* 本项目**不提供、不分发、不托管**任何非法的第三方 IPTV 直播源、盗版音视频内容或版权保护资源。
+* 用户通过自定义 M3U、订阅链接或网络文本方式导入的直播流资源，由导入者自行承担来源的合法性与合规性责任。
