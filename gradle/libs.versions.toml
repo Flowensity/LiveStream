@@ -30,6 +30,7 @@ retrofitKotlinxSerializationConverter = "1.0.0"
 
 # UI & Image
 coil = "2.6.0"
+zxing = "3.5.3"
 
 # Testing
 junit = "4.13.2"
@@ -104,6 +105,7 @@ retrofit-serialization-converter = { group = "com.jakewharton.retrofit", name = 
 
 # Coil
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

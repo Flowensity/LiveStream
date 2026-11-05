@@ -1,8 +1,10 @@
 package com.livestream.feature.settings
 
+import com.livestream.core.common.dispatcher.AppDispatchers
 import com.livestream.core.model.UserPreferences
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
+import com.livestream.feature.settings.server.LocalImportServer
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -14,6 +16,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -25,18 +28,31 @@ import org.junit.Test
 class SettingsViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    private val dispatchers = object : AppDispatchers {
+        override val main = testDispatcher
+        override val io = testDispatcher
+        override val default = testDispatcher
+    }
     private val prefsFlow = MutableStateFlow(UserPreferences())
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true) {
         coEvery { userPreferences } returns prefsFlow
     }
     private val channelRepository = mockk<ChannelRepository>(relaxed = true)
+    private val localImportServer = mockk<LocalImportServer>(relaxed = true)
+    private val okHttpClient = mockk<OkHttpClient>(relaxed = true)
 
     private lateinit var viewModel: SettingsViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = SettingsViewModel(userPreferencesRepository, channelRepository)
+        viewModel = SettingsViewModel(
+            userPreferencesRepository,
+            channelRepository,
+            localImportServer,
+            okHttpClient,
+            dispatchers
+        )
     }
 
     @After
@@ -82,5 +98,27 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertNotNull(viewModel.uiState.value.importError)
+    }
+
+    @Test
+    fun `openImportDialog starts local server and updates state`() = runTest(testDispatcher) {
+        io.mockk.every { localImportServer.start(any()) } returns "http://192.168.1.10:52026/"
+
+        viewModel.openImportDialog()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isImportDialogOpen)
+        assertEquals("http://192.168.1.10:52026/", viewModel.uiState.value.localServerUrl)
+        coVerify(exactly = 1) { localImportServer.start(any()) }
+    }
+
+    @Test
+    fun `closeImportDialog stops local server and clears url`() = runTest(testDispatcher) {
+        viewModel.closeImportDialog()
+        advanceUntilIdle()
+
+        org.junit.Assert.assertFalse(viewModel.uiState.value.isImportDialogOpen)
+        org.junit.Assert.assertNull(viewModel.uiState.value.localServerUrl)
+        coVerify(atLeast = 1) { localImportServer.stop() }
     }
 }

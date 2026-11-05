@@ -1,5 +1,6 @@
 package com.livestream.feature.settings
 
+import android.graphics.Bitmap
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
 
@@ -14,5 +15,7 @@ data class SettingsUiState(
     val importText: String = "",
     val isImporting: Boolean = false,
     val importSuccessCount: Int? = null,
-    val importError: String? = null
+    val importError: String? = null,
+    val localServerUrl: String? = null,
+    val qrBitmap: Bitmap? = null
 )

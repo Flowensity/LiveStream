@@ -32,7 +32,7 @@ import com.livestream.core.ui.theme.TextPrimary
 @Composable
 fun StreamLoadingIndicator(
     modifier: Modifier = Modifier,
-    message: String = "正在缓冲信号源..."
+    message: String = "正在缓冲..."
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_dots")
 

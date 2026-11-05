@@ -162,7 +162,7 @@ fun TabletDualPaneLayout(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (playerUiState.dayPrograms.isNotEmpty()) {
+                                if (playerUiState.activeChannel != null) {
                                     Box(
                                         modifier = Modifier
                                             .background(AppSurfaceElevated, RoundedCornerShape(6.dp))
@@ -298,7 +298,7 @@ fun TabletDualPaneLayout(
                             Text(text = "✕ 退出全屏", color = FocusHighlight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
 
-                        if (playerUiState.dayPrograms.isNotEmpty()) {
+                        if (playerUiState.activeChannel != null) {
                             Spacer(modifier = Modifier.width(10.dp))
                             Box(
                                 modifier = Modifier

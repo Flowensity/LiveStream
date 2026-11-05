@@ -237,6 +237,21 @@ fun TvLayout(
                     )
                 }
 
+                if (playerUiState.activeChannel != null) {
+                    Box(modifier = Modifier.padding(start = 10.dp)) {
+                        TvFocusableBox(
+                            onClick = onToggleEpgSheet
+                        ) { isFocused ->
+                            Text(
+                                text = "节目单",
+                                color = if (isFocused) FocusHighlight else AppTextPrimary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
                 Box(modifier = Modifier.padding(start = 10.dp)) {
                     TvFocusableBox(
                         onClick = onOpenSettings

@@ -3,6 +3,7 @@ package com.livestream.feature.settings.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -30,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -230,30 +233,106 @@ fun SettingsDialog(
                 ) {
                     Box(
                         modifier = Modifier
-                            .width(520.dp)
-                            .background(AppSurfaceElevated, RoundedCornerShape(12.dp))
+                            .width(580.dp)
+                            .background(AppSurfaceElevated, RoundedCornerShape(14.dp))
                             .padding(24.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "导入 M3U 播放列表",
+                                    color = AppTextPrimary,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                TvFocusableBox(
+                                    onClick = onCloseImportDialog,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) { isFocused ->
+                                    Text(
+                                        text = "关闭",
+                                        color = if (isFocused) FocusHighlight else AppTextSecondary,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // 1. Android TV 局域网扫码推送区域
+                            if (uiState.qrBitmap != null && uiState.localServerUrl != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(AppSurface, RoundedCornerShape(10.dp))
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Image(
+                                        bitmap = uiState.qrBitmap.asImageBitmap(),
+                                        contentDescription = "局域网推送二维码",
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .background(Color.White, RoundedCornerShape(8.dp))
+                                            .padding(4.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(16.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "📱 手机扫码或局域网推送",
+                                            color = FocusHighlight,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "同局域网浏览器访问：",
+                                            color = AppTextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                        Text(
+                                            text = uiState.localServerUrl,
+                                            color = AppTextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "手机粘贴 M3U 订阅 URL 或内容一键推送到电视",
+                                            color = AppTextMuted,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+                            }
+
                             Text(
-                                text = "导入 M3U 播放列表",
-                                color = AppTextPrimary,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "或手动输入 M3U 订阅 URL 或播放列表内容：",
+                                color = AppTextSecondary,
+                                fontSize = 12.sp
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = uiState.importText,
                                 onValueChange = onImportTextChanged,
                                 placeholder = {
                                     Text(
-                                        "#EXTM3U\n#EXTINF:-1 group-title=\"央视\",CCTV-1\nhttps://example.com/live.m3u8",
+                                        "https://example.com/playlist.m3u\n或直接粘贴 #EXTM3U 文本内容...",
                                         color = AppTextMuted,
                                         fontSize = 12.sp
                                     )
                                 },
-                                minLines = 5,
-                                maxLines = 8,
+                                minLines = 3,
+                                maxLines = 6,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = AppSurface,
                                     unfocusedContainerColor = AppSurface,
@@ -278,18 +357,19 @@ fun SettingsDialog(
                             if (uiState.importSuccessCount != null) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "成功安全导入 ${uiState.importSuccessCount} 个频道及播放源！",
+                                    text = "🎉 成功安全导入 ${uiState.importSuccessCount} 个频道及播放源！",
                                     color = StatusSuccess,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(18.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Button(
                                     onClick = onCloseImportDialog,

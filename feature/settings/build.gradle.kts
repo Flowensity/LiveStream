@@ -36,6 +36,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
+    implementation(project(":core:network"))
     implementation(project(":domain:channel"))
     implementation(project(":source:source-custom"))
 
@@ -48,6 +49,9 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+
+    implementation(libs.okhttp)
+    implementation(libs.zxing.core)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

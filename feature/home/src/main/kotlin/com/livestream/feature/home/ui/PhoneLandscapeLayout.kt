@@ -177,7 +177,7 @@ fun PhoneLandscapeLayout(
                     Text(text = "✕ 退出全屏", color = FocusHighlight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
 
-                if (playerUiState.dayPrograms.isNotEmpty()) {
+                if (playerUiState.activeChannel != null) {
                     Spacer(modifier = Modifier.width(10.dp))
                     Box(
                         modifier = Modifier

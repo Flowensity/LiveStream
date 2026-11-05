@@ -2,9 +2,12 @@ package com.livestream.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.livestream.core.common.dispatcher.AppDispatchers
+import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
+import com.livestream.feature.settings.server.LocalImportServer
 import com.livestream.source.custom.parser.M3uPlaylistParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,12 +16,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val channelRepository: ChannelRepository
+    private val channelRepository: ChannelRepository,
+    private val localImportServer: LocalImportServer,
+    private val okHttpClient: OkHttpClient,
+    private val dispatchers: AppDispatchers
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -76,29 +85,95 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
+    fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             userPreferencesRepository.setThemeMode(mode)
         }
     }
 
     fun openImportDialog() {
+        val serverUrl = localImportServer.start { rawInput ->
+            importM3uInternal(rawInput)
+        }
+        val qr = serverUrl?.let {
+            try {
+                LocalImportServer.generateQrCodeBitmap(it, 512)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
         _uiState.update {
             it.copy(
                 isImportDialogOpen = true,
                 importText = "",
                 importSuccessCount = null,
-                importError = null
+                importError = null,
+                localServerUrl = serverUrl,
+                qrBitmap = qr
             )
         }
     }
 
     fun closeImportDialog() {
-        _uiState.update { it.copy(isImportDialogOpen = false) }
+        localImportServer.stop()
+        _uiState.update {
+            it.copy(
+                isImportDialogOpen = false,
+                localServerUrl = null,
+                qrBitmap = null
+            )
+        }
     }
 
     fun onImportTextChanged(text: String) {
         _uiState.update { it.copy(importText = text, importError = null) }
+    }
+
+    suspend fun importM3uInternal(input: String): Result<Int> = withContext(dispatchers.io) {
+        try {
+            val trimmed = input.trim()
+            val content = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                val req = Request.Builder().url(trimmed).build()
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) {
+                        return@withContext Result.failure(Exception("下载 M3U 订阅失败: HTTP ${resp.code}"))
+                    }
+                    resp.body?.string() ?: ""
+                }
+            } else {
+                trimmed
+            }
+
+            if (content.isBlank()) {
+                return@withContext Result.failure(Exception("导入内容不能为空"))
+            }
+
+            val parsed = M3uPlaylistParser.parse(content)
+            if (parsed.channels.isEmpty()) {
+                return@withContext Result.failure(Exception("未能从播放列表中解析出合法频道或所有源均被安全策略拦截"))
+            }
+
+            channelRepository.saveChannels(parsed.channels)
+            channelRepository.saveSources(parsed.sources)
+
+            _uiState.update {
+                it.copy(
+                    isImporting = false,
+                    importSuccessCount = parsed.channels.size,
+                    importError = null
+                )
+            }
+            Result.success(parsed.channels.size)
+        } catch (e: Exception) {
+            _uiState.update {
+                it.copy(
+                    isImporting = false,
+                    importError = "解析导入失败: ${e.message}"
+                )
+            }
+            Result.failure(e)
+        }
     }
 
     fun importM3uContent() {
@@ -110,35 +185,12 @@ class SettingsViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, importError = null) }
-            try {
-                val parsed = M3uPlaylistParser.parse(content)
-                if (parsed.channels.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            isImporting = false,
-                            importError = "未能从播放列表中解析出合法频道或所有源均被安全策略拦截"
-                        )
-                    }
-                    return@launch
-                }
-
-                channelRepository.saveChannels(parsed.channels)
-                channelRepository.saveSources(parsed.sources)
-
-                _uiState.update {
-                    it.copy(
-                        isImporting = false,
-                        importSuccessCount = parsed.channels.size
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isImporting = false,
-                        importError = "解析导入失败: ${e.message}"
-                    )
-                }
-            }
+            importM3uInternal(content)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        localImportServer.stop()
     }
 }

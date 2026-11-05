@@ -89,7 +89,7 @@ class CntvEpgService @Inject constructor(
         val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.CHINA)
         val dateStr = dateFormat.format(date)
 
-        val url = "http://api.cntv.cn/epg/getEpgInfoByChannelNew?c=$code&serviceId=tvcctv&d=$dateStr"
+        val url = "https://api.cntv.cn/epg/getEpgInfoByChannelNew?c=$code&serviceId=tvcctv&d=$dateStr"
 
         val request = Request.Builder()
             .url(url)

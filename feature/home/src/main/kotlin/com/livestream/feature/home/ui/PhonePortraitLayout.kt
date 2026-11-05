@@ -181,7 +181,7 @@ fun PhonePortraitLayout(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (playerUiState.dayPrograms.isNotEmpty()) {
+                    if (playerUiState.activeChannel != null) {
                         Box(
                             modifier = Modifier
                                 .background(AppSurfaceElevated, RoundedCornerShape(6.dp))

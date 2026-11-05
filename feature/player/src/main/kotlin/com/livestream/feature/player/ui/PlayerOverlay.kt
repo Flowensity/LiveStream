@@ -185,19 +185,6 @@ fun PlayerOverlay(
                                     fontWeight = FontWeight.Bold
                                 )
 
-                                if (uiState.isOfficialWeb) {
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = "官方合规网页",
-                                        color = StatusWarning,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier
-                                            .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-
                                 if (uiState.totalSources > 0) {
                                     val lineIndex = uiState.activeSourceIndex + 1
                                     val lineBadge = "线路 $lineIndex/${uiState.totalSources} [${uiState.activeSource?.protocol ?: "AUTO"}]"
@@ -215,7 +202,7 @@ fun PlayerOverlay(
                             }
 
                             // EPG 节目单展示
-                            if (uiState.currentProgram != null || uiState.nextProgram != null || uiState.dayPrograms.isNotEmpty()) {
+                            if (uiState.activeChannel != null) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -224,7 +211,7 @@ fun PlayerOverlay(
                                     uiState.currentProgram?.let { prog ->
                                         val timeStr = "${formatTime(prog.startTimestamp)} - ${formatTime(prog.endTimestamp)}"
                                         Text(
-                                            text = "正在播出: ${prog.title} ($timeStr)",
+                                            text = "播出: ${prog.title} ($timeStr)",
                                             color = FocusHighlight,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
@@ -232,12 +219,12 @@ fun PlayerOverlay(
                                     }
                                     uiState.nextProgram?.let { prog ->
                                         Text(
-                                            text = "即将播出: ${prog.title} (${formatTime(prog.startTimestamp)})",
+                                            text = "下期: ${prog.title} (${formatTime(prog.startTimestamp)})",
                                             color = TextMuted,
                                             fontSize = 13.sp
                                         )
                                     }
-                                    if (onOpenEpgSchedule != null && uiState.dayPrograms.isNotEmpty()) {
+                                    if (onOpenEpgSchedule != null) {
                                         Box(
                                             modifier = Modifier
                                                 .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))

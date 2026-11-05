@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -57,6 +58,7 @@ class DefaultWebPlaybackController @Inject constructor(
                 viewGroup.addView(webView)
                 parentContainer = viewGroup
             }
+            webView?.alpha = 1f
             injectPlayerStyling(webView)
             return
         }
@@ -82,6 +84,9 @@ class DefaultWebPlaybackController @Inject constructor(
             isFocusableInTouchMode = false
             clearFocus()
 
+            // 3. 初始设置为透明，防止网页在完成全屏 CSS 注入前闪现居中半屏 (890x500) 容器
+            alpha = 0f
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -96,6 +101,21 @@ class DefaultWebPlaybackController @Inject constructor(
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
             }
+
+            addJavascriptInterface(
+                object {
+                    @JavascriptInterface
+                    fun onVideoReady() {
+                        post {
+                            if (alpha < 1f) {
+                                animate().alpha(1f).setDuration(250).start()
+                            }
+                            _webState.value = WebPlaybackState.Playing
+                        }
+                    }
+                },
+                "LiveStreamBridge"
+            )
 
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -125,6 +145,16 @@ class DefaultWebPlaybackController @Inject constructor(
                     loadTimeoutJob?.cancel()
                     _webState.value = WebPlaybackState.Ready
                     injectPlayerStyling(view)
+
+                    // 安全回退：2秒后若桥接回调未触发则平滑淡入呈现，防止白屏
+                    controllerScope.launch {
+                        delay(2000)
+                        post {
+                            if (alpha < 1f) {
+                                animate().alpha(1f).setDuration(250).start()
+                            }
+                        }
+                    }
                 }
 
                 override fun onReceivedError(
@@ -214,6 +244,7 @@ class DefaultWebPlaybackController @Inject constructor(
                     function applyVideoFix() {
                         injectCssRule();
                         var vids = document.getElementsByTagName('video');
+                        var isReady = false;
                         for (var i = 0; i < vids.length; i++) {
                             var v = vids[i];
                             v.style.setProperty('position', 'fixed', 'important');
@@ -228,14 +259,33 @@ class DefaultWebPlaybackController @Inject constructor(
                             v.style.setProperty('z-index', '2147483647', 'important');
                             v.style.setProperty('margin', '0px', 'important');
                             v.style.setProperty('padding', '0px', 'important');
+                            if (!v.__ls_bound) {
+                                v.__ls_bound = true;
+                                v.addEventListener('playing', function() {
+                                    if (window.LiveStreamBridge && window.LiveStreamBridge.onVideoReady) {
+                                        window.LiveStreamBridge.onVideoReady();
+                                    }
+                                });
+                                v.addEventListener('loadeddata', function() {
+                                    if (window.LiveStreamBridge && window.LiveStreamBridge.onVideoReady) {
+                                        window.LiveStreamBridge.onVideoReady();
+                                    }
+                                });
+                            }
                             if (v.paused) {
                                 v.muted = false;
                                 v.play().catch(function(){});
+                            }
+                            if (v.videoWidth > 0 || v.readyState >= 2 || v.currentTime > 0) {
+                                isReady = true;
                             }
                         }
                         var covers = document.querySelectorAll('.poster, .moren_cover, .xgplayer-poster, .xg-poster, .xgplayer-start, xg-start');
                         for (var j = 0; j < covers.length; j++) {
                             covers[j].style.setProperty('display', 'none', 'important');
+                        }
+                        if (isReady && window.LiveStreamBridge && window.LiveStreamBridge.onVideoReady) {
+                            window.LiveStreamBridge.onVideoReady();
                         }
                     }
 
