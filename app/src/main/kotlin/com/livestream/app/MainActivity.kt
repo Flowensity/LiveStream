@@ -25,6 +25,7 @@ import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
 import com.livestream.playback.api.PlaybackOrchestrator
+import com.livestream.source.api.SourceAdapterRegistry
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -39,6 +40,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var playbackOrchestrator: PlaybackOrchestrator
+
+    @Inject
+    lateinit var sourceAdapterRegistry: SourceAdapterRegistry
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

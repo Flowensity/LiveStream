@@ -6,6 +6,7 @@ import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackErrorType
 import com.livestream.core.model.PlaybackStatus
+import com.livestream.core.model.SourceResolution
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.playback.api.OrchestratorState
 import com.livestream.playback.api.PlaybackEngine
@@ -13,6 +14,7 @@ import com.livestream.playback.api.PlaybackOrchestrator
 import com.livestream.playback.api.SwitchDirection
 import com.livestream.playback.api.model.EngineState
 import com.livestream.playback.api.model.PlaybackMediaItem
+import com.livestream.source.api.SourceAdapterRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +31,7 @@ import javax.inject.Singleton
 class DefaultPlaybackOrchestrator @Inject constructor(
     private val engine: PlaybackEngine,
     private val channelRepository: ChannelRepository,
+    private val sourceAdapterRegistry: SourceAdapterRegistry,
     private val dispatchers: AppDispatchers
 ) : PlaybackOrchestrator {
 
@@ -131,22 +134,56 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         val channel = _orchestratorState.value.currentChannel ?: return
 
         _orchestratorState.value = _orchestratorState.value.copy(
-            status = PlaybackStatus.PREPARING,
+            status = PlaybackStatus.RESOLVING,
             currentSource = source,
             errorInfo = null
         )
 
-        val mediaItem = PlaybackMediaItem(
-            uri = "https://placeholder.invalid/${source.id}", // 实际由 SourceAdapter 或数据库 URL 填充
-            protocol = source.protocol,
-            title = "${channel.name} - ${source.name}",
-            channelId = channel.id,
-            sourceId = source.id,
-            headersProfileId = source.headersProfileId,
-            drmProfileId = source.drmProfileId
-        )
+        // 通过 SourceAdapter 插件解析真实媒体流
+        val adapter = sourceAdapterRegistry.getAdapter(source.adapterProviderId)
+        val resolution = adapter?.resolve(channel, source)
+            ?: SourceResolution.Unavailable("未找到对应直播源适配器 (${source.adapterProviderId})")
 
-        engine.prepare(mediaItem, playWhenReady = true)
+        if (sessionToken != activeSessionToken) return
+
+        when (resolution) {
+            is SourceResolution.NativeMedia -> {
+                _orchestratorState.value = _orchestratorState.value.copy(
+                    status = PlaybackStatus.PREPARING,
+                    currentSource = source,
+                    errorInfo = null
+                )
+
+                val mediaItem = PlaybackMediaItem(
+                    uri = resolution.uri,
+                    protocol = source.protocol,
+                    title = "${channel.name} - ${source.name}",
+                    channelId = channel.id,
+                    sourceId = source.id,
+                    headersProfileId = resolution.headersProfileId ?: source.headersProfileId,
+                    drmProfileId = resolution.drmProfileId ?: source.drmProfileId
+                )
+
+                engine.prepare(mediaItem, playWhenReady = true)
+            }
+            is SourceResolution.OfficialWeb -> {
+                // 官方网页兼容播放将在阶段七扩展
+                val error = PlaybackErrorInfo(
+                    errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
+                    message = "当前源需官方网页播放，原生播放器不支持",
+                    canRetry = false
+                )
+                handlePlaybackFailure(error)
+            }
+            is SourceResolution.Unavailable -> {
+                val error = PlaybackErrorInfo(
+                    errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
+                    message = resolution.reason,
+                    canRetry = true
+                )
+                handlePlaybackFailure(error)
+            }
+        }
     }
 
     private fun handleEngineState(engineState: EngineState) {

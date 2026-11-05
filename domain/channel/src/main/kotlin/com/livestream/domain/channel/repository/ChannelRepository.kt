@@ -31,6 +31,8 @@ interface ChannelRepository {
 
     suspend fun getSourcesForChannelSync(channelId: String): List<LiveSource>
 
+    suspend fun getStreamUrl(sourceId: String): String?
+
     suspend fun saveChannels(channels: List<Channel>)
 
     suspend fun saveSources(sources: List<LiveSource>)

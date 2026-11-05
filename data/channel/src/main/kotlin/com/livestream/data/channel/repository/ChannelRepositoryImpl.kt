@@ -88,6 +88,12 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getStreamUrl(sourceId: String): String? {
+        return withContext(dispatchers.io) {
+            liveSourceDao.getSourceById(sourceId)?.url
+        }
+    }
+
     override suspend fun saveChannels(channels: List<Channel>) {
         withContext(dispatchers.io) {
             channelDao.insertChannels(channels.map { it.toEntity() })

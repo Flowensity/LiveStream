@@ -62,6 +62,10 @@ dependencies {
     implementation(project(":data:epg"))
     implementation(project(":playback:playback-api"))
     implementation(project(":playback:playback-media3"))
+    implementation(project(":core:network"))
+    implementation(project(":source:source-api"))
+    implementation(project(":source:source-custom"))
+    implementation(project(":source:source-official"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

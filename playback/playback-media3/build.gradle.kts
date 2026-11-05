@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":playback:playback-api"))
+    implementation(project(":source:source-api"))
     implementation(project(":domain:channel"))
 
     implementation(libs.media3.exoplayer)

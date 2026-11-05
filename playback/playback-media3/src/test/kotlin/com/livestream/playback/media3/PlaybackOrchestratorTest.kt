@@ -7,24 +7,27 @@ import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackErrorType
 import com.livestream.core.model.PlaybackStatus
+import com.livestream.core.model.SourceResolution
 import com.livestream.core.model.StreamProtocol
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.playback.api.PlaybackEngine
 import com.livestream.playback.api.model.EngineState
 import com.livestream.playback.api.model.PlaybackMetrics
+import com.livestream.source.api.AvailabilityResult
+import com.livestream.source.api.DefaultSourceAdapterRegistry
+import com.livestream.source.api.SourceAdapter
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlaybackOrchestratorTest {
@@ -32,6 +35,7 @@ class PlaybackOrchestratorTest {
     private val engine = mockk<PlaybackEngine>(relaxed = true)
     private val channelRepository = mockk<ChannelRepository>(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
+    private val sourceAdapterRegistry = DefaultSourceAdapterRegistry()
 
     private val engineStateFlow = MutableStateFlow<EngineState>(EngineState.Idle)
     private val playbackMetricsFlow = MutableStateFlow(PlaybackMetrics())
@@ -78,17 +82,33 @@ class PlaybackOrchestratorTest {
     fun setUp() {
         coEvery { engine.engineState } returns engineStateFlow
         coEvery { engine.playbackMetrics } returns playbackMetricsFlow
+
+        // 注册测试适配器
+        sourceAdapterRegistry.register(object : SourceAdapter {
+            override val providerId: String = "cctv"
+
+            override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
+                return SourceResolution.NativeMedia(
+                    uri = "https://live.example.com/${source.id}.m3u8",
+                    protocol = source.protocol.name
+                )
+            }
+
+            override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
+                return AvailabilityResult.Available(50L)
+            }
+        })
     }
 
     @Test
     fun `test playChannel successfully transitions to preparing and invokes engine`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { engine.prepare(match { it.sourceId == "src_1" }, true) }
+        coVerify(exactly = 1) { engine.prepare(match { it.sourceId == "src_1" && it.uri.contains("src_1") }, true) }
         assertEquals(PlaybackStatus.PREPARING, orchestrator.orchestratorState.value.status)
         assertEquals("cctv1", orchestrator.orchestratorState.value.currentChannel?.id)
         assertEquals("src_1", orchestrator.orchestratorState.value.currentSource?.id)
@@ -101,7 +121,7 @@ class PlaybackOrchestratorTest {
             sampleSource1.copy(id = "src_ch2", channelId = "cctv2")
         )
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, testDispatchers)
 
         // 快速连续切台
         orchestrator.playChannel(sampleChannel1)
@@ -117,7 +137,7 @@ class PlaybackOrchestratorTest {
     fun `test channel without sources results in error state`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns emptyList()
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -129,7 +149,7 @@ class PlaybackOrchestratorTest {
     fun `test source fallback when primary source fails`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -149,7 +169,7 @@ class PlaybackOrchestratorTest {
     fun `test engine playing and buffering updates orchestrator state`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
