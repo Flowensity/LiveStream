@@ -33,4 +33,10 @@ interface LiveSourceDao {
 
     @Query("DELETE FROM live_sources WHERE channel_id = :channelId")
     suspend fun deleteSourcesByChannelId(channelId: String)
+
+    @Query("DELETE FROM live_sources WHERE channel_id IN (:channelIds)")
+    suspend fun deleteSourcesByChannelIds(channelIds: List<String>): Int
+
+    @Query("DELETE FROM live_sources WHERE adapter_provider_id = 'custom_user_source' OR id LIKE 'matched_%' OR id LIKE 'user_src_%'")
+    suspend fun deleteAllCustomSources(): Int
 }

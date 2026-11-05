@@ -7,11 +7,14 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.TvKeyMappingScheme
 import com.livestream.core.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,7 +33,27 @@ class UserPreferencesDataStore @Inject constructor(
         val TV_KEY_MAPPING_SCHEME = stringPreferencesKey("tv_key_mapping_scheme")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val BOOT_STARTUP_ENABLED = booleanPreferencesKey("boot_startup_enabled")
+        val CUSTOM_PLAYLIST_SOURCES = stringPreferencesKey("custom_playlist_sources")
     }
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    val customPlaylistSources: Flow<List<CustomPlaylistSource>> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            val jsonStr = preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] ?: "[]"
+            try {
+                json.decodeFromString<List<CustomPlaylistSource>>(jsonStr)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
 
     val userPreferences: Flow<UserPreferences> = dataStore.data
         .catch { exception ->
@@ -116,6 +139,39 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun setBootStartupEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveCustomPlaylistSource(source: CustomPlaylistSource) {
+        dataStore.edit { preferences ->
+            val jsonStr = preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] ?: "[]"
+            val current = try {
+                json.decodeFromString<List<CustomPlaylistSource>>(jsonStr).toMutableList()
+            } catch (_: Exception) {
+                mutableListOf()
+            }
+            current.removeAll { it.id == source.id || (it.url.isNotBlank() && it.url == source.url) }
+            current.add(0, source)
+            preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] = json.encodeToString(current)
+        }
+    }
+
+    suspend fun removeCustomPlaylistSource(sourceId: String) {
+        dataStore.edit { preferences ->
+            val jsonStr = preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] ?: "[]"
+            val current = try {
+                json.decodeFromString<List<CustomPlaylistSource>>(jsonStr).toMutableList()
+            } catch (_: Exception) {
+                mutableListOf()
+            }
+            current.removeAll { it.id == sourceId }
+            preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] = json.encodeToString(current)
+        }
+    }
+
+    suspend fun clearCustomPlaylistSources() {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] = "[]"
         }
     }
 }

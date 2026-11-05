@@ -91,16 +91,17 @@ fun EpgScheduleDialog(
             exit = slideOutHorizontally(targetOffsetX = { it }),
             modifier = Modifier.align(Alignment.CenterEnd)
         ) {
-            val drawerShape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+            val drawerShape = RoundedCornerShape(20.dp)
 
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
+                    .padding(start = 8.dp, top = 16.dp, bottom = 16.dp, end = 16.dp)
                     .width(OneUiDimensions.panelPlaylistWidth)
                     .clip(drawerShape)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), drawerShape)
                     .background(OneUiTheme.colors.panelBackground)
-                    .padding(vertical = 14.dp, horizontal = 12.dp)
+                    .padding(vertical = 12.dp, horizontal = 10.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     // 1. 顶部标题栏与关闭胶囊按钮

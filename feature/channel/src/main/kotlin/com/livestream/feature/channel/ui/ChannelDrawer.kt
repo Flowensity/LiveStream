@@ -83,7 +83,7 @@ fun ChannelDrawer(
         exit = slideOutHorizontally(targetOffsetX = { -it }),
         modifier = modifier
     ) {
-        val drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+        val drawerShape = RoundedCornerShape(20.dp)
         val categories = uiState.categories
         val currentCategoryIndex = categories.indexOfFirst { it.id == uiState.selectedCategory?.id }
         val currentCategoryTitle = uiState.selectedCategory?.name ?: "频道列表"
@@ -91,11 +91,12 @@ fun ChannelDrawer(
         Box(
             modifier = Modifier
                 .fillMaxHeight()
+                .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 8.dp)
                 .width(OneUiDimensions.panelPlaylistWidth)
                 .clip(drawerShape)
                 .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), drawerShape)
                 .background(OneUiTheme.colors.panelBackground)
-                .padding(vertical = 12.dp)
+                .padding(vertical = 10.dp)
                 .onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
@@ -115,6 +116,14 @@ fun ChannelDrawer(
                             }
                             Key.Back, Key.Escape -> {
                                 onCloseDrawer()
+                                true
+                            }
+                            Key.Menu -> {
+                                val activeCh = uiState.channels.find { it.id == uiState.activeChannelId }
+                                    ?: uiState.channels.firstOrNull()
+                                if (activeCh != null) {
+                                    onFavoriteToggle(activeCh)
+                                }
                                 true
                             }
                             else -> false

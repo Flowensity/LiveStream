@@ -34,10 +34,15 @@ class SettingsViewModelTest {
         override val default = testDispatcher
     }
     private val prefsFlow = MutableStateFlow(UserPreferences())
+    private val customSourcesFlow = MutableStateFlow<List<com.livestream.core.model.CustomPlaylistSource>>(emptyList())
+    private val customChannelsFlow = MutableStateFlow<List<com.livestream.core.model.Channel>>(emptyList())
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true) {
         coEvery { userPreferences } returns prefsFlow
+        coEvery { customPlaylistSources } returns customSourcesFlow
     }
-    private val channelRepository = mockk<ChannelRepository>(relaxed = true)
+    private val channelRepository = mockk<ChannelRepository>(relaxed = true) {
+        coEvery { observeCustomChannels() } returns customChannelsFlow
+    }
     private val categoryRepository = mockk<com.livestream.domain.channel.repository.CategoryRepository>(relaxed = true)
     private val localImportServer = mockk<LocalImportServer>(relaxed = true)
     private val okHttpClient = mockk<OkHttpClient>(relaxed = true)
@@ -154,5 +159,30 @@ class SettingsViewModelTest {
         org.junit.Assert.assertFalse(viewModel.uiState.value.isImportDialogOpen)
         org.junit.Assert.assertNull(viewModel.uiState.value.localServerUrl)
         coVerify(atLeast = 1) { localImportServer.stop() }
+    }
+
+    @Test
+    fun `openSourceManagement and closeSourceManagement update state`() = runTest(testDispatcher) {
+        viewModel.openSourceManagement()
+        assertTrue(viewModel.uiState.value.isSourceManagementOpen)
+        viewModel.closeSourceManagement()
+        org.junit.Assert.assertFalse(viewModel.uiState.value.isSourceManagementOpen)
+    }
+
+    @Test
+    fun `clearAllCustomSources calls channelRepository and userPreferencesRepository`() = runTest(testDispatcher) {
+        viewModel.clearAllCustomSources()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteAllCustomChannelsAndSources() }
+        coVerify(exactly = 1) { userPreferencesRepository.clearCustomPlaylistSources() }
+    }
+
+    @Test
+    fun `deleteSingleCustomChannel calls channelRepository`() = runTest(testDispatcher) {
+        viewModel.deleteSingleCustomChannel("user_ch_123")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteChannelById("user_ch_123") }
     }
 }

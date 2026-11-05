@@ -47,6 +47,7 @@ fun ChannelListItem(
 
     TvFocusableBox(
         onClick = { onChannelClick(channel) },
+        onLongClick = { onFavoriteToggle(channel) },
         shape = rowShape,
         unfocusedBackgroundColor = if (isActive) OneUiTheme.colors.accentSoft else Color.Transparent,
         focusedBackgroundColor = OneUiTheme.colors.accentSoft,
@@ -106,24 +107,25 @@ fun ChannelListItem(
                 )
             }
 
-            // 3. 收藏状态指示 (已收藏时展示规范胶囊，支持点击切换)
-            if (channel.isFavorite) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(OneUiShapes.pill)
-                        .background(OneUiTheme.colors.accentSoft)
-                        .clickable { onFavoriteToggle(channel) }
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "已收藏",
-                        color = OneUiTheme.colors.accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
+            // 3. 收藏状态指示与切换胶囊 (无论是否收藏均提供明确操作入口，长按 OK 或点击切换)
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .clip(OneUiShapes.pill)
+                    .background(
+                        if (channel.isFavorite) OneUiTheme.colors.accentSoft
+                        else OneUiTheme.colors.surfacePill
                     )
-                }
+                    .clickable { onFavoriteToggle(channel) }
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (channel.isFavorite) "已收藏" else "收藏",
+                    color = if (channel.isFavorite) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = if (channel.isFavorite) FontWeight.Bold else FontWeight.Medium
+                )
             }
         }
     }

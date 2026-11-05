@@ -131,6 +131,34 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun observeCustomChannels(): Flow<List<Channel>> {
+        return channelDao.observeCustomChannels()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(dispatchers.io)
+    }
+
+    override suspend fun deleteChannelById(channelId: String) {
+        withContext(dispatchers.io) {
+            channelDao.deleteChannelById(channelId)
+            liveSourceDao.deleteSourcesByChannelId(channelId)
+        }
+    }
+
+    override suspend fun deleteChannelsByIds(channelIds: List<String>) {
+        withContext(dispatchers.io) {
+            channelDao.deleteChannelsByIds(channelIds)
+            liveSourceDao.deleteSourcesByChannelIds(channelIds)
+        }
+    }
+
+    override suspend fun deleteAllCustomChannelsAndSources() {
+        withContext(dispatchers.io) {
+            channelDao.deleteAllCustomChannels()
+            liveSourceDao.deleteAllCustomSources()
+            categoryDao.deleteAllCustomCategories()
+        }
+    }
+
     override suspend fun checkAndSeedDefaultChannels() {
         withContext(dispatchers.io) {
             // Always ensure predefined categories are up-to-date (e.g. 地方卫视)

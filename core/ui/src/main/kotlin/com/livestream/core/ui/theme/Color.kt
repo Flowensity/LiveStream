@@ -8,11 +8,11 @@ import androidx.compose.ui.graphics.Color
 
 // --- 浅色主题 (Light Mode - TeleflowTv / One UI) ---
 val OneUiLightBackground = Color(0xFFF5F6FA)          // 页面背景
-val OneUiLightPanel = Color(0xFAF5F6FA)               // 浮动面板背景 (98% 不透明度)
-val OneUiLightCard = Color(0xFFFFFFFF)                // 主卡片背景
-val OneUiLightCardSecondary = Color(0xFFEEF1F7)       // 次级/辅助卡片背景与输入框底色
-val OneUiLightCardElevated = Color(0xFFF0F3F9)        // 悬浮/交互卡片背景
-val OneUiLightPill = Color(0xFFE6EAF2)                // 胶囊控件背景
+val OneUiLightPanel = Color(0xD8F5F6FA)               // 浮动面板背景 (85% 半透明毛玻璃)
+val OneUiLightCard = Color(0xF2FFFFFF)                // 主卡片背景 (95% 柔和底色)
+val OneUiLightCardSecondary = Color(0xE8EEF1F7)       // 次级/辅助卡片背景与输入框底色
+val OneUiLightCardElevated = Color(0xECF0F3F9)        // 悬浮/交互卡片背景
+val OneUiLightPill = Color(0xE0E6EAF2)                // 胶囊控件背景
 val OneUiLightTextPrimary = Color(0xFF191B20)         // 主文字 (高对比墨黑)
 val OneUiLightTextSecondary = Color(0xFF5C606A)       // 次级文字 (舒适冷灰，远距离高可读性)
 val OneUiLightTextMuted = Color(0xFF74777F)           // 弱化占位文字
@@ -25,11 +25,11 @@ val OneUiLightDangerSoft = Color(0x22DB332A)          // 危险柔和底色
 
 // --- 深色主题 (Dark Mode - TeleflowTv / One UI) ---
 val OneUiDarkBackground = Color(0xFF101114)           // 页面背景 (深炭黑)
-val OneUiDarkPanel = Color(0xF5101114)                // 浮动面板背景 (96% 不透明度)
-val OneUiDarkCard = Color(0xFF1C1D22)                 // 主卡片背景
-val OneUiDarkCardSecondary = Color(0xFF25262C)        // 次级/辅助卡片背景
-val OneUiDarkCardElevated = Color(0xFF2D2E36)         // 悬浮/交互卡片背景
-val OneUiDarkPill = Color(0xFF2F3139)                 // 胶囊控件背景
+val OneUiDarkPanel = Color(0xCC12141A)                // 浮动面板背景 (80% 半透明透光毛玻璃)
+val OneUiDarkCard = Color(0xB81C1D24)                 // 主卡片背景 (72% 半透明)
+val OneUiDarkCardSecondary = Color(0xB8252630)        // 次级/辅助卡片背景
+val OneUiDarkCardElevated = Color(0xC02D2E3A)         // 悬浮/交互卡片背景
+val OneUiDarkPill = Color(0xB02F313D)                 // 胶囊控件背景
 val OneUiDarkTextPrimary = Color(0xFFF1F1F5)          // 主文字 (舒适暖白)
 val OneUiDarkTextSecondary = Color(0xFFA7A9B2)        // 次级文字 (柔和灰)
 val OneUiDarkTextMuted = Color(0xFF7A7D87)            // 弱化占位文字

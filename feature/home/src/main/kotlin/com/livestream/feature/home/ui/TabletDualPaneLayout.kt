@@ -47,6 +47,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.theme.AppBackground
 import com.livestream.core.ui.theme.AppSurface
@@ -101,6 +102,11 @@ fun TabletDualPaneLayout(
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     onToggleBootStartup: (Boolean) -> Unit = {},
+    onOpenSourceManagement: () -> Unit = {},
+    onCloseSourceManagement: () -> Unit = {},
+    onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onDeleteSingleCustomChannel: (String) -> Unit = {},
+    onClearAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -393,7 +399,12 @@ fun TabletDualPaneLayout(
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
             onThemeModeSelected = onThemeModeSelected,
-            onToggleBootStartup = onToggleBootStartup
+            onToggleBootStartup = onToggleBootStartup,
+            onOpenSourceManagement = onOpenSourceManagement,
+            onCloseSourceManagement = onCloseSourceManagement,
+            onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,
+            onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
+            onClearAllCustomSources = onClearAllCustomSources
         )
 
         // 5. EPG 节目排期弹窗

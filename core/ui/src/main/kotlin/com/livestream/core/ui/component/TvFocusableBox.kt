@@ -3,9 +3,11 @@ package com.livestream.core.ui.component
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -34,10 +36,12 @@ import com.livestream.core.ui.theme.OneUiTheme
  * 2. 柔和 One UI 强调色边框
  * 3. 柔和圆角卡片过渡 (默认 14.dp)
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TvFocusableBox(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     shape: Shape = RoundedCornerShape(14.dp),
     focusedBorderWidth: Dp = 2.dp,
     focusedBorderColor: Color = OneUiTheme.colors.accent,
@@ -64,6 +68,21 @@ fun TvFocusableBox(
         else -> null
     }
 
+    val clickModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    } else {
+        Modifier.clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = onClick
+        )
+    }
+
     Box(
         modifier = modifier
             .scale(scale)
@@ -72,11 +91,7 @@ fun TvFocusableBox(
                 if (borderStroke != null) Modifier.border(borderStroke, shape) else Modifier
             )
             .background(currentBackground, shape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
+            .then(clickModifier)
             .focusable(interactionSource = interactionSource)
     ) {
         content(isFocused)

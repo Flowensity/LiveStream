@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.livestream.core.common.dispatcher.AppDispatchers
 import com.livestream.core.model.Channel
+import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
@@ -52,6 +53,18 @@ class SettingsViewModel @Inject constructor(
                         isBootStartupEnabled = prefs.isBootStartupEnabled
                     )
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            userPreferencesRepository.customPlaylistSources.collectLatest { sources ->
+                _uiState.update { it.copy(customSources = sources) }
+            }
+        }
+
+        viewModelScope.launch {
+            channelRepository.observeCustomChannels().collectLatest { customChs ->
+                _uiState.update { it.copy(customChannels = customChs) }
             }
         }
     }
@@ -197,6 +210,23 @@ class SettingsViewModel @Inject constructor(
             channelRepository.saveChannels(parsed.channels)
             channelRepository.saveSources(parsed.sources + matchedSources)
 
+            val sourceTitle = when {
+                downloadUrl.startsWith("http") -> {
+                    val candidate = downloadUrl.substringAfterLast('/').substringBefore('?')
+                    if (candidate.isNotBlank() && candidate.contains(".")) candidate else "网络订阅源"
+                }
+                else -> "文本导入源"
+            }
+            val record = CustomPlaylistSource(
+                id = UUID.randomUUID().toString(),
+                name = sourceTitle,
+                url = if (downloadUrl.startsWith("http")) downloadUrl else "",
+                channelCount = parsed.channels.size,
+                channelIds = parsed.channels.map { it.id },
+                timestamp = System.currentTimeMillis()
+            )
+            userPreferencesRepository.saveCustomPlaylistSource(record)
+
             _uiState.update {
                 it.copy(
                     isImporting = false,
@@ -226,6 +256,37 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, importError = null) }
             importM3uInternal(content)
+        }
+    }
+
+    fun openSourceManagement() {
+        _uiState.update { it.copy(isSourceManagementOpen = true) }
+    }
+
+    fun closeSourceManagement() {
+        _uiState.update { it.copy(isSourceManagementOpen = false) }
+    }
+
+    fun deleteCustomPlaylistSource(source: CustomPlaylistSource) {
+        viewModelScope.launch {
+            if (source.channelIds.isNotEmpty()) {
+                channelRepository.deleteChannelsByIds(source.channelIds)
+            }
+            userPreferencesRepository.removeCustomPlaylistSource(source.id)
+        }
+    }
+
+    fun deleteSingleCustomChannel(channelId: String) {
+        viewModelScope.launch {
+            channelRepository.deleteChannelById(channelId)
+        }
+    }
+
+    fun clearAllCustomSources() {
+        viewModelScope.launch {
+            channelRepository.deleteAllCustomChannelsAndSources()
+            userPreferencesRepository.clearCustomPlaylistSources()
+            _uiState.update { it.copy(importSuccessCount = null, importError = null) }
         }
     }
 

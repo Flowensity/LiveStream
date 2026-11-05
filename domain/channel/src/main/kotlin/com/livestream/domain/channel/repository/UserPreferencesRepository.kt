@@ -26,4 +26,12 @@ interface UserPreferencesRepository {
     suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode)
 
     suspend fun setBootStartupEnabled(enabled: Boolean)
+
+    val customPlaylistSources: Flow<List<com.livestream.core.model.CustomPlaylistSource>>
+
+    suspend fun saveCustomPlaylistSource(source: com.livestream.core.model.CustomPlaylistSource)
+
+    suspend fun removeCustomPlaylistSource(sourceId: String)
+
+    suspend fun clearCustomPlaylistSources()
 }

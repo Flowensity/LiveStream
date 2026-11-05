@@ -102,6 +102,11 @@ fun HomeScreen(
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -137,6 +142,11 @@ fun HomeScreen(
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -172,6 +182,11 @@ fun HomeScreen(
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -219,6 +234,11 @@ fun HomeScreen(
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
                 onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )

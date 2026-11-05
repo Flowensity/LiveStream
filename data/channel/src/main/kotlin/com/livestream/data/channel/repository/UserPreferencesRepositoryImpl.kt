@@ -46,4 +46,19 @@ class UserPreferencesRepositoryImpl @Inject constructor(
     override suspend fun setBootStartupEnabled(enabled: Boolean) {
         dataStore.setBootStartupEnabled(enabled)
     }
+
+    override val customPlaylistSources: Flow<List<com.livestream.core.model.CustomPlaylistSource>> =
+        dataStore.customPlaylistSources
+
+    override suspend fun saveCustomPlaylistSource(source: com.livestream.core.model.CustomPlaylistSource) {
+        dataStore.saveCustomPlaylistSource(source)
+    }
+
+    override suspend fun removeCustomPlaylistSource(sourceId: String) {
+        dataStore.removeCustomPlaylistSource(sourceId)
+    }
+
+    override suspend fun clearCustomPlaylistSources() {
+        dataStore.clearCustomPlaylistSources()
+    }
 }

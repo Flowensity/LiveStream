@@ -16,14 +16,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -56,12 +60,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.livestream.core.model.Channel
+import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.OneUiDimensions
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.settings.SettingsUiState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 规范系统与偏好设置右侧抽屉面板 (SettingsDrawerView, 居右对齐，与频道列表 ChannelDrawer 风格高度统一)
@@ -78,15 +87,20 @@ fun SettingsDialog(
     onConfirmImport: () -> Unit,
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     onToggleBootStartup: (Boolean) -> Unit = {},
+    onOpenSourceManagement: () -> Unit = {},
+    onCloseSourceManagement: () -> Unit = {},
+    onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onDeleteSingleCustomChannel: (String) -> Unit = {},
+    onClearAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    if (!uiState.isSettingsOpen && !uiState.isImportDialogOpen) return
+    if (!uiState.isSettingsOpen && !uiState.isImportDialogOpen && !uiState.isSourceManagementOpen) return
 
     val firstFocusRequester = remember { FocusRequester() }
     val importCancelFocusRequester = remember { FocusRequester() }
     var isQrEnlarged by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isSettingsOpen, uiState.isImportDialogOpen) {
+    LaunchedEffect(uiState.isSettingsOpen, uiState.isImportDialogOpen, uiState.isSourceManagementOpen) {
         if (uiState.isImportDialogOpen) {
             kotlinx.coroutines.delay(150)
             try {
@@ -98,16 +112,18 @@ fun SettingsDialog(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 半透明背景遮罩（点击可关闭设置）
+        // 半透明背景遮罩（点击可关闭当前浮层）
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
+                .background(Color.Black.copy(alpha = 0.45f))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    if (uiState.isImportDialogOpen) {
+                    if (uiState.isSourceManagementOpen) {
+                        onCloseSourceManagement()
+                    } else if (uiState.isImportDialogOpen) {
                         onCloseImportDialog()
                     } else {
                         onCloseSettings()
@@ -121,17 +137,18 @@ fun SettingsDialog(
             exit = slideOutHorizontally(targetOffsetX = { it }),
             modifier = Modifier.align(Alignment.CenterEnd)
         ) {
-            val drawerShape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+            val drawerShape = RoundedCornerShape(20.dp)
             val scrollState = rememberScrollState()
 
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
+                    .padding(start = 8.dp, top = 16.dp, bottom = 16.dp, end = 16.dp)
                     .width(OneUiDimensions.panelPlaylistWidth)
                     .clip(drawerShape)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), drawerShape)
                     .background(OneUiTheme.colors.panelBackground)
-                    .padding(vertical = 14.dp, horizontal = 12.dp)
+                    .padding(vertical = 12.dp, horizontal = 10.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     // 1. 顶部大标题与关闭胶囊
@@ -197,26 +214,31 @@ fun SettingsDialog(
                                 focusedBorderWidth = 1.5.dp,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(OneUiDimensions.rowHeightSetting)
+                                    .defaultMinSize(minHeight = 48.dp)
                             ) { isFocused ->
                                 Row(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 14.dp),
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 7.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 8.dp)
+                                    ) {
                                         Text(
                                             text = "导入 M3U 播放列表",
                                             color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                            fontSize = 13.5.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
                                             text = "局域网扫码推送 / 网络链接",
                                             color = OneUiTheme.colors.textSecondary,
-                                            fontSize = 11.sp,
+                                            fontSize = 10.sp,
+                                            lineHeight = 13.sp,
                                             modifier = Modifier.padding(top = 1.dp)
                                         )
                                     }
@@ -229,7 +251,69 @@ fun SettingsDialog(
                                         Text(
                                             text = "导入",
                                             color = OneUiTheme.colors.accent,
-                                            fontSize = 11.5.sp,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            OneUiCardDivider()
+
+                            TvFocusableBox(
+                                onClick = onOpenSourceManagement,
+                                shape = OneUiShapes.cardMedium,
+                                unfocusedBackgroundColor = Color.Transparent,
+                                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                focusedBorderColor = OneUiTheme.colors.accent,
+                                focusedBorderWidth = 1.5.dp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .defaultMinSize(minHeight = 48.dp)
+                            ) { isFocused ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = "自定义源管理",
+                                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = if (uiState.customChannels.isNotEmpty()) {
+                                                "已导入 ${uiState.customChannels.size} 个节目 (${uiState.customSources.size} 个源)"
+                                            } else {
+                                                "管理或删除自定义源与节目"
+                                            },
+                                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                                            fontSize = 10.sp,
+                                            lineHeight = 13.sp,
+                                            modifier = Modifier.padding(top = 1.dp)
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(OneUiShapes.pill)
+                                            .background(
+                                                if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accentSoft
+                                                else OneUiTheme.colors.surfacePill
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (uiState.customChannels.isNotEmpty()) "管理" else "查看",
+                                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -627,6 +711,240 @@ fun SettingsDialog(
                 }
             }
         }
+
+        // 4. 自定义源与节目管理弹窗
+        if (uiState.isSourceManagementOpen) {
+            val sourceDialogShape = OneUiShapes.panel
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.75f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(280.dp)
+                        .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), sourceDialogShape)
+                        .background(OneUiTheme.colors.panelBackground, sourceDialogShape)
+                        .padding(14.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "自定义源管理",
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            TvFocusableBox(
+                                onClick = onCloseSourceManagement,
+                                shape = OneUiShapes.pill,
+                                unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                                focusedBackgroundColor = OneUiTheme.colors.accent,
+                                focusedBorderColor = OneUiTheme.colors.accent,
+                                focusedBorderWidth = 1.5.dp
+                            ) { isFocused ->
+                                Text(
+                                    text = "关闭",
+                                    color = if (isFocused) Color.White else OneUiTheme.colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (uiState.customChannels.isNotEmpty() || uiState.customSources.isNotEmpty()) {
+                            // 统计与全部清空栏
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), OneUiShapes.cardMedium)
+                                    .background(OneUiTheme.colors.cardBackground, OneUiShapes.cardMedium)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "共 ${uiState.customChannels.size} 个自定义节目",
+                                        color = OneUiTheme.colors.textPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "${uiState.customSources.size} 个已导入源列表",
+                                        color = OneUiTheme.colors.textSecondary,
+                                        fontSize = 9.5.sp
+                                    )
+                                }
+                                TvFocusableBox(
+                                    onClick = onClearAllCustomSources,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.dangerSoft,
+                                    focusedBackgroundColor = OneUiTheme.colors.danger,
+                                    focusedBorderColor = OneUiTheme.colors.danger,
+                                    focusedBorderWidth = 1.dp
+                                ) { isFocused ->
+                                    Text(
+                                        text = "清空全部",
+                                        color = if (isFocused) Color.White else OneUiTheme.colors.danger,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 订阅源列表
+                            if (uiState.customSources.isNotEmpty()) {
+                                Text(
+                                    text = "已导入源列表：",
+                                    color = OneUiTheme.colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    uiState.customSources.forEach { src ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), RoundedCornerShape(8.dp))
+                                                .background(OneUiTheme.colors.cardBackground, RoundedCornerShape(8.dp))
+                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
+                                                Text(
+                                                    text = src.name,
+                                                    color = OneUiTheme.colors.textPrimary,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${src.channelCount} 个节目",
+                                                    color = OneUiTheme.colors.textSecondary,
+                                                    fontSize = 9.5.sp
+                                                )
+                                            }
+                                            TvFocusableBox(
+                                                onClick = { onDeleteCustomPlaylistSource(src) },
+                                                shape = OneUiShapes.pill,
+                                                unfocusedBackgroundColor = OneUiTheme.colors.dangerSoft,
+                                                focusedBackgroundColor = OneUiTheme.colors.danger,
+                                                focusedBorderColor = OneUiTheme.colors.danger,
+                                                focusedBorderWidth = 1.dp
+                                            ) { isFocused ->
+                                                Text(
+                                                    text = "删除源",
+                                                    color = if (isFocused) Color.White else OneUiTheme.colors.danger,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+
+                            // 节目清单滚动区
+                            Text(
+                                text = "自定义节目单：",
+                                color = OneUiTheme.colors.textSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 160.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                items(uiState.customChannels, key = { it.id }) { ch ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), RoundedCornerShape(6.dp))
+                                            .background(OneUiTheme.colors.cardBackground, RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = ch.name,
+                                            color = OneUiTheme.colors.textPrimary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f).padding(end = 6.dp)
+                                        )
+                                        TvFocusableBox(
+                                            onClick = { onDeleteSingleCustomChannel(ch.id) },
+                                            shape = OneUiShapes.pill,
+                                            unfocusedBackgroundColor = Color.Transparent,
+                                            focusedBackgroundColor = OneUiTheme.colors.danger,
+                                            focusedBorderColor = OneUiTheme.colors.danger,
+                                            focusedBorderWidth = 1.dp
+                                        ) { isFocused ->
+                                            Text(
+                                                text = "删除",
+                                                color = if (isFocused) Color.White else OneUiTheme.colors.danger,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // 空态提示
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "暂无自定义源与节目",
+                                        color = OneUiTheme.colors.textPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "可通过扫码或输入链接导入 M3U 源",
+                                        color = OneUiTheme.colors.textSecondary,
+                                        fontSize = 10.5.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -677,22 +995,27 @@ private fun SettingToggleRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(OneUiDimensions.rowHeightSetting)
-            .padding(horizontal = 14.dp),
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+        ) {
             Text(
                 text = title,
                 color = OneUiTheme.colors.textPrimary,
-                fontSize = 13.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = subtitle,
                 color = OneUiTheme.colors.textSecondary,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
                 modifier = Modifier.padding(top = 1.dp)
             )
         }

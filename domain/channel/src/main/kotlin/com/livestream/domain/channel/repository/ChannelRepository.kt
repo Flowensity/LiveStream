@@ -39,5 +39,13 @@ interface ChannelRepository {
 
     suspend fun saveSources(sources: List<LiveSource>)
 
+    fun observeCustomChannels(): Flow<List<Channel>>
+
+    suspend fun deleteChannelById(channelId: String)
+
+    suspend fun deleteChannelsByIds(channelIds: List<String>)
+
+    suspend fun deleteAllCustomChannelsAndSources()
+
     suspend fun checkAndSeedDefaultChannels()
 }

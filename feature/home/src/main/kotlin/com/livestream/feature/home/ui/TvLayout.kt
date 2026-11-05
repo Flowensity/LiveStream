@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.AppBackground
@@ -90,6 +91,11 @@ fun TvLayout(
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     onToggleBootStartup: (Boolean) -> Unit = {},
+    onOpenSourceManagement: () -> Unit = {},
+    onCloseSourceManagement: () -> Unit = {},
+    onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onDeleteSingleCustomChannel: (String) -> Unit = {},
+    onClearAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -147,10 +153,12 @@ fun TvLayout(
                     }
                 }
 
-                // 设置展开时交由弹窗，若内嵌导入弹窗打开则先关闭导入
-                if (settingsUiState.isSettingsOpen) {
+                // 设置或导入/源管理展开时拦截返回键
+                if (settingsUiState.isSettingsOpen || settingsUiState.isImportDialogOpen || settingsUiState.isSourceManagementOpen) {
                     if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                        if (settingsUiState.isImportDialogOpen) {
+                        if (settingsUiState.isSourceManagementOpen) {
+                            onCloseSourceManagement()
+                        } else if (settingsUiState.isImportDialogOpen) {
                             onCloseImportDialog()
                         } else {
                             onCloseSettings()
@@ -327,7 +335,12 @@ fun TvLayout(
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
             onThemeModeSelected = onThemeModeSelected,
-            onToggleBootStartup = onToggleBootStartup
+            onToggleBootStartup = onToggleBootStartup,
+            onOpenSourceManagement = onOpenSourceManagement,
+            onCloseSourceManagement = onCloseSourceManagement,
+            onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,
+            onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
+            onClearAllCustomSources = onClearAllCustomSources
         )
 
         // 5. 模态浮层：真实 EPG 节目单完整排期弹窗

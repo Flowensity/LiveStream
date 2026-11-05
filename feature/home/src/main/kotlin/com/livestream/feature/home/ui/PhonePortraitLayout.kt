@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
@@ -89,6 +90,11 @@ fun PhonePortraitLayout(
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     onToggleBootStartup: (Boolean) -> Unit = {},
+    onOpenSourceManagement: () -> Unit = {},
+    onCloseSourceManagement: () -> Unit = {},
+    onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onDeleteSingleCustomChannel: (String) -> Unit = {},
+    onClearAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -355,7 +361,12 @@ fun PhonePortraitLayout(
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
             onThemeModeSelected = onThemeModeSelected,
-            onToggleBootStartup = onToggleBootStartup
+            onToggleBootStartup = onToggleBootStartup,
+            onOpenSourceManagement = onOpenSourceManagement,
+            onCloseSourceManagement = onCloseSourceManagement,
+            onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,
+            onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
+            onClearAllCustomSources = onClearAllCustomSources
         )
 
         // EPG 节目单排期弹窗
