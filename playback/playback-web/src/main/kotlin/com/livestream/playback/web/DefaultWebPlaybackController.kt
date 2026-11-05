@@ -35,6 +35,9 @@ class DefaultWebPlaybackController @Inject constructor(
     private val _webState = MutableStateFlow<WebPlaybackState>(WebPlaybackState.Idle)
     override val webState: StateFlow<WebPlaybackState> = _webState.asStateFlow()
 
+    private val _activeWebViewCount = MutableStateFlow(0)
+    val activeWebViewCount: StateFlow<Int> = _activeWebViewCount.asStateFlow()
+
     private var webView: WebView? = null
     private var targetUrl: String? = null
     private var parentContainer: ViewGroup? = null
@@ -124,6 +127,7 @@ class DefaultWebPlaybackController @Inject constructor(
 
         container.addView(wv)
         webView = wv
+        _activeWebViewCount.value = 1
 
         // 超时保护定时器
         loadTimeoutJob = controllerScope.launch {
@@ -162,6 +166,7 @@ class DefaultWebPlaybackController @Inject constructor(
             wv.destroy()
         }
         webView = null
+        _activeWebViewCount.value = 0
         _webState.value = WebPlaybackState.Destroyed
     }
 }

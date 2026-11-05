@@ -13,7 +13,7 @@
 | **阶段五** | **核心 UI 开发** | **已完成 (Completed)** | 首页、频道列表、全屏播放器、OSD 交互面板、收藏与设置 |
 | **阶段六** | **设备适配与交互** | **已完成 (Completed)** | Android TV D-pad 遥控器与焦点适配、手机竖屏/横屏手势、平板分栏布局 |
 | **阶段七** | **EPG 与 WebView 兼容** | **已完成 (Completed)** | XMLTV 流式节目单解析与持久化、EPG 节目用例、官方合规网页独立播放容器、崩溃恢复 |
-| 阶段八 | 性能优化与稳定性 | 待开始 | 首帧速度、切台耗时、内存监控、8小时持续播放与压力测试 |
+| **阶段八** | **性能优化与稳定性** | **已完成 (Completed)** | 首帧速度 P95 统计、切台分段度量（P95 ≤ 2.0s）、网络自愈、卡顿看门狗、100次切台压测与8小时播放模拟 |
 | 阶段九 | 发布准备与交付物整理 | 待开始 | 启动页、图标、权限说明、Release 构建、交付文档汇总 |
 
 ---
@@ -164,3 +164,29 @@
   - 覆盖 `XmltvParserTest`、`DefaultWebPlaybackControllerTest`、`PlaybackOrchestratorTest`（官方网页状态流转测试）、`PlayerViewModelTest`（EPG 订阅与官方网页状态测试）。
   - `./gradlew test`：全工程 749 个 Action 全部通过（100% 成功）。
   - `./gradlew assembleDebug`：成功构建集成 Phase 7 的完整多端调试 APK。
+
+---
+
+## 阶段八详细执行日志
+
+- [x] **精细化时延拆解与统计基准追踪 (`:playback:playback-api`)**：
+  - `PlaybackMetrics`：扩展分段时延统计字段（`networkResolutionMs` 网络解析耗时、`enginePrepareMs` 引擎初始化耗时、`decodeToFirstFrameMs` 硬件解码首帧呈现耗时、`stallCount` 卡顿计数）。
+  - `LatencyTracker` & `DefaultLatencyTracker`：滑动窗口记录切台时延样本，采用 Nearest-Rank 分位数算法计算 P50 / P90 / P95 时延，判定是否达成验收指标（P95 ≤ 2.0s，成功率 ≥ 99%）。
+  - 单元测试：`LatencyTrackerTest` 验证 100 样本下的 P50/P90/P95 精确值、成功率计算、滑动窗口滚动淘汰与重置功能。
+- [x] **系统网络状态感知与断网无缝自愈 (`:core:common` & `:core:network`)**：
+  - `NetworkMonitor`：基于 Clean Architecture 定义纯 Kotlin 网络状态观察契约。
+  - `ConnectivityNetworkMonitor`：基于 Android `ConnectivityManager.NetworkCallback` 实时捕获 Wi-Fi / 移动蜂窝网络连接与断开。
+  - `DefaultPlaybackOrchestrator`：集成网络自愈监听，当由断网恢复连网（如进出电梯或网络切换）且当前播放器处于 `NETWORK_TIMEOUT` 或 `NETWORK_DISCONNECTED` 时，自动触发 `retry()` 恢复拉流，用户无需手动干预。
+- [x] **播放卡死看门狗机制 (`:playback:playback-media3`)**：
+  - `PlaybackWatchdog`：监控播放器 `BUFFERING` 状态，若缓冲卡死持续超过超时阈值（默认 10 秒无响应），自动报警并触发平滑切线或安全自愈，杜绝黑屏死锁。
+  - 单元测试：`PlaybackWatchdogTest` 验证超时触发、正常起播前取消定时器及主动停止保护。
+- [x] **单例播放器复用与 WebView 内存泄漏追踪 (`:playback:playback-media3` & `:playback:playback-web`)**：
+  - `Media3PlaybackEngine`：保持单一前台 `ExoPlayer` 实例复用（通过 `setMediaItem()` 增量换台），绝不重复创建。
+  - `DefaultWebPlaybackController`：加入 `activeWebViewCount` 实例追踪状态，并在 `stopAndDestroy` 时执行全量释放（`stopLoading`、`clearHistory`、`about:blank`、移除父容器、`destroy`），确保活跃数严格 $\le 1$ 且退出后为 0。
+  - 压测测试：`WebViewLeakStressTest` 验证连续 50 次切换后 WebView 活跃数恒定归零，无孤儿对象。
+- [x] **高频连续切台防竞争与 8 小时播放稳定性压测**：
+  - `ContinuousSwitchingStressTest`：模拟 TV 遥控器极端高频狂按方向键连续切台 100 次，验证递增 Sequence Token（`activeSessionToken`）彻底隔离废弃请求，播放器最终严格收敛至第 100 个频道，无并发串流与状态撕裂。
+  - `LongPlaybackStabilitySimulatorTest`：模拟连续 8 小时（按 1 小时步进推进）长时间运行，模拟偶发网络轻微重缓冲自愈，验证 8 小时全周期保持 `PLAYING` 状态、零崩溃、无持续性内存泄露、看门狗指标正常。
+- [x] **全工程集成测试与构建验证**：
+  - `./gradlew test`：全工程 751 个 Action 全部通过（100% 成功）。
+  - `./gradlew assembleDebug`：成功构建包含 Phase 8 性能与稳定性全套能力的调试 APK。

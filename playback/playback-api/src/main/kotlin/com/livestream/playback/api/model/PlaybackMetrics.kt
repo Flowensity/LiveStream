@@ -14,5 +14,9 @@ data class PlaybackMetrics(
     val decoderName: String? = null,
     val isHardwareAccelerated: Boolean = true,
     val firstFrameRenderedTimestampMs: Long = 0L,
-    val switchDurationMs: Long = 0L
+    val switchDurationMs: Long = 0L,
+    val networkResolutionMs: Long = 0L,
+    val enginePrepareMs: Long = 0L,
+    val decodeToFirstFrameMs: Long = 0L,
+    val stallCount: Long = 0L
 )

@@ -1,6 +1,7 @@
 package com.livestream.playback.media3
 
 import com.livestream.core.common.dispatcher.AppDispatchers
+import com.livestream.core.common.network.NetworkMonitor
 import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
@@ -14,17 +15,23 @@ import com.livestream.playback.api.PlaybackOrchestrator
 import com.livestream.playback.api.SwitchDirection
 import com.livestream.playback.api.model.EngineState
 import com.livestream.playback.api.model.PlaybackMediaItem
+import com.livestream.playback.api.monitor.LatencyTracker
+import com.livestream.playback.api.monitor.SwitchRecord
 import com.livestream.playback.api.web.WebPlaybackController
 import com.livestream.playback.api.web.WebPlaybackState
+import com.livestream.playback.media3.watchdog.PlaybackWatchdog
 import com.livestream.source.api.SourceAdapterRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +42,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private val channelRepository: ChannelRepository,
     private val sourceAdapterRegistry: SourceAdapterRegistry,
     override val webPlaybackController: WebPlaybackController,
+    private val networkMonitor: NetworkMonitor,
+    override val latencyTracker: LatencyTracker,
     private val dispatchers: AppDispatchers
 ) : PlaybackOrchestrator {
 
@@ -47,16 +56,52 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var activeSessionToken = 0L
     private var activePlayJob: Job? = null
 
+    // 时延与性能统计分段打点
+    private var switchStartTimeMs = 0L
+    private var networkResolutionMs = 0L
+    private var enginePrepareStartTimeMs = 0L
+
     // 当前频道可用的源列表与索引
     private var availableSources: List<LiveSource> = emptyList()
     private var currentSourceIndex: Int = 0
     private var currentRetryCount: Int = 0
+
+    // 缓冲卡死看门狗（超时自动换线或自愈）
+    private val watchdog = PlaybackWatchdog(dispatchers) {
+        val currentMetrics = _orchestratorState.value.metrics
+        _orchestratorState.value = _orchestratorState.value.copy(
+            metrics = currentMetrics.copy(stallCount = currentMetrics.stallCount + 1)
+        )
+        switchNextSource()
+    }
 
     companion object {
         const val MAX_RETRY_COUNT = 3
     }
 
     init {
+        // 启动卡顿看门狗监听
+        val statusFlow = _orchestratorState
+            .map { it.status }
+            .stateIn(orchestratorScope, SharingStarted.Eagerly, PlaybackStatus.IDLE)
+        watchdog.start(statusFlow)
+
+        // 监听网络连通性自愈事件：从断网恢复连网时，自动尝试重连恢复播放
+        orchestratorScope.launch {
+            var prevConnected = networkMonitor.isConnected.value
+            networkMonitor.isConnected.collect { connected ->
+                if (!prevConnected && connected) {
+                    val curState = _orchestratorState.value
+                    if (curState.status == PlaybackStatus.ERROR &&
+                        (curState.errorInfo?.errorType == PlaybackErrorType.NETWORK_TIMEOUT ||
+                         curState.errorInfo?.errorType == PlaybackErrorType.NETWORK_DISCONNECTED)) {
+                        retry()
+                    }
+                }
+                prevConnected = connected
+            }
+        }
+
         // 监听原生引擎状态并映射到调度器聚合状态
         orchestratorScope.launch {
             engine.engineState.collect { engineState ->
@@ -74,7 +119,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                         _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.BUFFERING)
                     }
                     is WebPlaybackState.Ready, is WebPlaybackState.Playing -> {
-                        _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PLAYING)
+                        recordPlayingSuccess()
                     }
                     is WebPlaybackState.Error -> {
                         handlePlaybackFailure(
@@ -102,7 +147,19 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         // 监听实时性能指标
         orchestratorScope.launch {
             engine.playbackMetrics.collect { metrics ->
-                _orchestratorState.value = _orchestratorState.value.copy(metrics = metrics)
+                _orchestratorState.value = _orchestratorState.value.copy(
+                    metrics = _orchestratorState.value.metrics.copy(
+                        bitrateBps = metrics.bitrateBps,
+                        videoWidth = metrics.videoWidth,
+                        videoHeight = metrics.videoHeight,
+                        frameRate = metrics.frameRate,
+                        droppedFrames = metrics.droppedFrames,
+                        liveLatencyMs = metrics.liveLatencyMs,
+                        bufferedDurationMs = metrics.bufferedDurationMs,
+                        decoderName = metrics.decoderName,
+                        isHardwareAccelerated = metrics.isHardwareAccelerated
+                    )
+                )
             }
         }
     }
@@ -113,6 +170,11 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         // 1. 协同取消旧播放与解析任务，杜绝旧任务回调污染新状态
         activePlayJob?.cancel()
         currentRetryCount = 0
+
+        // 记录切台起始时间点
+        switchStartTimeMs = System.currentTimeMillis()
+        networkResolutionMs = 0L
+        enginePrepareStartTimeMs = 0L
 
         _orchestratorState.value = _orchestratorState.value.copy(
             status = PlaybackStatus.SWITCHING,
@@ -188,6 +250,10 @@ class DefaultPlaybackOrchestrator @Inject constructor(
 
         if (sessionToken != activeSessionToken) return
 
+        val now = System.currentTimeMillis()
+        networkResolutionMs = if (switchStartTimeMs > 0L) (now - switchStartTimeMs).coerceAtLeast(0L) else 0L
+        enginePrepareStartTimeMs = now
+
         when (resolution) {
             is SourceResolution.NativeMedia -> {
                 // 停止并清理任何残留的 Web 容器
@@ -262,7 +328,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.READY)
             }
             is EngineState.Playing -> {
-                _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PLAYING)
+                recordPlayingSuccess()
             }
             is EngineState.Paused -> {
                 _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PAUSED)
@@ -301,10 +367,70 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             return
         }
 
+        // 记录切台失败指标
+        if (switchStartTimeMs > 0L) {
+            val now = System.currentTimeMillis()
+            val channel = _orchestratorState.value.currentChannel
+            val source = _orchestratorState.value.currentSource
+            if (channel != null) {
+                latencyTracker.recordSwitch(
+                    SwitchRecord(
+                        channelId = channel.id,
+                        sourceId = source?.id ?: "",
+                        isSuccess = false,
+                        totalDurationMs = (now - switchStartTimeMs).coerceAtLeast(0L),
+                        networkResolutionMs = networkResolutionMs,
+                        timestampMs = now
+                    )
+                )
+            }
+            switchStartTimeMs = 0L
+        }
+
         _orchestratorState.value = _orchestratorState.value.copy(
             status = PlaybackStatus.ERROR,
             errorInfo = errorInfo.copy(retryCount = currentRetryCount)
         )
+    }
+
+    private fun recordPlayingSuccess() {
+        val now = System.currentTimeMillis()
+        if (switchStartTimeMs > 0L) {
+            val totalDuration = (now - switchStartTimeMs).coerceAtLeast(0L)
+            val decodeDuration = if (enginePrepareStartTimeMs > 0L) (now - enginePrepareStartTimeMs).coerceAtLeast(0L) else 0L
+
+            val updatedMetrics = _orchestratorState.value.metrics.copy(
+                switchDurationMs = totalDuration,
+                networkResolutionMs = networkResolutionMs,
+                enginePrepareMs = if (enginePrepareStartTimeMs > 0L) (enginePrepareStartTimeMs - switchStartTimeMs).coerceAtLeast(0L) else 0L,
+                decodeToFirstFrameMs = decodeDuration,
+                firstFrameRenderedTimestampMs = now
+            )
+            _orchestratorState.value = _orchestratorState.value.copy(
+                status = PlaybackStatus.PLAYING,
+                metrics = updatedMetrics
+            )
+
+            val channel = _orchestratorState.value.currentChannel
+            val source = _orchestratorState.value.currentSource
+            if (channel != null && source != null) {
+                latencyTracker.recordSwitch(
+                    SwitchRecord(
+                        channelId = channel.id,
+                        sourceId = source.id,
+                        isSuccess = true,
+                        totalDurationMs = totalDuration,
+                        networkResolutionMs = networkResolutionMs,
+                        enginePrepareMs = if (enginePrepareStartTimeMs > 0L) (enginePrepareStartTimeMs - switchStartTimeMs).coerceAtLeast(0L) else 0L,
+                        decodeToFirstFrameMs = decodeDuration,
+                        timestampMs = now
+                    )
+                )
+            }
+            switchStartTimeMs = 0L
+        } else {
+            _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PLAYING)
+        }
     }
 
     override fun switchChannel(direction: SwitchDirection) {
@@ -362,6 +488,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     override fun stop() {
         activeSessionToken++
         activePlayJob?.cancel()
+        switchStartTimeMs = 0L
+        watchdog.stop()
         engine.stop()
         webPlaybackController.stopAndDestroy()
         _orchestratorState.value = _orchestratorState.value.copy(
@@ -374,6 +502,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     override fun release() {
         activeSessionToken++
         activePlayJob?.cancel()
+        switchStartTimeMs = 0L
+        watchdog.stop()
         engine.release()
         webPlaybackController.stopAndDestroy()
         _orchestratorState.value = _orchestratorState.value.copy(

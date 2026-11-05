@@ -2,10 +2,13 @@ package com.livestream.playback.media3.di
 
 import com.livestream.playback.api.PlaybackEngine
 import com.livestream.playback.api.PlaybackOrchestrator
+import com.livestream.playback.api.monitor.DefaultLatencyTracker
+import com.livestream.playback.api.monitor.LatencyTracker
 import com.livestream.playback.media3.DefaultPlaybackOrchestrator
 import com.livestream.playback.media3.Media3PlaybackEngine
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -25,4 +28,10 @@ abstract class PlaybackModule {
     abstract fun bindPlaybackOrchestrator(
         impl: DefaultPlaybackOrchestrator
     ): PlaybackOrchestrator
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideLatencyTracker(): LatencyTracker = DefaultLatencyTracker()
+    }
 }

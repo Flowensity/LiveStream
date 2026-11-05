@@ -2,6 +2,7 @@ package com.livestream.playback.media3
 
 import app.cash.turbine.test
 import com.livestream.core.common.dispatcher.AppDispatchers
+import com.livestream.core.common.network.NetworkMonitor
 import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
@@ -13,6 +14,7 @@ import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.playback.api.PlaybackEngine
 import com.livestream.playback.api.model.EngineState
 import com.livestream.playback.api.model.PlaybackMetrics
+import com.livestream.playback.api.monitor.DefaultLatencyTracker
 import com.livestream.playback.api.web.WebPlaybackController
 import com.livestream.playback.api.web.WebPlaybackState
 import com.livestream.source.api.AvailabilityResult
@@ -20,12 +22,14 @@ import com.livestream.source.api.DefaultSourceAdapterRegistry
 import com.livestream.source.api.SourceAdapter
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -44,6 +48,11 @@ class PlaybackOrchestratorTest {
 
     private val engineStateFlow = MutableStateFlow<EngineState>(EngineState.Idle)
     private val webStateFlow = MutableStateFlow<WebPlaybackState>(WebPlaybackState.Idle)
+    private val isConnectedFlow = MutableStateFlow(true)
+    private val networkMonitor = mockk<NetworkMonitor>(relaxed = true) {
+        every { isConnected } returns isConnectedFlow
+    }
+    private val latencyTracker = DefaultLatencyTracker()
     private val playbackMetricsFlow = MutableStateFlow(PlaybackMetrics())
 
     private val testDispatchers = object : AppDispatchers {
@@ -115,7 +124,7 @@ class PlaybackOrchestratorTest {
     fun `test playChannel successfully transitions to preparing and invokes engine`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -132,7 +141,7 @@ class PlaybackOrchestratorTest {
             sampleSource1.copy(id = "src_ch2", channelId = "cctv2")
         )
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
 
         // 快速连续切台
         orchestrator.playChannel(sampleChannel1)
@@ -148,7 +157,7 @@ class PlaybackOrchestratorTest {
     fun `test channel without sources results in error state`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns emptyList()
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -160,7 +169,7 @@ class PlaybackOrchestratorTest {
     fun `test source fallback when primary source fails`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -180,7 +189,7 @@ class PlaybackOrchestratorTest {
     fun `test engine playing and buffering updates orchestrator state`() = runTest(testDispatcher) {
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -198,7 +207,7 @@ class PlaybackOrchestratorTest {
         val webSource = sampleSource1.copy(id = "src_web")
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(webSource)
 
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
@@ -219,11 +228,53 @@ class PlaybackOrchestratorTest {
 
     @Test
     fun `test stop and release call webPlaybackController stopAndDestroy`() = runTest(testDispatcher) {
-        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, testDispatchers)
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
         orchestrator.stop()
         verify(exactly = 1) { webPlaybackController.stopAndDestroy() }
 
         orchestrator.release()
         verify(atLeast = 2) { webPlaybackController.stopAndDestroy() }
+    }
+
+    @Test
+    fun `test network self healing automatically retries when network recovers`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        // 模拟断网引发网络错误（重试耗尽后转为不可再自动重试的 ERROR）
+        isConnectedFlow.value = false
+        val error = PlaybackErrorInfo(PlaybackErrorType.NETWORK_DISCONNECTED, "网络断开连接", canRetry = false)
+        engineStateFlow.value = EngineState.Error(error)
+        advanceUntilIdle()
+        assertEquals(PlaybackStatus.ERROR, orchestrator.orchestratorState.value.status)
+
+        // 模拟网络恢复 -> 验证自动触发 retry
+        isConnectedFlow.value = true
+        advanceUntilIdle()
+
+        assertEquals(PlaybackStatus.PREPARING, orchestrator.orchestratorState.value.status)
+        coVerify(atLeast = 2) { engine.prepare(any(), true) }
+    }
+
+    @Test
+    fun `test playing success records switch metrics in latency tracker`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+
+        latencyTracker.reset()
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        engineStateFlow.value = EngineState.Playing
+        advanceUntilIdle()
+
+        val report = latencyTracker.latencyReport.value
+        assertEquals(1, report.totalSwitches)
+        assertEquals(1, report.successfulSwitches)
+        assertEquals(100.0, report.successRatePercent, 0.01)
+        assertTrue(report.meetsP95Target)
     }
 }

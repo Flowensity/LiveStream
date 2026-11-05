@@ -5,6 +5,7 @@ import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.playback.api.model.PlaybackMetrics
+import com.livestream.playback.api.monitor.LatencyTracker
 import com.livestream.playback.api.web.WebPlaybackController
 import kotlinx.coroutines.flow.StateFlow
 
@@ -44,6 +45,8 @@ interface PlaybackOrchestrator {
     val orchestratorState: StateFlow<OrchestratorState>
 
     val webPlaybackController: WebPlaybackController? get() = null
+
+    val latencyTracker: LatencyTracker? get() = null
 
     fun playChannel(channel: Channel, preferredSourceId: String? = null)
 
