@@ -136,6 +136,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         _orchestratorState.value = _orchestratorState.value.copy(
             status = PlaybackStatus.RESOLVING,
             currentSource = source,
+            currentSourceIndex = currentSourceIndex,
+            totalSources = availableSources.size,
             errorInfo = null
         )
 
@@ -276,6 +278,16 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             }
 
             playChannel(channels[targetIndex])
+        }
+    }
+
+    override fun switchNextSource() {
+        if (availableSources.size <= 1) return
+        val currentToken = activeSessionToken
+        currentSourceIndex = (currentSourceIndex + 1) % availableSources.size
+        activePlayJob?.cancel()
+        activePlayJob = orchestratorScope.launch {
+            executeSourcePlayback(currentToken)
         }
     }
 

@@ -8,6 +8,9 @@ import com.livestream.data.channel.repository.UserPreferencesRepositoryImpl
 import com.livestream.domain.channel.repository.CategoryRepository
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
+import com.livestream.domain.channel.usecase.GetChannelsUseCase
+import com.livestream.domain.channel.usecase.SearchChannelsUseCase
+import com.livestream.domain.channel.usecase.ToggleFavoriteUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -41,5 +44,23 @@ abstract class ChannelDataModule {
         @Provides
         @Singleton
         fun provideAppDispatchers(): AppDispatchers = DefaultAppDispatchers()
+
+        @Provides
+        @Singleton
+        fun provideGetChannelsUseCase(
+            channelRepository: ChannelRepository
+        ): GetChannelsUseCase = GetChannelsUseCase(channelRepository)
+
+        @Provides
+        @Singleton
+        fun provideSearchChannelsUseCase(
+            channelRepository: ChannelRepository
+        ): SearchChannelsUseCase = SearchChannelsUseCase(channelRepository)
+
+        @Provides
+        @Singleton
+        fun provideToggleFavoriteUseCase(
+            channelRepository: ChannelRepository
+        ): ToggleFavoriteUseCase = ToggleFavoriteUseCase(channelRepository)
     }
 }

@@ -22,6 +22,8 @@ data class OrchestratorState(
     val status: PlaybackStatus = PlaybackStatus.IDLE,
     val currentChannel: Channel? = null,
     val currentSource: LiveSource? = null,
+    val currentSourceIndex: Int = 0,
+    val totalSources: Int = 1,
     val errorInfo: PlaybackErrorInfo? = null,
     val metrics: PlaybackMetrics = PlaybackMetrics()
 )
@@ -41,6 +43,8 @@ interface PlaybackOrchestrator {
     fun playChannel(channel: Channel, preferredSourceId: String? = null)
 
     fun switchChannel(direction: SwitchDirection)
+
+    fun switchNextSource()
 
     fun retry()
 

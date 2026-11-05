@@ -3,27 +3,15 @@ package com.livestream.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.FocusHighlight
+import androidx.activity.viewModels
 import com.livestream.core.ui.theme.LiveStreamTheme
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
+import com.livestream.feature.channel.ChannelViewModel
+import com.livestream.feature.home.HomeViewModel
+import com.livestream.feature.home.ui.HomeScreen
+import com.livestream.feature.player.PlayerViewModel
+import com.livestream.feature.settings.SettingsViewModel
 import com.livestream.playback.api.PlaybackOrchestrator
 import com.livestream.source.api.SourceAdapterRegistry
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,46 +32,22 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var sourceAdapterRegistry: SourceAdapterRegistry
 
+    private val homeViewModel: HomeViewModel by viewModels()
+    private val playerViewModel: PlayerViewModel by viewModels()
+    private val channelViewModel: ChannelViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             LiveStreamTheme {
-                MainPlaceholderScreen()
+                HomeScreen(
+                    homeViewModel = homeViewModel,
+                    playerViewModel = playerViewModel,
+                    channelViewModel = channelViewModel,
+                    settingsViewModel = settingsViewModel
+                )
             }
-        }
-    }
-}
-
-@Composable
-fun MainPlaceholderScreen() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "LiveStream",
-                color = FocusHighlight,
-                fontSize = 32.sp,
-                style = MaterialTheme.typography.headlineLarge
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "高性能多端直播应用架构基线已就绪",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Phase 1: Architecture Baseline Verified",
-                color = TextMuted,
-                fontSize = 14.sp,
-                style = MaterialTheme.typography.bodyMedium
-            )
         }
     }
 }

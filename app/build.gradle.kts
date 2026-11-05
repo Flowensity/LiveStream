@@ -66,6 +66,10 @@ dependencies {
     implementation(project(":source:source-api"))
     implementation(project(":source:source-custom"))
     implementation(project(":source:source-official"))
+    implementation(project(":feature:player"))
+    implementation(project(":feature:channel"))
+    implementation(project(":feature:settings"))
+    implementation(project(":feature:home"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

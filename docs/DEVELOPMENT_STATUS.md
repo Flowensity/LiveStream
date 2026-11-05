@@ -10,7 +10,7 @@
 | **阶段二** | **基础数据与领域层** | **已完成 (Completed)** | 频道/播放源/EPG 纯领域模型、Room 数据库、DataStore 偏好存储、仓储实现、单元测试 |
 | **阶段三** | **原生播放器核心** | **已完成 (Completed)** | AndroidX Media3 集成、Media3PlaybackEngine、PlaybackOrchestrator 状态机、多源回退与防重入切台 |
 | **阶段四** | **频道和资源管理** | **已完成 (Completed)** | ChannelRepository、SourceAdapter 插件化体系、自定义直播源支持、回退策略 |
-| 阶段五 | 核心 UI 开发 | 待开始 | 首页、频道列表、全屏播放器、OSD 交互面板、收藏与历史 |
+| **阶段五** | **核心 UI 开发** | **已完成 (Completed)** | 首页、频道列表、全屏播放器、OSD 交互面板、收藏与设置 |
 | 阶段六 | 设备适配与交互 | 待开始 | Android TV D-pad 遥控器与焦点适配、手机竖屏/横屏手势、平板分栏布局 |
 | 阶段七 | EPG 与 WebView 兼容 | 待开始 | EPG 节目单展示、官方合规网页独立播放容器、崩溃恢复 |
 | 阶段八 | 性能优化与稳定性 | 待开始 | 首帧速度、切台耗时、内存监控、8小时持续播放与压力测试 |
@@ -68,3 +68,32 @@
   - 覆盖 `SourceAdapterRegistryTest`、`M3uPlaylistParserTest`、`CustomSourceAdapterTest`、`OfficialSourceAdapterTest`。
   - `./gradlew test`：全工程 498 个 Action 全部通过（100% 成功）。
   - `./gradlew assembleDebug`：成功编译输出包含 Phase 4 的完整调试 APK。
+
+---
+
+## 阶段五详细执行日志
+
+- [x] **建立核心 TV/移动通用 UI 基础组件 (`:core:ui`)**：
+  - `TvFocusableBox`：专为 Android TV 遥控器与触摸端优化的焦点容器（遥控器获焦时触发 1.04x 微放大动效、`FocusHighlight` 高对比度边框与背景色提升，确保远距离观看可见性）。
+  - `StreamLoadingIndicator`：暗色主题动态脉冲三点缓冲组件与状态提示文字。
+- [x] **实现原生播放器视图与 OSD 交互面板 (`:feature:player`)**：
+  - `LiveVideoSurface`：基于 Compose `AndroidView` 封装底层原生 `SurfaceView`（默认优先启用独立硬件叠加层），自动生命周期绑定/解绑 `PlaybackOrchestrator`。
+  - `PlayerOverlay`：全屏 OSD 叠加面板，集成顶部频道徽标（频道号、频道名、多源线路切换信息）、底部实时技术指标（分辨率、帧率、码率、缓冲水位、切台耗时）、中间缓冲状态与错误重试卡片。
+  - `PlayerViewModel`：UDF 单向数据流架构，自动响应 `OrchestratorState`，实现 5 秒无操作 OSD 自动淡出淡入倒计时与遥控器数字键切台防抖收集。
+- [x] **实现频道侧边栏与分类列表 (`:feature:channel`)**：
+  - `CategoryTabRow`：横向平滑滚动与 D-pad 左右焦点穿透的分类导航栏（支持虚拟"全部频道"、"我的收藏"及数据库分类）。
+  - `ChannelListItem`：高可见度频道项组件（台号、频道名、正在播放绿点指示器、星标收藏一键切换）。
+  - `ChannelDrawer`：左侧半透明毛玻璃抽屉面板，集成即时搜索栏、分类筛选、频道统计与空状态占位。
+  - `ChannelViewModel`：状态容器管理，支持关键词即时模糊搜索与分类切换，配合 Turbine 单元测试验证。
+- [x] **实现设置与自定义直播源导入 (`:feature:settings`)**：
+  - `SettingsDialog`：模态暗色交互面板，支持硬件解码优先开关、SurfaceView/TextureView 渲染图层切换、换台超时设置。
+  - `M3uImportDialog`：直接输入/粘贴 M3U 播放列表，结合 `M3uPlaylistParser` 安全策略解析并写入 Room 数据库，展示实时导入成功计数或错误原因。
+  - `SettingsViewModel`：持久化与 DataStore 偏好设置及 Room 频道仓储联动。
+- [x] **实现主界面统一协调容器与按键调度 (`:feature:home`)**：
+  - `HomeScreen`：全层级叠加容器（底层视频、中层 OSD、顶层抽屉与模态设置），支持 Back 键逐级消费。
+  - Android TV 遥控器按键全量劫持（`Key.DirectionUp/Down` 快速切台、`Key.DirectionLeft` 切换直播源线路、`Key.DirectionCenter/Enter` 调出频道抽屉、`Key.Menu` 打开设置、数字键 `0-9` 直接选台）。
+  - `HomeViewModel`：开机自动首播（记忆最后播放频道，无记录时默认起播首个频道）。
+- [x] **全面单元测试与构建验证**：
+  - 覆盖 `PlayerViewModelTest`、`ChannelViewModelTest`、`SettingsViewModelTest`、`HomeViewModelTest`。
+  - `./gradlew test`：全工程 694 个 Action 全部通过（100% 成功）。
+  - `./gradlew assembleDebug`：成功构建包含 Phase 5 完整 UI 的调试 APK（`app-debug.apk`）。
