@@ -13,11 +13,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextMuted
+import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
 
 @Composable
 fun CategoryTabRow(
@@ -38,14 +38,14 @@ fun CategoryTabRow(
             val isSelected = category.id == selectedCategory?.id
             TvFocusableBox(
                 onClick = { onCategorySelected(category) },
-                unfocusedBackgroundColor = if (isSelected) DarkSurfaceElevated else DarkSurface,
-                focusedBackgroundColor = DarkSurfaceElevated,
+                unfocusedBackgroundColor = if (isSelected) AppSurfaceElevated else AppSurface,
+                focusedBackgroundColor = AppSurfaceElevated,
                 focusedBorderColor = FocusHighlight
             ) { isFocused ->
                 val textColor = when {
                     isFocused -> FocusHighlight
-                    isSelected -> TextPrimary
-                    else -> TextMuted
+                    isSelected -> AppTextPrimary
+                    else -> AppTextMuted
                 }
                 Text(
                     text = category.name,

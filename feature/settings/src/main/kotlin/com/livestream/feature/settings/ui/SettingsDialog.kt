@@ -23,23 +23,27 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextMuted
+import com.livestream.core.ui.theme.AppTextPrimary
+import com.livestream.core.ui.theme.AppTextSecondary
 import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.StatusError
 import com.livestream.core.ui.theme.StatusSuccess
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
-import com.livestream.core.ui.theme.TextSecondary
 import com.livestream.feature.settings.SettingsUiState
 
 @Composable
@@ -55,6 +59,14 @@ fun SettingsDialog(
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val firstFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(uiState.isSettingsOpen) {
+        if (uiState.isSettingsOpen && !uiState.isImportDialogOpen) {
+            firstFocusRequester.requestFocus()
+        }
+    }
+
     AnimatedVisibility(
         visible = uiState.isSettingsOpen,
         enter = fadeIn(),
@@ -70,7 +82,7 @@ fun SettingsDialog(
             Box(
                 modifier = Modifier
                     .width(480.dp)
-                    .background(DarkBackground, RoundedCornerShape(14.dp))
+                    .background(AppBackground, RoundedCornerShape(14.dp))
                     .padding(24.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -82,7 +94,7 @@ fun SettingsDialog(
                     ) {
                         Text(
                             text = "播放与系统设置",
-                            color = TextPrimary,
+                            color = AppTextPrimary,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -93,7 +105,7 @@ fun SettingsDialog(
                         ) {
                             Text(
                                 text = "关闭",
-                                color = TextMuted,
+                                color = AppTextMuted,
                                 fontSize = 14.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
@@ -107,7 +119,8 @@ fun SettingsDialog(
                         title = "硬件解码优先",
                         subtitle = "默认启用 MediaCodec 硬件加速解码，降低功耗与延迟",
                         checked = uiState.isHardwareDecodePreferred,
-                        onCheckedChange = onToggleHardwareDecode
+                        onCheckedChange = onToggleHardwareDecode,
+                        modifier = Modifier.focusRequester(firstFocusRequester)
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -125,7 +138,7 @@ fun SettingsDialog(
                     // 3. 主题模式切换
                     Text(
                         text = "显示主题模式",
-                        color = TextSecondary,
+                        color = AppTextSecondary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -143,8 +156,8 @@ fun SettingsDialog(
                             }
                             TvFocusableBox(
                                 onClick = { onThemeModeSelected(mode) },
-                                unfocusedBackgroundColor = if (isSelected) DarkSurfaceElevated else DarkSurface,
-                                focusedBackgroundColor = DarkSurfaceElevated,
+                                unfocusedBackgroundColor = if (isSelected) AppSurfaceElevated else AppSurface,
+                                focusedBackgroundColor = AppSurfaceElevated,
                                 focusedBorderColor = FocusHighlight,
                                 modifier = Modifier.weight(1f)
                             ) { isFocused ->
@@ -156,7 +169,7 @@ fun SettingsDialog(
                                 ) {
                                     Text(
                                         text = label,
-                                        color = if (isSelected || isFocused) FocusHighlight else TextMuted,
+                                        color = if (isSelected || isFocused) FocusHighlight else AppTextMuted,
                                         fontSize = 13.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -170,7 +183,7 @@ fun SettingsDialog(
                     // 4. 自定义源管理
                     Text(
                         text = "自定义资源管理",
-                        color = TextSecondary,
+                        color = AppTextSecondary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -191,13 +204,13 @@ fun SettingsDialog(
                             Column {
                                 Text(
                                     text = "导入 M3U 直播源列表",
-                                    color = if (isFocused) FocusHighlight else TextPrimary,
+                                    color = if (isFocused) FocusHighlight else AppTextPrimary,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
                                     text = "支持标准 #EXTINF 格式，带内网 SSRF 自动过滤",
-                                    color = TextMuted,
+                                    color = AppTextMuted,
                                     fontSize = 12.sp
                                 )
                             }
@@ -218,13 +231,13 @@ fun SettingsDialog(
                     Box(
                         modifier = Modifier
                             .width(520.dp)
-                            .background(DarkSurfaceElevated, RoundedCornerShape(12.dp))
+                            .background(AppSurfaceElevated, RoundedCornerShape(12.dp))
                             .padding(24.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "导入 M3U 播放列表",
-                                color = TextPrimary,
+                                color = AppTextPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -235,19 +248,19 @@ fun SettingsDialog(
                                 placeholder = {
                                     Text(
                                         "#EXTM3U\n#EXTINF:-1 group-title=\"央视\",CCTV-1\nhttps://example.com/live.m3u8",
-                                        color = TextMuted,
+                                        color = AppTextMuted,
                                         fontSize = 12.sp
                                     )
                                 },
                                 minLines = 5,
                                 maxLines = 8,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = DarkSurface,
-                                    unfocusedContainerColor = DarkSurface,
+                                    focusedContainerColor = AppSurface,
+                                    unfocusedContainerColor = AppSurface,
                                     focusedBorderColor = FocusHighlight,
                                     unfocusedBorderColor = Color.Transparent,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
+                                    focusedTextColor = AppTextPrimary,
+                                    unfocusedTextColor = AppTextPrimary
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
@@ -280,9 +293,9 @@ fun SettingsDialog(
                             ) {
                                 Button(
                                     onClick = onCloseImportDialog,
-                                    colors = ButtonDefaults.buttonColors(containerColor = DarkSurface)
+                                    colors = ButtonDefaults.buttonColors(containerColor = AppSurface)
                                 ) {
-                                    Text("取消", color = TextSecondary)
+                                    Text("取消", color = AppTextSecondary)
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Button(
@@ -310,12 +323,13 @@ private fun SettingToggleRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     TvFocusableBox(
         onClick = { onCheckedChange(!checked) },
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) { isFocused ->
         Row(
             modifier = Modifier
@@ -327,22 +341,22 @@ private fun SettingToggleRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = if (isFocused) FocusHighlight else TextPrimary,
+                    color = if (isFocused) FocusHighlight else AppTextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = subtitle,
-                    color = TextMuted,
+                    color = AppTextMuted,
                     fontSize = 12.sp
                 )
             }
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
+                onCheckedChange = null,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = FocusHighlight,
-                    checkedTrackColor = DarkSurfaceElevated
+                    checkedTrackColor = AppSurfaceElevated
                 )
             )
         }

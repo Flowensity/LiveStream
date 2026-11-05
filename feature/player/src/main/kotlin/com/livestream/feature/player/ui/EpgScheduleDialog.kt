@@ -32,14 +32,14 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.EpgProgram
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextMuted
+import com.livestream.core.ui.theme.AppTextPrimary
+import com.livestream.core.ui.theme.AppTextSecondary
 import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.StatusSuccess
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
-import com.livestream.core.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -79,7 +79,7 @@ fun EpgScheduleDialog(
                 modifier = Modifier
                     .width(420.dp)
                     .fillMaxHeight(0.85f)
-                    .background(DarkBackground, RoundedCornerShape(16.dp))
+                    .background(AppBackground, RoundedCornerShape(16.dp))
                     .padding(20.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -92,14 +92,14 @@ fun EpgScheduleDialog(
                         Column {
                             Text(
                                 text = "${channel?.name ?: "当前频道"} 节目单",
-                                color = TextPrimary,
+                                color = AppTextPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date())
                             Text(
                                 text = "今日排期 ($todayStr)",
-                                color = TextMuted,
+                                color = AppTextMuted,
                                 fontSize = 12.sp
                             )
                         }
@@ -110,7 +110,7 @@ fun EpgScheduleDialog(
                         ) { isFocused ->
                             Text(
                                 text = "关闭",
-                                color = if (isFocused) FocusHighlight else TextSecondary,
+                                color = if (isFocused) FocusHighlight else AppTextSecondary,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
@@ -128,7 +128,7 @@ fun EpgScheduleDialog(
                         ) {
                             Text(
                                 text = "正在获取最新节目排期...",
-                                color = TextMuted,
+                                color = AppTextMuted,
                                 fontSize = 14.sp
                             )
                         }
@@ -150,7 +150,7 @@ fun EpgScheduleDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(
-                                            if (isCurrent) DarkSurfaceElevated else DarkSurface,
+                                            if (isCurrent) AppSurfaceElevated else AppSurface,
                                             RoundedCornerShape(8.dp)
                                         )
                                         .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -173,7 +173,7 @@ fun EpgScheduleDialog(
                                                 }
                                                 Text(
                                                     text = timeRange,
-                                                    color = if (isCurrent) FocusHighlight else TextMuted,
+                                                    color = if (isCurrent) FocusHighlight else AppTextMuted,
                                                     fontSize = 12.sp,
                                                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
                                                 )
@@ -181,7 +181,7 @@ fun EpgScheduleDialog(
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = prog.title,
-                                                color = if (isCurrent) TextPrimary else TextSecondary,
+                                                color = if (isCurrent) AppTextPrimary else AppTextSecondary,
                                                 fontSize = 14.sp,
                                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
                                             )

@@ -2,6 +2,9 @@ package com.livestream.feature.home.ui
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -13,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.livestream.core.ui.device.DeviceType
 import com.livestream.core.ui.device.rememberDeviceType
+import com.livestream.core.ui.theme.AppBackground
 import com.livestream.feature.channel.ChannelViewModel
 import com.livestream.feature.home.HomeViewModel
 import com.livestream.feature.player.PlayerViewModel
@@ -63,7 +67,12 @@ fun HomeScreen(
         }
     }
 
-    when (deviceType) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(AppBackground)
+    ) {
+        when (deviceType) {
         DeviceType.PHONE_PORTRAIT -> {
             PhonePortraitLayout(
                 playerUiState = playerUiState,
@@ -155,6 +164,8 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                onOpenDrawer = { channelViewModel.openDrawer() },
+                onCloseDrawer = { channelViewModel.closeDrawer() },
                 onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
@@ -210,10 +221,11 @@ fun HomeScreen(
         }
     }
 
-    // 退出确认二次弹窗
-    ExitConfirmDialog(
-        visible = showExitDialog,
-        onConfirm = { activity?.finish() },
-        onDismiss = { showExitDialog = false }
-    )
+        // 退出确认二次弹窗
+        ExitConfirmDialog(
+            visible = showExitDialog,
+            onConfirm = { activity?.finish() },
+            onDismiss = { showExitDialog = false }
+        )
+    }
 }

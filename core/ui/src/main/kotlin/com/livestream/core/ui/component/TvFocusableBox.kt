@@ -22,8 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
 import com.livestream.core.ui.theme.FocusHighlight
 
 /**
@@ -40,8 +40,8 @@ fun TvFocusableBox(
     shape: Shape = RoundedCornerShape(8.dp),
     focusedBorderWidth: Dp = 2.dp,
     focusedBorderColor: Color = FocusHighlight,
-    unfocusedBackgroundColor: Color = DarkSurface,
-    focusedBackgroundColor: Color = DarkSurfaceElevated,
+    unfocusedBackgroundColor: Color = AppSurface,
+    focusedBackgroundColor: Color = AppSurfaceElevated,
     scaleOnFocus: Float = 1.04f,
     content: @Composable BoxScope.(isFocused: Boolean) -> Unit
 ) {

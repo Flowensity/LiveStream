@@ -197,6 +197,21 @@ fun PlayerOverlay(
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
+
+                                if (uiState.totalSources > 0) {
+                                    val lineIndex = uiState.activeSourceIndex + 1
+                                    val lineBadge = "线路 $lineIndex/${uiState.totalSources} [${uiState.activeSource?.protocol ?: "AUTO"}]"
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = lineBadge,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier
+                                            .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
 
                             // EPG 节目单展示
@@ -239,20 +254,6 @@ fun PlayerOverlay(
                                     }
                                 }
                             }
-                        }
-
-                        // 线路切换状态徽标
-                        if (uiState.totalSources > 0) {
-                            val lineIndex = uiState.activeSourceIndex + 1
-                            val lineBadge = "线路 $lineIndex/${uiState.totalSources} [${uiState.activeSource?.protocol ?: "AUTO"}]"
-                            Text(
-                                text = lineBadge,
-                                color = TextSecondary,
-                                fontSize = 14.sp,
-                                modifier = Modifier
-                                    .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
                         }
                     }
                 }

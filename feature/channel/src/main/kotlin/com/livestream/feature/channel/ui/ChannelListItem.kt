@@ -22,13 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextMuted
+import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.StatusSuccess
 import com.livestream.core.ui.theme.StatusWarning
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
 
 @Composable
 fun ChannelListItem(
@@ -41,8 +41,8 @@ fun ChannelListItem(
 ) {
     TvFocusableBox(
         onClick = { onChannelClick(channel) },
-        unfocusedBackgroundColor = if (isActive) DarkSurfaceElevated else DarkSurface,
-        focusedBackgroundColor = DarkSurfaceElevated,
+        unfocusedBackgroundColor = if (isActive) AppSurfaceElevated else AppSurface,
+        focusedBackgroundColor = AppSurfaceElevated,
         focusedBorderColor = FocusHighlight,
         modifier = modifier.fillMaxWidth()
     ) { isFocused ->
@@ -70,7 +70,7 @@ fun ChannelListItem(
                 // 频道序号
                 Text(
                     text = "%02d".format(channel.channelNumber),
-                    color = if (isFocused || isActive) FocusHighlight else TextMuted,
+                    color = if (isFocused || isActive) FocusHighlight else AppTextMuted,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(36.dp)
@@ -82,7 +82,7 @@ fun ChannelListItem(
                 Column {
                     Text(
                         text = channel.name,
-                        color = if (isActive) FocusHighlight else TextPrimary,
+                        color = if (isActive) FocusHighlight else AppTextPrimary,
                         fontSize = 15.sp,
                         fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.Normal,
                         maxLines = 1
@@ -90,7 +90,7 @@ fun ChannelListItem(
                     if (!programTitle.isNullOrBlank()) {
                         Text(
                             text = programTitle,
-                            color = if (isActive) FocusHighlight.copy(alpha = 0.8f) else TextMuted,
+                            color = if (isActive) FocusHighlight.copy(alpha = 0.8f) else AppTextMuted,
                             fontSize = 12.sp,
                             maxLines = 1
                         )
@@ -107,7 +107,7 @@ fun ChannelListItem(
             ) {
                 Text(
                     text = if (channel.isFavorite) "★" else "☆",
-                    color = if (channel.isFavorite) StatusWarning else TextMuted,
+                    color = if (channel.isFavorite) StatusWarning else AppTextMuted,
                     fontSize = 18.sp
                 )
             }

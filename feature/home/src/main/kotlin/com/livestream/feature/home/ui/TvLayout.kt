@@ -28,9 +28,9 @@ import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkBackground
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.player.PlayerUiState
@@ -87,14 +87,16 @@ fun TvLayout(
 ) {
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+    LaunchedEffect(settingsUiState.isSettingsOpen, channelUiState.isDrawerOpen, playerUiState.isEpgSheetVisible) {
+        if (!settingsUiState.isSettingsOpen && !channelUiState.isDrawerOpen && !playerUiState.isEpgSheetVisible) {
+            focusRequester.requestFocus()
+        }
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(AppBackground)
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { keyEvent ->
@@ -229,7 +231,7 @@ fun TvLayout(
                 ) { isFocused ->
                     Text(
                         text = "频道菜单",
-                        color = if (isFocused) FocusHighlight else TextPrimary,
+                        color = if (isFocused) FocusHighlight else AppTextPrimary,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
@@ -241,7 +243,7 @@ fun TvLayout(
                     ) { isFocused ->
                         Text(
                             text = "设置",
-                            color = if (isFocused) FocusHighlight else TextPrimary,
+                            color = if (isFocused) FocusHighlight else AppTextPrimary,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )

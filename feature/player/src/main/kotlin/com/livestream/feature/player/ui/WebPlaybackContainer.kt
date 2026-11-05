@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
@@ -18,8 +21,9 @@ import com.livestream.playback.api.web.WebPlaybackController
 /**
  * 官方合规网页播放容器：
  * 1. 独立沙箱生命周期管理，仅在官方要求网页播放时按需激活
- * 2. 退出或切换流时自动触发 stopLoading、clearHistory 与 destroy 释放 WebView
- * 3. 上层覆盖透明交互图层，确保点击与手势能正常触发 OSD 与控制
+ * 2. 屏幕旋转或布局重组时无缝迁移 WebView 图层，不重载流
+ * 3. 退出或切换流时由 PlaybackOrchestrator 释放 WebView
+ * 4. 上层覆盖透明交互图层，确保点击与手势能正常触发 OSD 与控制
  */
 @Composable
 fun WebPlaybackContainer(
@@ -29,6 +33,8 @@ fun WebPlaybackContainer(
     overlayModifier: Modifier = Modifier,
     onContainerClick: (() -> Unit)? = null
 ) {
+    var containerRef by remember { mutableStateOf<FrameLayout?>(null) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -44,9 +50,11 @@ fun WebPlaybackContainer(
                     )
                     isFocusable = false
                     isFocusableInTouchMode = false
+                    containerRef = this
                 }
             },
             update = { frameLayout ->
+                containerRef = frameLayout
                 if (controller != null && url.isNotBlank()) {
                     controller.loadOfficialUrl(url, frameLayout)
                 }
@@ -73,7 +81,7 @@ fun WebPlaybackContainer(
 
         DisposableEffect(controller, url) {
             onDispose {
-                controller?.stopAndDestroy()
+                controller?.detachContainer(containerRef)
             }
         }
     }

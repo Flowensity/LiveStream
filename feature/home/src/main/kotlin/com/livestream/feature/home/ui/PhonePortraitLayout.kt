@@ -35,12 +35,12 @@ import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextMuted
+import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelListItem
@@ -89,11 +89,14 @@ fun PhonePortraitLayout(
     val context = LocalContext.current
     val activity = context as? Activity
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(AppBackground)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // 1. 上半部：16:9 原生播放窗口或官方网页容器
         Box(
             modifier = Modifier
@@ -136,7 +139,7 @@ fun PhonePortraitLayout(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(14.dp)
-                        .background(DarkSurfaceElevated.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
+                        .background(AppSurfaceElevated.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
                         .clickable {
                             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         }
@@ -169,7 +172,7 @@ fun PhonePortraitLayout(
             ) {
                 Text(
                     text = "频道列表 (${channelUiState.channels.size})",
-                    color = TextPrimary,
+                    color = AppTextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -181,7 +184,7 @@ fun PhonePortraitLayout(
                     if (playerUiState.dayPrograms.isNotEmpty()) {
                         Box(
                             modifier = Modifier
-                                .background(DarkSurfaceElevated, RoundedCornerShape(6.dp))
+                                .background(AppSurfaceElevated, RoundedCornerShape(6.dp))
                                 .clickable { onToggleEpgSheet() }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
@@ -196,13 +199,13 @@ fun PhonePortraitLayout(
 
                     Box(
                         modifier = Modifier
-                            .background(DarkSurfaceElevated, RoundedCornerShape(6.dp))
+                            .background(AppSurfaceElevated, RoundedCornerShape(6.dp))
                             .clickable { onOpenSettings() }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = "⚙ 设置",
-                            color = TextPrimary,
+                            color = AppTextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -215,15 +218,15 @@ fun PhonePortraitLayout(
             OutlinedTextField(
                 value = channelUiState.searchQuery,
                 onValueChange = onSearchQueryChanged,
-                placeholder = { Text("搜索频道...", color = TextMuted, fontSize = 13.sp) },
+                placeholder = { Text("搜索频道...", color = AppTextMuted, fontSize = 13.sp) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkSurfaceElevated,
-                    unfocusedContainerColor = DarkSurface,
+                    focusedContainerColor = AppSurfaceElevated,
+                    unfocusedContainerColor = AppSurface,
                     focusedBorderColor = FocusHighlight,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedTextColor = AppTextPrimary,
+                    unfocusedTextColor = AppTextPrimary
                 ),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
@@ -277,11 +280,12 @@ fun PhonePortraitLayout(
         onThemeModeSelected = onThemeModeSelected
     )
 
-    // EPG 节目单排期弹窗
-    EpgScheduleDialog(
-        visible = playerUiState.isEpgSheetVisible,
-        channel = playerUiState.activeChannel,
-        programs = playerUiState.dayPrograms,
-        onDismiss = onHideEpgSheet
-    )
+        // EPG 节目单排期弹窗
+        EpgScheduleDialog(
+            visible = playerUiState.isEpgSheetVisible,
+            channel = playerUiState.activeChannel,
+            programs = playerUiState.dayPrograms,
+            onDismiss = onHideEpgSheet
+        )
+    }
 }

@@ -28,12 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextPrimary
+import com.livestream.core.ui.theme.AppTextSecondary
 import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.StatusError
-import com.livestream.core.ui.theme.TextPrimary
-import com.livestream.core.ui.theme.TextSecondary
 
 @Composable
 fun ExitConfirmDialog(
@@ -65,7 +65,7 @@ fun ExitConfirmDialog(
             Box(
                 modifier = Modifier
                     .width(360.dp)
-                    .background(DarkBackground, RoundedCornerShape(14.dp))
+                    .background(AppBackground, RoundedCornerShape(14.dp))
                     .padding(24.dp)
             ) {
                 Column(
@@ -74,14 +74,14 @@ fun ExitConfirmDialog(
                 ) {
                     Text(
                         text = "退出提示",
-                        color = TextPrimary,
+                        color = AppTextPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "确定要退出 LiveStream 电视直播应用吗？",
-                        color = TextSecondary,
+                        color = AppTextSecondary,
                         fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(24.dp))
@@ -101,7 +101,7 @@ fun ExitConfirmDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(
-                                        if (isFocused) DarkSurfaceElevated else Color.Transparent,
+                                        if (isFocused) AppSurfaceElevated else Color.Transparent,
                                         RoundedCornerShape(8.dp)
                                     )
                                     .padding(vertical = 10.dp),
@@ -109,7 +109,7 @@ fun ExitConfirmDialog(
                             ) {
                                 Text(
                                     text = "取消",
-                                    color = if (isFocused) FocusHighlight else TextPrimary,
+                                    color = if (isFocused) FocusHighlight else AppTextPrimary,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -134,7 +134,7 @@ fun ExitConfirmDialog(
                             ) {
                                 Text(
                                     text = "退出应用",
-                                    color = if (isFocused) StatusError else TextSecondary,
+                                    color = if (isFocused) StatusError else AppTextSecondary,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 )

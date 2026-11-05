@@ -22,6 +22,8 @@ interface WebPlaybackController {
 
     fun loadOfficialUrl(url: String, container: Any?)
 
+    fun detachContainer(container: Any? = null) {}
+
     fun stopAndDestroy()
 
     fun reload()

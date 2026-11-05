@@ -35,13 +35,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.DarkSurface
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppSurface
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextMuted
+import com.livestream.core.ui.theme.AppTextPrimary
+import com.livestream.core.ui.theme.AppTextSecondary
 import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
-import com.livestream.core.ui.theme.TextSecondary
 import com.livestream.feature.channel.ChannelUiState
 import kotlinx.coroutines.delay
 
@@ -75,7 +75,7 @@ fun ChannelDrawer(
             modifier = Modifier
                 .fillMaxHeight()
                 .width(360.dp)
-                .background(DarkBackground.copy(alpha = 0.96f))
+                .background(AppBackground.copy(alpha = 0.96f))
                 .padding(vertical = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -89,13 +89,13 @@ fun ChannelDrawer(
                 ) {
                     Text(
                         text = "频道列表",
-                        color = TextPrimary,
+                        color = AppTextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "共 ${uiState.channels.size} 个",
-                        color = TextMuted,
+                        color = AppTextMuted,
                         fontSize = 13.sp
                     )
                 }
@@ -106,15 +106,15 @@ fun ChannelDrawer(
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = onSearchQueryChanged,
-                    placeholder = { Text("搜索频道名称或编号...", color = TextMuted, fontSize = 13.sp) },
+                    placeholder = { Text("搜索频道名称或编号...", color = AppTextMuted, fontSize = 13.sp) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = DarkSurfaceElevated,
-                        unfocusedContainerColor = DarkSurface,
+                        focusedContainerColor = AppSurfaceElevated,
+                        unfocusedContainerColor = AppSurface,
                         focusedBorderColor = FocusHighlight,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        focusedTextColor = AppTextPrimary,
+                        unfocusedTextColor = AppTextPrimary
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
@@ -144,7 +144,7 @@ fun ChannelDrawer(
                     ) {
                         Text(
                             text = if (uiState.searchQuery.isNotBlank()) "未搜寻到匹配频道" else "该分类下暂无频道",
-                            color = TextSecondary,
+                            color = AppTextSecondary,
                             fontSize = 14.sp
                         )
                     }

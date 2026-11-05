@@ -51,7 +51,13 @@ class DefaultWebPlaybackController @Inject constructor(
     @SuppressLint("SetJavaScriptEnabled")
     override fun loadOfficialUrl(url: String, container: Any?) {
         val viewGroup = container as? ViewGroup ?: return
-        if (targetUrl == url && webView != null && parentContainer == viewGroup) {
+        if (targetUrl == url && webView != null) {
+            if (parentContainer != viewGroup) {
+                (webView?.parent as? ViewGroup)?.removeView(webView)
+                viewGroup.addView(webView)
+                parentContainer = viewGroup
+            }
+            injectPlayerStyling(webView)
             return
         }
 
@@ -97,7 +103,7 @@ class DefaultWebPlaybackController @Inject constructor(
                     if (newProgress in 1..99) {
                         _webState.value = WebPlaybackState.Loading(newProgress)
                     }
-                    if (newProgress >= 50) {
+                    if (newProgress >= 10) {
                         injectPlayerStyling(view)
                     }
                 }
@@ -184,22 +190,29 @@ class DefaultWebPlaybackController @Inject constructor(
                     }
                     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
 
-                    // 2. 注入全局 CSS：隐藏无关 UI，打破 890PX/500PX/300PX 容器限制，将 video fixed 撑满视口
+                    // 2. 注入全局 CSS：隐藏无关 UI，打破 890PX/500PX/300PX 容器限制，将 video fixed 撑满视口，消除居中半屏
                     var css = 'html, body { width: 100vw !important; height: 100vh !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; background-color: #000000 !important; } ' +
                         '.header, .header-b, header, .max-footer, .footer, footer, .tv-main-con-r, .tv-zhan, .searchMinHeight > div:not(:first-child), .poster, .moren_cover, .xgplayer-controls, xg-controls, .xgplayer-start, xg-start, .xgplayer-poster, .xg-poster { display: none !important; } ' +
                         '* { transform: none !important; filter: none !important; perspective: none !important; } ' +
                         '#app, .tv-home, .tv-home-list, .tv, .tv-main, .tv-main-con, .tv-main-con-l, .tv-main-con-l-vid, live-player, .xgplayer, xg-video-container { width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; min-width: 100vw !important; min-height: 100vh !important; margin: 0 !important; padding: 0 !important; background: transparent !important; background-color: transparent !important; border: none !important; } ' +
                         'video { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; object-fit: contain !important; background: transparent !important; background-color: transparent !important; margin: 0 !important; padding: 0 !important; border: none !important; z-index: 2147483647 !important; }';
 
-                    var style = document.getElementById('livestream-custom-style');
-                    if (!style) {
-                        style = document.createElement('style');
-                        style.id = 'livestream-custom-style';
-                        (document.head || document.documentElement).appendChild(style);
+                    function injectCssRule() {
+                        var style = document.getElementById('livestream-custom-style');
+                        if (!style) {
+                            style = document.createElement('style');
+                            style.id = 'livestream-custom-style';
+                            (document.head || document.documentElement).appendChild(style);
+                        }
+                        if (style.textContent !== css) {
+                            style.textContent = css;
+                        }
                     }
-                    style.innerHTML = css;
+
+                    injectCssRule();
 
                     function applyVideoFix() {
+                        injectCssRule();
                         var vids = document.getElementsByTagName('video');
                         for (var i = 0; i < vids.length; i++) {
                             var v = vids[i];
@@ -227,18 +240,43 @@ class DefaultWebPlaybackController @Inject constructor(
                     }
 
                     applyVideoFix();
+
+                    if (!window.__livestream_observer && window.MutationObserver) {
+                        window.__livestream_observer = new MutationObserver(function() {
+                            applyVideoFix();
+                        });
+                        var target = document.documentElement || document.body;
+                        if (target) {
+                            window.__livestream_observer.observe(target, {
+                                childList: true,
+                                subtree: true
+                            });
+                        }
+                    }
+
+                    window.dispatchEvent(new Event('resize'));
+
                     var count = 0;
                     var timer = setInterval(function() {
                         applyVideoFix();
+                        window.dispatchEvent(new Event('resize'));
                         count++;
-                        if (count >= 25) {
+                        if (count >= 20) {
                             clearInterval(timer);
                         }
-                    }, 350);
+                    }, 250);
                 } catch(e) {}
             })();
         """.trimIndent()
         view?.evaluateJavascript(js, null)
+    }
+
+    override fun detachContainer(container: Any?) {
+        val viewGroup = container as? ViewGroup
+        if (viewGroup == null || parentContainer == viewGroup) {
+            (webView?.parent as? ViewGroup)?.removeView(webView)
+            parentContainer = null
+        }
     }
 
     override fun reload() {

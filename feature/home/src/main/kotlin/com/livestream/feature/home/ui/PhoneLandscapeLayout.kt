@@ -28,10 +28,10 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.ThemeMode
-import com.livestream.core.ui.theme.DarkBackground
-import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.AppBackground
+import com.livestream.core.ui.theme.AppSurfaceElevated
+import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.player.PlayerUiState
@@ -123,7 +123,7 @@ fun PhoneLandscapeLayout(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(AppBackground)
     ) {
         // 1. 底层：视频表面或官方网页容器
         val webUrl = playerUiState.officialWebUrl
@@ -168,7 +168,7 @@ fun PhoneLandscapeLayout(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(DarkSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
                         .clickable {
                             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         }
@@ -181,7 +181,7 @@ fun PhoneLandscapeLayout(
                     Spacer(modifier = Modifier.width(10.dp))
                     Box(
                         modifier = Modifier
-                            .background(DarkSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                            .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
                             .clickable { onToggleEpgSheet() }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
@@ -193,22 +193,22 @@ fun PhoneLandscapeLayout(
 
                 Box(
                     modifier = Modifier
-                        .background(DarkSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
                         .clickable { onOpenDrawer() }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text(text = "频道列表", color = TextPrimary, fontSize = 13.sp)
+                    Text(text = "频道列表", color = AppTextPrimary, fontSize = 13.sp)
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Box(
                     modifier = Modifier
-                        .background(DarkSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
                         .clickable { onOpenSettings() }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text(text = "⚙ 设置", color = TextPrimary, fontSize = 13.sp)
+                    Text(text = "⚙ 设置", color = AppTextPrimary, fontSize = 13.sp)
                 }
             }
         }
