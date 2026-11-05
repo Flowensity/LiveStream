@@ -5,6 +5,7 @@ import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.playback.api.model.PlaybackMetrics
+import com.livestream.playback.api.web.WebPlaybackController
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -25,7 +26,9 @@ data class OrchestratorState(
     val currentSourceIndex: Int = 0,
     val totalSources: Int = 1,
     val errorInfo: PlaybackErrorInfo? = null,
-    val metrics: PlaybackMetrics = PlaybackMetrics()
+    val metrics: PlaybackMetrics = PlaybackMetrics(),
+    val isOfficialWeb: Boolean = false,
+    val officialWebUrl: String? = null
 )
 
 /**
@@ -39,6 +42,8 @@ data class OrchestratorState(
 interface PlaybackOrchestrator {
 
     val orchestratorState: StateFlow<OrchestratorState>
+
+    val webPlaybackController: WebPlaybackController? get() = null
 
     fun playChannel(channel: Channel, preferredSourceId: String? = null)
 

@@ -35,8 +35,10 @@ import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.player.PlayerUiState
 import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
+import com.livestream.feature.player.ui.WebPlaybackContainer
 import com.livestream.feature.settings.SettingsUiState
 import com.livestream.feature.settings.ui.SettingsDialog
+import com.livestream.playback.api.web.WebPlaybackController
 
 /**
  * Android TV 专属全屏与遥控器交互布局：
@@ -75,7 +77,8 @@ fun TvLayout(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    webPlaybackController: WebPlaybackController? = null
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -138,25 +141,34 @@ fun TvLayout(
                 }
             }
     ) {
-        // 1. 底层：硬件渲染图层
-        LiveVideoSurface(
-            onSurfaceAttached = onSurfaceAttached,
-            onSurfaceDetached = onSurfaceDetached,
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    if (channelUiState.isDrawerOpen) {
-                        onCloseDrawer()
-                    } else if (settingsUiState.isSettingsOpen) {
-                        onCloseSettings()
-                    } else {
-                        onToggleOsd()
+        // 1. 底层：硬件渲染图层或官方合规网页容器
+        val webUrl = playerUiState.officialWebUrl
+        if (playerUiState.isOfficialWeb && !webUrl.isNullOrBlank()) {
+            WebPlaybackContainer(
+                controller = webPlaybackController,
+                url = webUrl,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            LiveVideoSurface(
+                onSurfaceAttached = onSurfaceAttached,
+                onSurfaceDetached = onSurfaceDetached,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        if (channelUiState.isDrawerOpen) {
+                            onCloseDrawer()
+                        } else if (settingsUiState.isSettingsOpen) {
+                            onCloseSettings()
+                        } else {
+                            onToggleOsd()
+                        }
                     }
-                }
-        )
+            )
+        }
 
         // 2. 中层：OSD 状态、指标与错误卡片
         PlayerOverlay(

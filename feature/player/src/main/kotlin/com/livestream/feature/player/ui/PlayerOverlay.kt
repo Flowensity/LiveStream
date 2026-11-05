@@ -33,10 +33,14 @@ import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.DarkSurfaceElevated
 import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.StatusError
+import com.livestream.core.ui.theme.StatusWarning
 import com.livestream.core.ui.theme.TextMuted
 import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.core.ui.theme.TextSecondary
 import com.livestream.feature.player.PlayerUiState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun PlayerOverlay(
@@ -162,21 +166,62 @@ fun PlayerOverlay(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val channelNum = uiState.activeChannel?.channelNumber?.let { "%02d".format(it) } ?: "--"
-                            Text(
-                                text = channelNum,
-                                color = FocusHighlight,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = uiState.activeChannel?.name ?: "未选频道",
-                                color = TextPrimary,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val channelNum = uiState.activeChannel?.channelNumber?.let { "%02d".format(it) } ?: "--"
+                                Text(
+                                    text = channelNum,
+                                    color = FocusHighlight,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = uiState.activeChannel?.name ?: "未选频道",
+                                    color = TextPrimary,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                if (uiState.isOfficialWeb) {
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "官方合规网页",
+                                        color = StatusWarning,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            // EPG 节目单展示
+                            if (uiState.currentProgram != null || uiState.nextProgram != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    uiState.currentProgram?.let { prog ->
+                                        val timeStr = "${formatTime(prog.startTimestamp)} - ${formatTime(prog.endTimestamp)}"
+                                        Text(
+                                            text = "正在播出: ${prog.title} ($timeStr)",
+                                            color = FocusHighlight,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    uiState.nextProgram?.let { prog ->
+                                        Text(
+                                            text = "即将播出: ${prog.title} (${formatTime(prog.startTimestamp)})",
+                                            color = TextMuted,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         // 线路切换状态徽标
@@ -230,4 +275,10 @@ fun PlayerOverlay(
             }
         }
     }
+}
+
+private fun formatTime(timestampMs: Long): String {
+    if (timestampMs <= 0L) return "--:--"
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestampMs))
 }

@@ -1,8 +1,11 @@
 package com.livestream.feature.player
 
 import com.livestream.core.model.Channel
+import com.livestream.core.model.EpgProgram
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.domain.channel.repository.ChannelRepository
+import com.livestream.domain.channel.usecase.GetCurrentProgramUseCase
+import com.livestream.domain.channel.usecase.GetNextProgramUseCase
 import com.livestream.playback.api.OrchestratorState
 import com.livestream.playback.api.PlaybackOrchestrator
 import io.mockk.coEvery
@@ -36,13 +39,22 @@ class PlayerViewModelTest {
         every { orchestratorState } returns orchestratorStateFlow
     }
     private val channelRepository = mockk<ChannelRepository>(relaxed = true)
+    private val getCurrentProgramUseCase = mockk<GetCurrentProgramUseCase>(relaxed = true)
+    private val getNextProgramUseCase = mockk<GetNextProgramUseCase>(relaxed = true)
 
     private lateinit var viewModel: PlayerViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = PlayerViewModel(playbackOrchestrator, channelRepository)
+        every { getCurrentProgramUseCase(any(), any()) } returns flowOf(null)
+        every { getNextProgramUseCase(any(), any()) } returns flowOf(null)
+        viewModel = PlayerViewModel(
+            playbackOrchestrator,
+            channelRepository,
+            getCurrentProgramUseCase,
+            getNextProgramUseCase
+        )
     }
 
     @After
@@ -111,5 +123,39 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { playbackOrchestrator.switchNextSource() }
+    }
+
+    @Test
+    fun `active channel changes trigger epg programs subscription`() = runTest(testDispatcher) {
+        val channel = Channel(id = "cctv1", name = "CCTV-1", channelNumber = 1, categoryId = "cctv")
+        val sampleProgram = EpgProgram(
+            id = "cctv1_1",
+            channelId = "cctv1",
+            title = "新闻联播",
+            startTimestamp = 1000L,
+            endTimestamp = 2000L
+        )
+        every { getCurrentProgramUseCase("cctv1", any()) } returns flowOf(sampleProgram)
+
+        orchestratorStateFlow.value = OrchestratorState(
+            currentChannel = channel,
+            status = PlaybackStatus.PLAYING
+        )
+        testScheduler.runCurrent()
+
+        assertEquals(sampleProgram, viewModel.uiState.value.currentProgram)
+    }
+
+    @Test
+    fun `orchestrator official web state propagates to uiState`() = runTest(testDispatcher) {
+        orchestratorStateFlow.value = OrchestratorState(
+            status = PlaybackStatus.PREPARING,
+            isOfficialWeb = true,
+            officialWebUrl = "https://tv.cctv.com/live"
+        )
+        testScheduler.runCurrent()
+
+        assertTrue(viewModel.uiState.value.isOfficialWeb)
+        assertEquals("https://tv.cctv.com/live", viewModel.uiState.value.officialWebUrl)
     }
 }

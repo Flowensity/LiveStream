@@ -14,6 +14,8 @@ import com.livestream.playback.api.PlaybackOrchestrator
 import com.livestream.playback.api.SwitchDirection
 import com.livestream.playback.api.model.EngineState
 import com.livestream.playback.api.model.PlaybackMediaItem
+import com.livestream.playback.api.web.WebPlaybackController
+import com.livestream.playback.api.web.WebPlaybackState
 import com.livestream.source.api.SourceAdapterRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -32,6 +34,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private val engine: PlaybackEngine,
     private val channelRepository: ChannelRepository,
     private val sourceAdapterRegistry: SourceAdapterRegistry,
+    override val webPlaybackController: WebPlaybackController,
     private val dispatchers: AppDispatchers
 ) : PlaybackOrchestrator {
 
@@ -54,10 +57,45 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     }
 
     init {
-        // 监听底层引擎状态并映射到调度器聚合状态
+        // 监听原生引擎状态并映射到调度器聚合状态
         orchestratorScope.launch {
             engine.engineState.collect { engineState ->
                 handleEngineState(engineState)
+            }
+        }
+
+        // 监听官方网页播放状态并映射到调度器聚合状态
+        orchestratorScope.launch {
+            webPlaybackController.webState.collect { webState ->
+                if (!_orchestratorState.value.isOfficialWeb) return@collect
+                when (webState) {
+                    is WebPlaybackState.Idle -> { }
+                    is WebPlaybackState.Loading -> {
+                        _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.BUFFERING)
+                    }
+                    is WebPlaybackState.Ready, is WebPlaybackState.Playing -> {
+                        _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PLAYING)
+                    }
+                    is WebPlaybackState.Error -> {
+                        handlePlaybackFailure(
+                            PlaybackErrorInfo(
+                                errorType = PlaybackErrorType.NETWORK_TIMEOUT,
+                                message = webState.description,
+                                canRetry = true
+                            )
+                        )
+                    }
+                    is WebPlaybackState.RendererCrashed -> {
+                        handlePlaybackFailure(
+                            PlaybackErrorInfo(
+                                errorType = PlaybackErrorType.RENDERER_CRASHED,
+                                message = "官方网页渲染进程异常崩溃，正在恢复",
+                                canRetry = true
+                            )
+                        )
+                    }
+                    is WebPlaybackState.Destroyed -> { }
+                }
             }
         }
 
@@ -80,7 +118,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             status = PlaybackStatus.SWITCHING,
             currentChannel = channel,
             currentSource = null,
-            errorInfo = null
+            errorInfo = null,
+            isOfficialWeb = false,
+            officialWebUrl = null
         )
 
         activePlayJob = orchestratorScope.launch {
@@ -150,10 +190,15 @@ class DefaultPlaybackOrchestrator @Inject constructor(
 
         when (resolution) {
             is SourceResolution.NativeMedia -> {
+                // 停止并清理任何残留的 Web 容器
+                webPlaybackController.stopAndDestroy()
+
                 _orchestratorState.value = _orchestratorState.value.copy(
                     status = PlaybackStatus.PREPARING,
                     currentSource = source,
-                    errorInfo = null
+                    errorInfo = null,
+                    isOfficialWeb = false,
+                    officialWebUrl = null
                 )
 
                 val mediaItem = PlaybackMediaItem(
@@ -169,13 +214,16 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 engine.prepare(mediaItem, playWhenReady = true)
             }
             is SourceResolution.OfficialWeb -> {
-                // 官方网页兼容播放将在阶段七扩展
-                val error = PlaybackErrorInfo(
-                    errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
-                    message = "当前源需官方网页播放，原生播放器不支持",
-                    canRetry = false
+                // 原生播放引擎停止，转入官方合规网页模式
+                engine.stop()
+
+                _orchestratorState.value = _orchestratorState.value.copy(
+                    status = PlaybackStatus.PREPARING,
+                    currentSource = source,
+                    errorInfo = null,
+                    isOfficialWeb = true,
+                    officialWebUrl = resolution.uri
                 )
-                handlePlaybackFailure(error)
             }
             is SourceResolution.Unavailable -> {
                 val error = PlaybackErrorInfo(
@@ -189,6 +237,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     }
 
     private fun handleEngineState(engineState: EngineState) {
+        // 若当前处于官方网页播放模式，原生引擎回调不覆盖状态
+        if (_orchestratorState.value.isOfficialWeb) return
+
         // 当前为 SWITCHING 或 RESOLVING 时不被旧引擎状态提前覆盖
         val currentStatus = _orchestratorState.value.status
         if (currentStatus == PlaybackStatus.SWITCHING || currentStatus == PlaybackStatus.RESOLVING) {
@@ -312,14 +363,24 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activeSessionToken++
         activePlayJob?.cancel()
         engine.stop()
-        _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.IDLE)
+        webPlaybackController.stopAndDestroy()
+        _orchestratorState.value = _orchestratorState.value.copy(
+            status = PlaybackStatus.IDLE,
+            isOfficialWeb = false,
+            officialWebUrl = null
+        )
     }
 
     override fun release() {
         activeSessionToken++
         activePlayJob?.cancel()
         engine.release()
-        _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.RELEASED)
+        webPlaybackController.stopAndDestroy()
+        _orchestratorState.value = _orchestratorState.value.copy(
+            status = PlaybackStatus.RELEASED,
+            isOfficialWeb = false,
+            officialWebUrl = null
+        )
     }
 
     override fun attachOutput(output: Any?) {

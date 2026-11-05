@@ -39,8 +39,10 @@ import com.livestream.feature.player.ui.GestureHud
 import com.livestream.feature.player.ui.GestureHudState
 import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
+import com.livestream.feature.player.ui.WebPlaybackContainer
 import com.livestream.feature.settings.SettingsUiState
 import com.livestream.feature.settings.ui.SettingsDialog
+import com.livestream.playback.api.web.WebPlaybackController
 
 /**
  * 手机横屏全屏模式：
@@ -73,7 +75,8 @@ fun PhoneLandscapeLayout(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    webPlaybackController: WebPlaybackController? = null
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -87,39 +90,48 @@ fun PhoneLandscapeLayout(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // 1. 底层：视频表面与触控手势识别
-        LiveVideoSurface(
-            onSurfaceAttached = onSurfaceAttached,
-            onSurfaceDetached = onSurfaceDetached,
-            modifier = Modifier
-                .fillMaxSize()
-                .playerTouchGestures(
-                    onTap = {
-                        if (channelUiState.isDrawerOpen) {
-                            onCloseDrawer()
-                        } else if (settingsUiState.isSettingsOpen) {
-                            onCloseSettings()
-                        } else {
-                            onToggleOsd()
+        // 1. 底层：视频表面或官方网页容器
+        val webUrl = playerUiState.officialWebUrl
+        if (playerUiState.isOfficialWeb && !webUrl.isNullOrBlank()) {
+            WebPlaybackContainer(
+                controller = webPlaybackController,
+                url = webUrl,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            LiveVideoSurface(
+                onSurfaceAttached = onSurfaceAttached,
+                onSurfaceDetached = onSurfaceDetached,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .playerTouchGestures(
+                        onTap = {
+                            if (channelUiState.isDrawerOpen) {
+                                onCloseDrawer()
+                            } else if (settingsUiState.isSettingsOpen) {
+                                onCloseSettings()
+                            } else {
+                                onToggleOsd()
+                            }
+                        },
+                        onDoubleTap = {
+                            onSwitchSource()
+                        },
+                        onLeftVerticalDrag = { deltaY ->
+                            currentBrightness = controlHelper.adjustBrightnessByDelta(activity, deltaY, currentBrightness)
+                            val percent = (currentBrightness * 100).toInt()
+                            gestureHudState = GestureHudState.Brightness(percent)
+                        },
+                        onRightVerticalDrag = { deltaY ->
+                            val percent = controlHelper.adjustVolumeByDelta(deltaY)
+                            gestureHudState = GestureHudState.Volume(percent)
+                        },
+                        onDragEnd = {
+                            gestureHudState = GestureHudState.Hidden
                         }
-                    },
-                    onDoubleTap = {
-                        onSwitchSource()
-                    },
-                    onLeftVerticalDrag = { deltaY ->
-                        currentBrightness = controlHelper.adjustBrightnessByDelta(activity, deltaY, currentBrightness)
-                        val percent = (currentBrightness * 100).toInt()
-                        gestureHudState = GestureHudState.Brightness(percent)
-                    },
-                    onRightVerticalDrag = { deltaY ->
-                        val percent = controlHelper.adjustVolumeByDelta(deltaY)
-                        gestureHudState = GestureHudState.Volume(percent)
-                    },
-                    onDragEnd = {
-                        gestureHudState = GestureHudState.Hidden
-                    }
-                )
-        )
+                    )
+            )
+        }
 
         // 2. 中层：OSD 状态面板
         PlayerOverlay(

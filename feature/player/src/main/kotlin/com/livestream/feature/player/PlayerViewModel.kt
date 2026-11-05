@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.livestream.core.model.Channel
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.domain.channel.repository.ChannelRepository
+import com.livestream.domain.channel.usecase.GetCurrentProgramUseCase
+import com.livestream.domain.channel.usecase.GetNextProgramUseCase
 import com.livestream.playback.api.PlaybackOrchestrator
+import com.livestream.playback.api.web.WebPlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,14 +25,21 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val playbackOrchestrator: PlaybackOrchestrator,
-    private val channelRepository: ChannelRepository
+    private val channelRepository: ChannelRepository,
+    private val getCurrentProgramUseCase: GetCurrentProgramUseCase,
+    private val getNextProgramUseCase: GetNextProgramUseCase
 ) : ViewModel() {
+
+    val webPlaybackController: WebPlaybackController?
+        get() = playbackOrchestrator.webPlaybackController
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     private var osdDismissJob: Job? = null
     private var numberKeyJob: Job? = null
+    private var epgJob: Job? = null
+    private var currentObservedChannelId: String? = null
 
     init {
         observeOrchestratorState()
@@ -46,6 +56,28 @@ class PlayerViewModel @Inject constructor(
 
                 val isPlaying = state.status == PlaybackStatus.PLAYING
 
+                val channelId = state.currentChannel?.id
+                if (channelId != currentObservedChannelId) {
+                    currentObservedChannelId = channelId
+                    epgJob?.cancel()
+                    if (channelId != null) {
+                        epgJob = viewModelScope.launch {
+                            launch {
+                                getCurrentProgramUseCase(channelId).collect { program ->
+                                    _uiState.update { it.copy(currentProgram = program) }
+                                }
+                            }
+                            launch {
+                                getNextProgramUseCase(channelId).collect { program ->
+                                    _uiState.update { it.copy(nextProgram = program) }
+                                }
+                            }
+                        }
+                    } else {
+                        _uiState.update { it.copy(currentProgram = null, nextProgram = null) }
+                    }
+                }
+
                 _uiState.update { current ->
                     current.copy(
                         status = state.status,
@@ -56,7 +88,9 @@ class PlayerViewModel @Inject constructor(
                         activeSourceIndex = state.currentSourceIndex,
                         totalSources = state.totalSources,
                         metrics = state.metrics,
-                        error = state.errorInfo
+                        error = state.errorInfo,
+                        isOfficialWeb = state.isOfficialWeb,
+                        officialWebUrl = state.officialWebUrl
                     )
                 }
 

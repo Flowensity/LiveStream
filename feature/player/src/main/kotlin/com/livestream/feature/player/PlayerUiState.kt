@@ -1,6 +1,7 @@
 package com.livestream.feature.player
 
 import com.livestream.core.model.Channel
+import com.livestream.core.model.EpgProgram
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackStatus
@@ -17,5 +18,9 @@ data class PlayerUiState(
     val metrics: PlaybackMetrics = PlaybackMetrics(),
     val error: PlaybackErrorInfo? = null,
     val isOsdVisible: Boolean = true,
-    val quickChannelNumber: String = ""
+    val quickChannelNumber: String = "",
+    val isOfficialWeb: Boolean = false,
+    val officialWebUrl: String? = null,
+    val currentProgram: EpgProgram? = null,
+    val nextProgram: EpgProgram? = null
 )

@@ -80,6 +80,7 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
         }
@@ -110,6 +111,7 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
         }
@@ -138,6 +140,7 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
         }
@@ -180,6 +183,7 @@ fun HomeScreen(
                 onCloseImportDialog = { settingsViewModel.closeImportDialog() },
                 onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
                 onConfirmImport = { settingsViewModel.importM3uContent() },
+                webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
         }

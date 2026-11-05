@@ -12,7 +12,7 @@
 | **阶段四** | **频道和资源管理** | **已完成 (Completed)** | ChannelRepository、SourceAdapter 插件化体系、自定义直播源支持、回退策略 |
 | **阶段五** | **核心 UI 开发** | **已完成 (Completed)** | 首页、频道列表、全屏播放器、OSD 交互面板、收藏与设置 |
 | **阶段六** | **设备适配与交互** | **已完成 (Completed)** | Android TV D-pad 遥控器与焦点适配、手机竖屏/横屏手势、平板分栏布局 |
-| 阶段七 | EPG 与 WebView 兼容 | 待开始 | EPG 节目单展示、官方合规网页独立播放容器、崩溃恢复 |
+| **阶段七** | **EPG 与 WebView 兼容** | **已完成 (Completed)** | XMLTV 流式节目单解析与持久化、EPG 节目用例、官方合规网页独立播放容器、崩溃恢复 |
 | 阶段八 | 性能优化与稳定性 | 待开始 | 首帧速度、切台耗时、内存监控、8小时持续播放与压力测试 |
 | 阶段九 | 发布准备与交付物整理 | 待开始 | 启动页、图标、权限说明、Release 构建、交付文档汇总 |
 
@@ -127,3 +127,40 @@
   - 覆盖 `DeviceDetectorTest`（TV、平板、手机横屏/竖屏判断）与 `DeviceControlHelperTest`（音量百分比换算）。
   - `./gradlew test`：全工程 700 个 Action 全部通过（100% 成功）。
   - `./gradlew assembleDebug`：成功构建多端自适应调试 APK。
+
+---
+
+## 阶段七详细执行日志
+
+- [x] **实现 XMLTV 流式节目单解析器 (`:data:epg`)**：
+  - `XmltvParser`：采用标准 SAX 流式事件驱动解析（`SAXParserFactory`），实现内存占用恒定 O(1) 的大容量 XML 节目单流式导入。
+  - 严谨处理时区偏移格式（`yyyyMMddHHmmss Z` 与 `yyyyMMddHHmmss`）与确定性唯一主键设计（`${channelId}_${startTimestamp}`），杜绝重复与数据污染。
+  - 单元测试：`XmltvParserTest` 覆盖标准 XMLTV、缺失时区、格式容错与空字段健壮性验证。
+- [x] **EPG 领域用例与数据层装配 (`:domain:channel` & `:data:epg`)**：
+  - `GetCurrentProgramUseCase`：按当前时标动态流式观察当前频道的正在播出节目。
+  - `GetNextProgramUseCase`：流式观察下一档即将播出的节目预告。
+  - `GetProgramsForChannelUseCase`：观察指定时间区间内的全量节目单。
+  - 在 `EpgDataModule` 中声明并由 Hilt 注入各 UseCase。
+- [x] **官方合规网页独立播放容器 (`:playback:playback-api` & `:playback:playback-web`)**：
+  - `WebPlaybackController`：纯领域播放契约，独立生命周期与状态机（`Idle`、`Loading`、`Ready`、`Playing`、`Error`、`RendererCrashed`、`Destroyed`）。
+  - `DefaultWebPlaybackController`：独立沙箱生命周期管理，按需激活。
+    - 严格 Web 安全沙箱：禁止明文混合内容（`MIXED_CONTENT_NEVER_ALLOW`）。
+    - 崩溃隔离与恢复（`onRenderProcessGone`）：防止因 Web 进程内存超限崩溃导致整个宿主应用闪退，优雅捕获崩溃并流转至 `RendererCrashed` 触发自动回退或重启。
+    - 页面加载 15 秒超时保护（`PAGE_LOAD_TIMEOUT_MS`）。
+    - 干净退出销毁（`stopLoading`、`clearHistory`、`about:blank`、从父布局容器解绑、`destroy()` 并置空引用，杜绝内存泄漏）。
+- [x] **统一播放调度层整合与状态流转 (`DefaultPlaybackOrchestrator`)**：
+  - 接入 `WebPlaybackController`，当适配器解析出 `SourceResolution.OfficialWeb` 时：
+    - 自动停止原生 Media3 引擎（释放硬件解码通道）。
+    - 将调度器状态标记为 `isOfficialWeb = true` 与 `officialWebUrl`。
+  - 当解析或回退为 `SourceResolution.NativeMedia` 时，自动调用 `webPlaybackController.stopAndDestroy()`。
+  - 在 `stop()` 与 `release()` 周期中自动联动销毁 Web 播放容器。
+  - 监听 `webState` 驱动调度器的 `BUFFERING`、`PLAYING` 与 `ERROR` 状态。
+- [x] **UI 呈现与多端合规渲染 (`:feature:player` & `:feature:home`)**：
+  - `WebPlaybackContainer`：基于 Compose `AndroidView` 实现的官方网页容器，自动托管加载与生命周期解绑。
+  - `PlayerOverlay`：在 OSD 顶部面板动态呈现当前播出节目（如 `正在播出: 新闻联播 (19:00 - 19:30)`）与即将播出预告，展示"官方合规网页"状态角标。
+  - `ChannelListItem`：频道列表项增加当前播出节目副标题，丰富选台信息。
+  - 多端布局（`TvLayout`、`PhonePortraitLayout`、`PhoneLandscapeLayout`、`TabletDualPaneLayout`）全量支持根据流类型自适应切换 `LiveVideoSurface` 与 `WebPlaybackContainer`。
+- [x] **单元测试与构建验证**：
+  - 覆盖 `XmltvParserTest`、`DefaultWebPlaybackControllerTest`、`PlaybackOrchestratorTest`（官方网页状态流转测试）、`PlayerViewModelTest`（EPG 订阅与官方网页状态测试）。
+  - `./gradlew test`：全工程 749 个 Action 全部通过（100% 成功）。
+  - `./gradlew assembleDebug`：成功构建集成 Phase 7 的完整多端调试 APK。

@@ -36,7 +36,8 @@ fun ChannelListItem(
     isActive: Boolean,
     onChannelClick: (Channel) -> Unit,
     onFavoriteToggle: (Channel) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    programTitle: String? = null
 ) {
     TvFocusableBox(
         onClick = { onChannelClick(channel) },
@@ -77,7 +78,7 @@ fun ChannelListItem(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // 频道名称
+                // 频道名称与当前节目
                 Column {
                     Text(
                         text = channel.name,
@@ -86,6 +87,14 @@ fun ChannelListItem(
                         fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.Normal,
                         maxLines = 1
                     )
+                    if (!programTitle.isNullOrBlank()) {
+                        Text(
+                            text = programTitle,
+                            color = if (isActive) FocusHighlight.copy(alpha = 0.8f) else TextMuted,
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 

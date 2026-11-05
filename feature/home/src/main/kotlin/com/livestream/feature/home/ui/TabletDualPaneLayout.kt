@@ -41,8 +41,10 @@ import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
 import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
+import com.livestream.feature.player.ui.WebPlaybackContainer
 import com.livestream.feature.settings.SettingsUiState
 import com.livestream.feature.settings.ui.SettingsDialog
+import com.livestream.playback.api.web.WebPlaybackController
 
 /**
  * 平板电脑分栏响应式布局（Tablet Dual-Pane）：
@@ -71,7 +73,8 @@ fun TabletDualPaneLayout(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    webPlaybackController: WebPlaybackController? = null
 ) {
     Row(
         modifier = modifier
@@ -164,20 +167,29 @@ fun TabletDualPaneLayout(
             }
         }
 
-        // 2. 右栏：全尺寸播放器区域
+        // 2. 右栏：全尺寸播放器区域或官方网页容器
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Color.Black)
         ) {
-            LiveVideoSurface(
-                onSurfaceAttached = onSurfaceAttached,
-                onSurfaceDetached = onSurfaceDetached,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { onToggleOsd() }
-            )
+            val webUrl = playerUiState.officialWebUrl
+            if (playerUiState.isOfficialWeb && !webUrl.isNullOrBlank()) {
+                WebPlaybackContainer(
+                    controller = webPlaybackController,
+                    url = webUrl,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                LiveVideoSurface(
+                    onSurfaceAttached = onSurfaceAttached,
+                    onSurfaceDetached = onSurfaceDetached,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onToggleOsd() }
+                )
+            }
 
             PlayerOverlay(
                 uiState = playerUiState,

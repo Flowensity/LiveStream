@@ -46,8 +46,10 @@ import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
 import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
+import com.livestream.feature.player.ui.WebPlaybackContainer
 import com.livestream.feature.settings.SettingsUiState
 import com.livestream.feature.settings.ui.SettingsDialog
+import com.livestream.playback.api.web.WebPlaybackController
 
 /**
  * 手机竖屏专用布局：
@@ -76,7 +78,8 @@ fun PhonePortraitLayout(
     onCloseImportDialog: () -> Unit,
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    webPlaybackController: WebPlaybackController? = null
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -86,24 +89,33 @@ fun PhonePortraitLayout(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // 1. 上半部：16:9 原生播放窗口
+        // 1. 上半部：16:9 原生播放窗口或官方网页容器
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
                 .background(Color.Black)
         ) {
-            LiveVideoSurface(
-                onSurfaceAttached = onSurfaceAttached,
-                onSurfaceDetached = onSurfaceDetached,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onToggleOsd
-                    )
-            )
+            val webUrl = playerUiState.officialWebUrl
+            if (playerUiState.isOfficialWeb && !webUrl.isNullOrBlank()) {
+                WebPlaybackContainer(
+                    controller = webPlaybackController,
+                    url = webUrl,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                LiveVideoSurface(
+                    onSurfaceAttached = onSurfaceAttached,
+                    onSurfaceDetached = onSurfaceDetached,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onToggleOsd
+                        )
+                )
+            }
 
             PlayerOverlay(
                 uiState = playerUiState,
