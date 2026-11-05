@@ -3,7 +3,9 @@ package com.livestream.feature.player.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,12 +17,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.livestream.core.ui.theme.DarkSurfaceElevated
-import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextPrimary
+import com.livestream.core.ui.theme.OneUiTheme
 
 sealed interface GestureHudState {
     data object Hidden : GestureHudState
@@ -29,6 +30,9 @@ sealed interface GestureHudState {
     data class QuickSwitch(val title: String) : GestureHudState
 }
 
+/**
+ * Samsung One UI 风格手势悬浮反馈胶囊 (One UI Pill HUD)
+ */
 @Composable
 fun GestureHud(
     state: GestureHudState,
@@ -40,32 +44,35 @@ fun GestureHud(
         exit = fadeOut(),
         modifier = modifier
     ) {
+        val pillShape = RoundedCornerShape(50)
+
         Box(
             modifier = Modifier
-                .background(DarkSurfaceElevated.copy(alpha = 0.9f), RoundedCornerShape(10.dp))
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .border(BorderStroke(1.dp, Color(0x22FFFFFF)), pillShape)
+                .background(Color(0xDD1A1B20), pillShape)
+                .padding(horizontal = 22.dp, vertical = 12.dp)
         ) {
             when (state) {
                 is GestureHudState.Volume -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🔊", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "🔊", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "音量 ${state.percentage}%",
-                            color = TextPrimary,
-                            fontSize = 15.sp,
+                            color = Color.White,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
                 is GestureHudState.Brightness -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "☀", fontSize = 18.sp, color = FocusHighlight)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "☀", fontSize = 16.sp, color = OneUiTheme.colors.accent)
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "亮度 ${state.percentage}%",
-                            color = TextPrimary,
-                            fontSize = 15.sp,
+                            color = Color.White,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -74,8 +81,8 @@ fun GestureHud(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = state.title,
-                            color = FocusHighlight,
-                            fontSize = 16.sp,
+                            color = OneUiTheme.colors.accent,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }

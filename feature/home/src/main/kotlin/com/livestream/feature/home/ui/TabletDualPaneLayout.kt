@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +53,7 @@ import com.livestream.core.ui.theme.AppSurfaceElevated
 import com.livestream.core.ui.theme.AppTextMuted
 import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
+import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelDrawer
@@ -163,49 +167,58 @@ fun TabletDualPaneLayout(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (playerUiState.activeChannel != null) {
+                                    val epgPill = RoundedCornerShape(50)
                                     Box(
                                         modifier = Modifier
-                                            .background(AppSurfaceElevated, RoundedCornerShape(6.dp))
+                                            .clip(epgPill)
+                                            .background(OneUiTheme.colors.accentSoft)
                                             .clickable { onToggleEpgSheet() }
-                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
                                     ) {
                                         Text(
                                             text = "📅 节目单",
-                                            color = FocusHighlight,
+                                            color = OneUiTheme.colors.accent,
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
 
+                                val settingsPill = RoundedCornerShape(50)
                                 Box(
                                     modifier = Modifier
-                                        .background(AppSurfaceElevated, RoundedCornerShape(6.dp))
+                                        .clip(settingsPill)
+                                        .background(OneUiTheme.colors.cardSecondary)
                                         .clickable { onOpenSettings() }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
-                                    Text(text = "⚙ 设置", color = AppTextPrimary, fontSize = 12.sp)
+                                    Text(
+                                        text = "⚙ 设置",
+                                        color = OneUiTheme.colors.textPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        // 搜索框
+                        // One UI 药丸搜索框
                         OutlinedTextField(
                             value = channelUiState.searchQuery,
                             onValueChange = onSearchQueryChanged,
-                            placeholder = { Text("搜索频道...", color = AppTextMuted, fontSize = 13.sp) },
+                            placeholder = { Text("搜索频道...", color = OneUiTheme.colors.textMuted, fontSize = 13.sp) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = AppSurfaceElevated,
-                                unfocusedContainerColor = AppBackground,
-                                focusedBorderColor = FocusHighlight,
+                                focusedContainerColor = OneUiTheme.colors.cardSecondary,
+                                unfocusedContainerColor = OneUiTheme.colors.cardSecondary,
+                                focusedBorderColor = OneUiTheme.colors.accent,
                                 unfocusedBorderColor = Color.Transparent,
-                                focusedTextColor = AppTextPrimary,
-                                unfocusedTextColor = AppTextPrimary
+                                focusedTextColor = OneUiTheme.colors.textPrimary,
+                                unfocusedTextColor = OneUiTheme.colors.textPrimary
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(24.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
 
@@ -283,6 +296,10 @@ fun TabletDualPaneLayout(
 
                 // 平板全屏时的顶部快捷操作条（退出全屏、节目单、频道抽屉、设置）
                 if (isFullscreen && playerUiState.isOsdVisible && !channelUiState.isDrawerOpen && !settingsUiState.isSettingsOpen) {
+                    val pillShape = RoundedCornerShape(50)
+                    val btnBg = Color(0xCC1A1B20)
+                    val btnBorder = BorderStroke(1.dp, Color(0x33FFFFFF))
+
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -291,22 +308,24 @@ fun TabletDualPaneLayout(
                     ) {
                         Box(
                             modifier = Modifier
-                                .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                                .border(btnBorder, pillShape)
+                                .background(btnBg, pillShape)
                                 .clickable { isFullscreen = false }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
-                            Text(text = "✕ 退出全屏", color = FocusHighlight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "✕ 退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
 
                         if (playerUiState.activeChannel != null) {
                             Spacer(modifier = Modifier.width(10.dp))
                             Box(
                                 modifier = Modifier
-                                    .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                                    .border(btnBorder, pillShape)
+                                    .background(btnBg, pillShape)
                                     .clickable { onToggleEpgSheet() }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
                             ) {
-                                Text(text = "📅 节目单", color = FocusHighlight, fontSize = 13.sp)
+                                Text(text = "📅 节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
@@ -314,22 +333,24 @@ fun TabletDualPaneLayout(
 
                         Box(
                             modifier = Modifier
-                                .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                                .border(btnBorder, pillShape)
+                                .background(btnBg, pillShape)
                                 .clickable { onOpenDrawer() }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
-                            Text(text = "频道列表", color = AppTextPrimary, fontSize = 13.sp)
+                            Text(text = "频道菜单", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         }
 
                         Spacer(modifier = Modifier.width(10.dp))
 
                         Box(
                             modifier = Modifier
-                                .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                                .border(btnBorder, pillShape)
+                                .background(btnBg, pillShape)
                                 .clickable { onOpenSettings() }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
-                            Text(text = "⚙ 设置", color = AppTextPrimary, fontSize = 13.sp)
+                            Text(text = "⚙ 设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }

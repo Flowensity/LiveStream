@@ -3,7 +3,9 @@ package com.livestream.feature.player.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -31,18 +34,15 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.core.ui.component.StreamLoadingIndicator
 import com.livestream.core.ui.component.TvFocusableBox
-import com.livestream.core.ui.theme.DarkSurfaceElevated
-import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.StatusError
-import com.livestream.core.ui.theme.StatusWarning
-import com.livestream.core.ui.theme.TextMuted
-import com.livestream.core.ui.theme.TextPrimary
-import com.livestream.core.ui.theme.TextSecondary
+import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.player.PlayerUiState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Samsung One UI 风格播放器控制浮层 (OSD)
+ */
 @Composable
 fun PlayerOverlay(
     uiState: PlayerUiState,
@@ -57,7 +57,7 @@ fun PlayerOverlay(
             val statusText = when (uiState.status) {
                 PlaybackStatus.SWITCHING -> "正在切换频道..."
                 PlaybackStatus.RESOLVING -> "正在解析直播信号..."
-                PlaybackStatus.PREPARING -> "正在初始化硬件解码器..."
+                PlaybackStatus.PREPARING -> "正在初始化解码器..."
                 else -> "正在缓冲数据..."
             }
             StreamLoadingIndicator(
@@ -66,14 +66,16 @@ fun PlayerOverlay(
             )
         }
 
-        // 2. 播放异常提示卡片
+        // 2. 播放异常提示卡片 (One UI Error Dialog Card)
         if (uiState.status == PlaybackStatus.ERROR && uiState.error != null) {
+            val errCardShape = RoundedCornerShape(24.dp)
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.divider), errCardShape)
                     .background(
-                        color = DarkSurfaceElevated.copy(alpha = 0.95f),
-                        shape = RoundedCornerShape(12.dp)
+                        color = OneUiTheme.colors.cardBackground.copy(alpha = 0.95f),
+                        shape = errCardShape
                     )
                     .padding(24.dp)
             ) {
@@ -83,14 +85,14 @@ fun PlayerOverlay(
                 ) {
                     Text(
                         text = "播放异常",
-                        color = StatusError,
+                        color = OneUiTheme.colors.statusError,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = uiState.error.message,
-                        color = TextSecondary,
+                        color = OneUiTheme.colors.textSecondary,
                         fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(20.dp))
@@ -100,14 +102,16 @@ fun PlayerOverlay(
                     ) {
                         Button(
                             onClick = onRetry,
-                            colors = ButtonDefaults.buttonColors(containerColor = FocusHighlight),
+                            shape = RoundedCornerShape(50),
+                            colors = ButtonDefaults.buttonColors(containerColor = OneUiTheme.colors.accent),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("重试", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text("重试", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                         if (uiState.totalSources > 1) {
                             OutlinedButton(
                                 onClick = onSwitchSource,
+                                shape = RoundedCornerShape(50),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("换线 (${uiState.activeSourceIndex + 1}/${uiState.totalSources})")
@@ -120,23 +124,25 @@ fun PlayerOverlay(
 
         // 3. 数字键换台悬浮窗
         if (uiState.quickChannelNumber.isNotEmpty()) {
+            val quickShape = RoundedCornerShape(18.dp)
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(32.dp)
-                    .background(DarkSurfaceElevated.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, Color(0x33FFFFFF)), quickShape)
+                    .background(Color(0xDD1A1B20), quickShape)
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = uiState.quickChannelNumber,
-                        color = FocusHighlight,
+                        color = OneUiTheme.colors.accent,
                         fontSize = 36.sp,
                         fontWeight = FontWeight.Black
                     )
                     Text(
                         text = "正在换台...",
-                        color = TextMuted,
+                        color = OneUiTheme.colors.textMuted,
                         fontSize = 12.sp
                     )
                 }
@@ -161,7 +167,7 @@ fun PlayerOverlay(
                                 colors = listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent)
                             )
                         )
-                        .padding(horizontal = 28.dp, vertical = 20.dp)
+                        .padding(horizontal = 24.dp, vertical = 18.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -171,17 +177,26 @@ fun PlayerOverlay(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 val channelNum = uiState.activeChannel?.channelNumber?.let { "%02d".format(it) } ?: "--"
-                                Text(
-                                    text = channelNum,
-                                    color = FocusHighlight,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(OneUiTheme.colors.accent.copy(alpha = 0.25f))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = channelNum,
+                                        color = OneUiTheme.colors.accent,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = uiState.activeChannel?.name ?: "未选频道",
-                                    color = TextPrimary,
-                                    fontSize = 22.sp,
+                                    color = Color.White,
+                                    fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold
                                 )
 
@@ -191,51 +206,55 @@ fun PlayerOverlay(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text(
                                         text = lineBadge,
-                                        color = TextSecondary,
+                                        color = Color(0xFFC5C8D4),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
                                         modifier = Modifier
-                                            .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                            .clip(RoundedCornerShape(50))
+                                            .background(Color(0x33FFFFFF))
+                                            .padding(horizontal = 10.dp, vertical = 3.dp)
                                     )
                                 }
                             }
 
                             // EPG 节目单展示
                             if (uiState.activeChannel != null) {
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    uiState.currentProgram?.let { prog ->
-                                        val timeStr = "${formatTime(prog.startTimestamp)} - ${formatTime(prog.endTimestamp)}"
+                                    val currentProg = uiState.currentProgram
+                                    if (currentProg != null) {
+                                        val timeStr = "${formatTime(currentProg.startTimestamp)} - ${formatTime(currentProg.endTimestamp)}"
                                         Text(
-                                            text = "播出: ${prog.title} ($timeStr)",
-                                            color = FocusHighlight,
+                                            text = "播出: ${currentProg.title} ($timeStr)",
+                                            color = OneUiTheme.colors.accent,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
-                                    uiState.nextProgram?.let { prog ->
+                                    val nextProg = uiState.nextProgram
+                                    if (nextProg != null) {
                                         Text(
-                                            text = "下期: ${prog.title} (${formatTime(prog.startTimestamp)})",
-                                            color = TextMuted,
+                                            text = "下期: ${nextProg.title} (${formatTime(nextProg.startTimestamp)})",
+                                            color = Color(0xFFA0A4B2),
                                             fontSize = 13.sp
                                         )
                                     }
                                     if (onOpenEpgSchedule != null) {
                                         Box(
                                             modifier = Modifier
-                                                .background(DarkSurfaceElevated, RoundedCornerShape(4.dp))
+                                                .clip(RoundedCornerShape(50))
+                                                .background(OneUiTheme.colors.accent.copy(alpha = 0.25f))
                                                 .clickable { onOpenEpgSchedule() }
-                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                .padding(horizontal = 10.dp, vertical = 3.dp)
                                         ) {
                                             Text(
                                                 text = "📅 节目单",
-                                                color = FocusHighlight,
+                                                color = OneUiTheme.colors.accent,
                                                 fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium
+                                                fontWeight = FontWeight.SemiBold
                                             )
                                         }
                                     }
@@ -245,7 +264,7 @@ fun PlayerOverlay(
                     }
                 }
 
-                // 底部性能指标统计渐变栏（仅在能真实获取到指标时展示，未获取到的项绝不显示占位符）
+                // 底部性能指标统计渐变栏
                 val metrics = uiState.metrics
                 val statItems = mutableListOf<String>()
                 if (metrics.videoWidth > 0 && metrics.videoHeight > 0) {
@@ -274,11 +293,11 @@ fun PlayerOverlay(
                                     colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
                                 )
                             )
-                            .padding(horizontal = 28.dp, vertical = 16.dp)
+                            .padding(horizontal = 24.dp, vertical = 14.dp)
                     ) {
                         Text(
-                            text = statItems.joinToString(" | "),
-                            color = TextMuted,
+                            text = statItems.joinToString("  •  "),
+                            color = Color(0xFF9EA2B0),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )

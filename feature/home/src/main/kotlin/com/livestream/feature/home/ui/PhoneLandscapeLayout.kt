@@ -2,7 +2,9 @@ package com.livestream.feature.home.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -32,6 +34,7 @@ import com.livestream.core.ui.theme.AppBackground
 import com.livestream.core.ui.theme.AppSurfaceElevated
 import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
+import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.player.PlayerUiState
@@ -160,6 +163,10 @@ fun PhoneLandscapeLayout(
 
         // 4. 顶部操作快捷栏（全屏退出、频道菜单、设置）
         if (playerUiState.isOsdVisible && !channelUiState.isDrawerOpen && !settingsUiState.isSettingsOpen) {
+            val pillShape = RoundedCornerShape(50)
+            val btnBg = Color(0xCC1A1B20)
+            val btnBorder = BorderStroke(1.dp, Color(0x33FFFFFF))
+
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -168,24 +175,26 @@ fun PhoneLandscapeLayout(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .border(btnBorder, pillShape)
+                        .background(btnBg, pillShape)
                         .clickable {
                             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "✕ 退出全屏", color = FocusHighlight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "✕ 退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
 
                 if (playerUiState.activeChannel != null) {
                     Spacer(modifier = Modifier.width(10.dp))
                     Box(
                         modifier = Modifier
-                            .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                            .border(btnBorder, pillShape)
+                            .background(btnBg, pillShape)
                             .clickable { onToggleEpgSheet() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
-                        Text(text = "📅 节目单", color = FocusHighlight, fontSize = 13.sp)
+                        Text(text = "📅 节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -193,22 +202,24 @@ fun PhoneLandscapeLayout(
 
                 Box(
                     modifier = Modifier
-                        .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .border(btnBorder, pillShape)
+                        .background(btnBg, pillShape)
                         .clickable { onOpenDrawer() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "频道列表", color = AppTextPrimary, fontSize = 13.sp)
+                    Text(text = "频道菜单", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Box(
                     modifier = Modifier
-                        .background(AppSurfaceElevated.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                        .border(btnBorder, pillShape)
+                        .background(btnBg, pillShape)
                         .clickable { onOpenSettings() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "⚙ 设置", color = AppTextPrimary, fontSize = 13.sp)
+                    Text(text = "⚙ 设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }

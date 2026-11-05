@@ -26,8 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.livestream.core.ui.theme.FocusHighlight
-import com.livestream.core.ui.theme.TextPrimary
+import com.livestream.core.ui.theme.OneUiTheme
 
 @Composable
 fun StreamLoadingIndicator(
@@ -71,20 +70,23 @@ fun StreamLoadingIndicator(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        val accent = OneUiTheme.colors.accent
+        val textCol = OneUiTheme.colors.textPrimary
+
         Row(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Dot(scale = dot1Scale, color = FocusHighlight)
+            Dot(scale = dot1Scale, color = accent)
             Spacer(modifier = Modifier.width(8.dp))
-            Dot(scale = dot2Scale, color = FocusHighlight)
+            Dot(scale = dot2Scale, color = accent)
             Spacer(modifier = Modifier.width(8.dp))
-            Dot(scale = dot3Scale, color = FocusHighlight)
+            Dot(scale = dot3Scale, color = accent)
         }
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = message,
-            color = TextPrimary,
+            color = textCol,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )

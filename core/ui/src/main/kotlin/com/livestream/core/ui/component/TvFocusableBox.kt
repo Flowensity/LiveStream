@@ -25,24 +25,25 @@ import androidx.compose.ui.unit.dp
 import com.livestream.core.ui.theme.AppSurface
 import com.livestream.core.ui.theme.AppSurfaceElevated
 import com.livestream.core.ui.theme.FocusHighlight
+import com.livestream.core.ui.theme.OneUiTheme
 
 /**
- * Android TV 与触摸屏通用的焦点容器组件。
- * 当通过 D-pad 遥控器获取焦点时，自动触发：
- * 1. 尺度微放大 (1.04x) 提供远距离可见性
- * 2. 高对比度高亮边框 (FocusHighlight)
- * 3. 提升表面背景对比度
+ * Samsung One UI 与 Android TV 通用的焦点/交互容器组件。
+ * 当触控按压或遥控器获取焦点时：
+ * 1. 尺度微放大 (1.03x) 平滑反馈
+ * 2. 柔和 One UI 强调色边框
+ * 3. 柔和圆角卡片过渡 (默认 14.dp)
  */
 @Composable
 fun TvFocusableBox(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(8.dp),
+    shape: Shape = RoundedCornerShape(14.dp),
     focusedBorderWidth: Dp = 2.dp,
-    focusedBorderColor: Color = FocusHighlight,
-    unfocusedBackgroundColor: Color = AppSurface,
-    focusedBackgroundColor: Color = AppSurfaceElevated,
-    scaleOnFocus: Float = 1.04f,
+    focusedBorderColor: Color = OneUiTheme.colors.accent,
+    unfocusedBackgroundColor: Color = OneUiTheme.colors.cardBackground,
+    focusedBackgroundColor: Color = OneUiTheme.colors.cardSecondary,
+    scaleOnFocus: Float = 1.03f,
     content: @Composable BoxScope.(isFocused: Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
