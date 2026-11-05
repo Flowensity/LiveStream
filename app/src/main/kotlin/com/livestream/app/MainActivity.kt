@@ -22,10 +22,20 @@ import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.LiveStreamTheme
 import com.livestream.core.ui.theme.TextMuted
 import com.livestream.core.ui.theme.TextPrimary
+import com.livestream.domain.channel.repository.ChannelRepository
+import com.livestream.domain.channel.repository.UserPreferencesRepository
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var channelRepository: ChannelRepository
+
+    @Inject
+    lateinit var userPreferencesRepository: UserPreferencesRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {

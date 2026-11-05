@@ -7,7 +7,7 @@
 | 阶段 | 阶段名称 | 状态 | 交付目标 |
 | :--- | :--- | :--- | :--- |
 | **阶段一** | **项目初始化与架构设计** | **已完成 (Completed)** | 环境核验、技术选型、架构文档、基础工程初始化、空白应用编译验证 |
-| 阶段二 | 基础数据与领域层 | 待开始 | 频道/播放源/EPG 纯领域模型、Room 数据库、DataStore 偏好存储、单元测试 |
+| **阶段二** | **基础数据与领域层** | **已完成 (Completed)** | 频道/播放源/EPG 纯领域模型、Room 数据库、DataStore 偏好存储、仓储实现、单元测试 |
 | 阶段三 | 原生播放器核心 | 待开始 | Media3 集成、NativePlaybackEngine、PlaybackOrchestrator 状态机、HLS 验证 |
 | 阶段四 | 频道和资源管理 | 待开始 | ChannelRepository、SourceAdapter 插件化体系、自定义直播源支持、回退策略 |
 | 阶段五 | 核心 UI 开发 | 待开始 | 首页、频道列表、全屏播放器、OSD 交互面板、收藏与历史 |
@@ -18,28 +18,27 @@
 
 ---
 
-## 阶段一详细执行日志
+## 阶段二详细执行日志
 
-- [x] **本地开发环境核查**：
-  - JDK: OpenJDK 17.0.21 (Temurin) (`/home/flowensity/android-toolchain/jdk-17.0.21+9`)
-  - Android SDK: Platform API 34, Build-Tools 34.0.0 (`/home/flowensity/android-toolchain/sdk`)
-  - Gradle: Gradle 8.5
-- [x] **技术选型核对与依赖版本治理**：
-  - 建立统一 Gradle Version Catalog (`gradle/libs.versions.toml`)
-  - 锁定 AGP 8.2.2 + Kotlin 1.9.22 + Compose BOM 2024.02.00 + Media3 1.2.1 + Room 2.6.1 + Hilt 2.50
-- [x] **输出架构设计与接入规范文档**：
-  - `docs/architecture/01-system-overview-and-modular-structure.md` (系统总体架构与模块划分)
-  - `docs/architecture/02-clean-architecture-and-data-flow.md` (Clean Architecture 与 UDF 单向数据流)
-  - `docs/architecture/03-tech-stack-and-version-governance.md` (技术选型核对与依赖版本治理)
-  - `docs/architecture/04-data-models-and-storage.md` (数据模型与本地存储架构)
-  - `docs/architecture/05-playback-orchestrator-and-media3.md` (播放器架构与 Media3 深度治理)
-  - `docs/architecture/06-source-adapter-specification.md` (直播源适配器接入规范)
-  - `docs/architecture/07-epg-specification.md` (EPG 节目单接入规范)
-- [x] **创建基础多模块工程骨架**：
-  - `:app`：主入口容器、Hilt 容器装配、Android TV Leanback 与 Mobile 统一 Manifest
-  - `:core:common`：通用业务封装 (`AppResult`)、协程调度器契约 (`AppDispatchers`)
-  - `:core:model`：纯 Kotlin 领域数据实体（`Channel`, `LiveSource`, `SourceResolution`, `PlaybackStatus`, `EpgProgram`），零 Android / Media3 污染
-  - `:core:ui`：Compose 基础主题、OLED 暗黑配色、Typography 设计标记
-- [x] **执行全量构建与单元测试验证**：
-  - `./gradlew assembleDebug`：成功生成 `app-debug.apk` (9.3MB)
-  - `./gradlew test`：全模块 101 个构建与测试 Action 100% 通过
+- [x] **定义核心领域模型 (`:core:model`)**：
+  - `Channel`、`ChannelCategory`、`LiveSource`、`EpgProgram`、`SourceResolution`、`PlaybackStatus`、`UserPreferences`
+  - 频道与直播源物理隔离（1:N），播放 URL 由 `LiveSource` 单独管理，领域模型零平台污染。
+- [x] **实现 Room 2.6.1 本地数据库 (`:core:database`)**：
+  - Entities：`CategoryEntity`、`ChannelEntity`、`LiveSourceEntity`、`EpgProgramEntity`、`PlaybackHistoryEntity`
+  - DAOs：`CategoryDao`、`ChannelDao`、`LiveSourceDao`、`EpgDao`、`PlaybackHistoryDao`
+  - Database：`LiveStreamDatabase` (版本 1，支持降级安全回退与外键级联删除)
+  - Hilt Module：`DatabaseModule` 全局单例注入
+- [x] **实现 DataStore Preferences (`:core:datastore`)**：
+  - `UserPreferencesDataStore`：集中管控默认分类、上次播放频道、硬解优先、SurfaceView 优先、切台超时和遥控器映射方案。
+  - Hilt Module：`DataStoreModule`
+- [x] **定义领域层仓库契约与 UseCase (`:domain:channel`)**：
+  - Repositories：`ChannelRepository`、`CategoryRepository`、`EpgRepository`、`UserPreferencesRepository`
+  - UseCases：`GetChannelsUseCase`、`ToggleFavoriteUseCase`、`SearchChannelsUseCase`、`GetCurrentProgramUseCase`
+- [x] **实现数据仓库与预置数据 (`:data:channel`, `:data:epg`)**：
+  - `ChannelRepositoryImpl`、`CategoryRepositoryImpl`、`UserPreferencesRepositoryImpl`、`EpgRepositoryImpl`
+  - 双向实体/领域映射器：`CategoryMapper`、`ChannelMapper`、`LiveSourceMapper`、`EpgMapper`
+  - 预置真实频道元数据：`PresetChannelDataProvider`（央视频道 1~18、主流省份卫视，不伪造非法 URL）
+- [x] **依赖注入装配与全量编译测试**：
+  - `:app` 主 Activity 注入验证 Hilt 完整依赖链。
+  - `./gradlew assembleDebug`：成功生成最新 Debug APK。
+  - `./gradlew test`：全模块 302 个 Action（单元测试覆盖率 100% 通过）。
