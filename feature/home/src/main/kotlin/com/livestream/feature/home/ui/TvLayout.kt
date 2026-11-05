@@ -89,6 +89,7 @@ fun TvLayout(
     onToggleEpgSheet: () -> Unit = {},
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
+    onToggleBootStartup: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -305,7 +306,8 @@ fun TvLayout(
             onCloseImportDialog = onCloseImportDialog,
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
-            onThemeModeSelected = onThemeModeSelected
+            onThemeModeSelected = onThemeModeSelected,
+            onToggleBootStartup = onToggleBootStartup
         )
 
         // 5. 模态浮层：真实 EPG 节目单完整排期弹窗

@@ -29,6 +29,7 @@ class UserPreferencesDataStore @Inject constructor(
         val SWITCH_CHANNEL_TIMEOUT_MS = longPreferencesKey("switch_channel_timeout_ms")
         val TV_KEY_MAPPING_SCHEME = stringPreferencesKey("tv_key_mapping_scheme")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val BOOT_STARTUP_ENABLED = booleanPreferencesKey("boot_startup_enabled")
     }
 
     val userPreferences: Flow<UserPreferences> = dataStore.data
@@ -56,6 +57,7 @@ class UserPreferencesDataStore @Inject constructor(
                 com.livestream.core.model.ThemeMode.LIGHT.name -> com.livestream.core.model.ThemeMode.LIGHT
                 else -> com.livestream.core.model.ThemeMode.SYSTEM
             }
+            val bootStartup = preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] ?: false
 
             UserPreferences(
                 defaultCategoryId = defaultCategory,
@@ -64,7 +66,8 @@ class UserPreferencesDataStore @Inject constructor(
                 isSurfaceViewPreferred = surfaceView,
                 channelSwitchTimeoutMs = timeout,
                 tvKeyMappingScheme = mappingScheme,
-                themeMode = themeMode
+                themeMode = themeMode,
+                isBootStartupEnabled = bootStartup
             )
         }
 
@@ -107,6 +110,12 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_MODE] = mode.name
+        }
+    }
+
+    suspend fun setBootStartupEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] = enabled
         }
     }
 }

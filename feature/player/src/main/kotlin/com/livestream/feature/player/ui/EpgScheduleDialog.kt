@@ -1,11 +1,13 @@
 package com.livestream.feature.player.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,17 +19,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.EpgProgram
 import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.theme.OneUiDimensions
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import java.text.SimpleDateFormat
@@ -46,10 +47,10 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Samsung One UI 风格节目单排期弹窗 (One UI Bottom Sheet / Modal Card)：
- * 1. 采用 One UI 标志性大圆角 (28.dp) 与顶部拖拽条 (Drag Handle)
- * 2. 正在播出的节目项以专属浅蓝底衬、高亮边框和“正在播出”胶囊徽章突出呈现
- * 3. 自动定位滑动至当前正在播出的节目，极大优化单手查阅效率
+ * 规范节目单右侧抽屉面板 (EpgScheduleDrawerView, 居右对齐，与频道列表 ChannelDrawer 风格高度统一)：
+ * 1. 居右对齐滑入展示，左侧内向圆角 (24.dp)
+ * 2. 正在播出的节目项以专属浅蓝底衬、高亮边框和规范圆润胶囊突出呈现
+ * 3. 自动定位滑动至当前正在播出的节目
  */
 @Composable
 fun EpgScheduleDialog(
@@ -59,90 +60,94 @@ fun EpgScheduleDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = modifier
-    ) {
-        val now = System.currentTimeMillis()
-        val listState = rememberLazyListState()
+    if (!visible) return
 
-        // 自动定位到当前正在播出的节目项
-        LaunchedEffect(programs) {
-            val currentIndex = programs.indexOfFirst { it.startTimestamp <= now && it.endTimestamp > now }
-            if (currentIndex >= 0) {
-                listState.scrollToItem(maxOf(0, currentIndex - 1))
-            }
+    val now = System.currentTimeMillis()
+    val listState = rememberLazyListState()
+
+    // 自动定位到当前正在播出的节目项
+    LaunchedEffect(programs) {
+        val currentIndex = programs.indexOfFirst { it.startTimestamp <= now && it.endTimestamp > now }
+        if (currentIndex >= 0) {
+            listState.scrollToItem(maxOf(0, currentIndex - 1))
         }
+    }
 
+    Box(modifier = modifier.fillMaxSize()) {
+        // 半透明背景遮罩（点击可关闭）
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.65f)),
-            contentAlignment = Alignment.Center
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() }
+        )
+
+        AnimatedVisibility(
+            visible = visible,
+            enter = slideInHorizontally(initialOffsetX = { it }),
+            exit = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.align(Alignment.CenterEnd)
         ) {
-            val sheetShape = OneUiShapes.panel
+            val drawerShape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
 
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .widthIn(max = 420.dp)
-                    .fillMaxHeight(0.82f)
-                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), sheetShape)
-                    .background(OneUiTheme.colors.panelBackground, sheetShape)
-                    .padding(18.dp)
+                    .fillMaxHeight()
+                    .width(OneUiDimensions.panelPlaylistWidth)
+                    .clip(drawerShape)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), drawerShape)
+                    .background(OneUiTheme.colors.panelBackground)
+                    .padding(vertical = 14.dp, horizontal = 12.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // 顶部拖拽指示条 (One UI Signature Drag Handle)
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .size(width = 40.dp, height = 4.dp)
-                            .background(OneUiTheme.colors.divider, CircleShape)
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 顶部标题栏
+                    // 1. 顶部标题栏与关闭胶囊按钮
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "${channel?.name ?: "当前频道"} 节目单",
                                 color = OneUiTheme.colors.textPrimary,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date())
                             Text(
                                 text = "今日排期 ($todayStr)",
                                 color = OneUiTheme.colors.textSecondary,
-                                fontSize = 12.sp,
+                                fontSize = 11.5.sp,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }
 
                         TvFocusableBox(
                             onClick = onDismiss,
-                            shape = RoundedCornerShape(50),
-                            unfocusedBackgroundColor = OneUiTheme.colors.cardSecondary,
-                            focusedBackgroundColor = OneUiTheme.colors.cardSecondary
+                            shape = OneUiShapes.pill,
+                            unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                            focusedBackgroundColor = OneUiTheme.colors.accent,
+                            focusedBorderColor = OneUiTheme.colors.accent,
+                            focusedBorderWidth = 1.5.dp
                         ) { isFocused ->
                             Text(
                                 text = "关闭",
-                                color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
-                                fontSize = 13.sp,
+                                color = if (isFocused) Color.White else OneUiTheme.colors.textSecondary,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     if (programs.isEmpty()) {
                         Box(
@@ -154,7 +159,7 @@ fun EpgScheduleDialog(
                             Text(
                                 text = "正在获取最新节目排期...",
                                 color = OneUiTheme.colors.textSecondary,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                         }
                     } else {
@@ -164,18 +169,18 @@ fun EpgScheduleDialog(
                                 .fillMaxWidth()
                                 .weight(1f),
                             contentPadding = PaddingValues(vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(programs, key = { it.id }) { prog ->
                                 val isCurrent = prog.startTimestamp <= now && prog.endTimestamp > now
                                 val timeFormat = SimpleDateFormat("HH:mm", Locale.CHINA)
                                 val timeRange = "${timeFormat.format(Date(prog.startTimestamp))} - ${timeFormat.format(Date(prog.endTimestamp))}"
-                                val itemShape = RoundedCornerShape(14.dp)
+                                val itemShape = RoundedCornerShape(12.dp)
 
                                 val borderStroke = if (isCurrent) {
                                     BorderStroke(1.5.dp, OneUiTheme.colors.accent)
                                 } else {
-                                    BorderStroke(1.dp, OneUiTheme.colors.divider)
+                                    BorderStroke(1.dp, OneUiTheme.colors.borderSubtle)
                                 }
 
                                 val itemBg = if (isCurrent) {
@@ -189,49 +194,47 @@ fun EpgScheduleDialog(
                                         .fillMaxWidth()
                                         .border(borderStroke, itemShape)
                                         .background(itemBg, itemShape)
-                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                        .padding(horizontal = 12.dp, vertical = 9.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                if (isCurrent) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(6.dp))
-                                                            .background(OneUiTheme.colors.accent)
-                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = "正在播出",
-                                                            color = Color.White,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            if (isCurrent) {
+                                                // 规范标准尺寸徽章胶囊（与外部列表序号胶囊尺寸完全统一呼应）
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(OneUiTheme.colors.accent)
+                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "正在播出",
+                                                        color = Color.White,
+                                                        fontSize = 10.5.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
                                                 }
-                                                Text(
-                                                    text = prog.title,
-                                                    color = if (isCurrent) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.weight(1f, fill = false)
-                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
                                             }
-
                                             Text(
-                                                text = timeRange,
-                                                color = if (isCurrent) OneUiTheme.colors.accent.copy(alpha = 0.8f) else OneUiTheme.colors.textSecondary,
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.padding(top = 4.dp)
+                                                text = prog.title,
+                                                color = if (isCurrent) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
                                             )
                                         }
+
+                                        Text(
+                                            text = timeRange,
+                                            color = if (isCurrent) OneUiTheme.colors.accent.copy(alpha = 0.85f) else OneUiTheme.colors.textSecondary,
+                                            fontSize = 11.5.sp,
+                                            modifier = Modifier.padding(top = 3.dp)
+                                        )
                                     }
                                 }
                             }

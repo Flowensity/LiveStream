@@ -74,10 +74,14 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
 
+            val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             SideEffect {
                 val insetsController = WindowCompat.getInsetsController(window, window.decorView)
                 insetsController.isAppearanceLightStatusBars = !isDarkTheme
                 insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+                if (isLandscape) {
+                    com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, true)
+                }
             }
 
             LiveStreamTheme(darkTheme = isDarkTheme) {

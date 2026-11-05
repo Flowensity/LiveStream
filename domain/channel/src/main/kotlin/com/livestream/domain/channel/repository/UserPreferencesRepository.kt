@@ -24,4 +24,6 @@ interface UserPreferencesRepository {
     suspend fun setTvKeyMappingScheme(scheme: TvKeyMappingScheme)
 
     suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode)
+
+    suspend fun setBootStartupEnabled(enabled: Boolean)
 }

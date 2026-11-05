@@ -101,6 +101,7 @@ fun HomeScreen(
                 onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -135,6 +136,7 @@ fun HomeScreen(
                 onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -169,6 +171,7 @@ fun HomeScreen(
                 onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )
@@ -215,6 +218,7 @@ fun HomeScreen(
                 onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                 onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                 onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                 webPlaybackController = playerViewModel.webPlaybackController,
                 modifier = modifier
             )

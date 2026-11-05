@@ -7,6 +7,7 @@ import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
+import com.livestream.domain.channel.repository.CategoryRepository
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
 import com.livestream.feature.settings.server.LocalImportServer
@@ -29,6 +30,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val channelRepository: ChannelRepository,
+    private val categoryRepository: CategoryRepository,
     private val localImportServer: LocalImportServer,
     private val okHttpClient: OkHttpClient,
     private val dispatchers: AppDispatchers
@@ -46,7 +48,8 @@ class SettingsViewModel @Inject constructor(
                         isSurfaceViewPreferred = prefs.isSurfaceViewPreferred,
                         channelSwitchTimeoutMs = prefs.channelSwitchTimeoutMs,
                         tvKeyMappingScheme = prefs.tvKeyMappingScheme,
-                        themeMode = prefs.themeMode
+                        themeMode = prefs.themeMode,
+                        isBootStartupEnabled = prefs.isBootStartupEnabled
                     )
                 }
             }
@@ -95,6 +98,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setBootStartupEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setBootStartupEnabled(enabled)
+        }
+    }
+
     fun openImportDialog() {
         val serverUrl = localImportServer.start { rawInput ->
             importM3uInternal(rawInput)
@@ -137,8 +146,12 @@ class SettingsViewModel @Inject constructor(
     suspend fun importM3uInternal(input: String): Result<Int> = withContext(dispatchers.io) {
         try {
             val trimmed = input.trim()
-            val content = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                val req = Request.Builder().url(trimmed).build()
+            var downloadUrl = trimmed
+            if (downloadUrl.contains("github.com/") && downloadUrl.contains("/blob/")) {
+                downloadUrl = downloadUrl.replace("github.com/", "raw.githubusercontent.com/").replace("/blob/", "/")
+            }
+            val content = if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
+                val req = Request.Builder().url(downloadUrl).build()
                 okHttpClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
                         return@withContext Result.failure(Exception("下载 M3U 订阅失败: HTTP ${resp.code}"))
@@ -156,6 +169,10 @@ class SettingsViewModel @Inject constructor(
             val parsed = M3uPlaylistParser.parse(content)
             if (parsed.channels.isEmpty()) {
                 return@withContext Result.failure(Exception("未能从播放列表中解析出合法频道或所有源均被安全策略拦截"))
+            }
+
+            if (parsed.categories.isNotEmpty()) {
+                categoryRepository.saveCategories(parsed.categories)
             }
 
             val existingChannels = channelRepository.getAllChannelsSync()

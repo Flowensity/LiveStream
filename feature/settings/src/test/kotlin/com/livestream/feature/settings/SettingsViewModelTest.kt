@@ -38,6 +38,7 @@ class SettingsViewModelTest {
         coEvery { userPreferences } returns prefsFlow
     }
     private val channelRepository = mockk<ChannelRepository>(relaxed = true)
+    private val categoryRepository = mockk<com.livestream.domain.channel.repository.CategoryRepository>(relaxed = true)
     private val localImportServer = mockk<LocalImportServer>(relaxed = true)
     private val okHttpClient = mockk<OkHttpClient>(relaxed = true)
 
@@ -49,6 +50,7 @@ class SettingsViewModelTest {
         viewModel = SettingsViewModel(
             userPreferencesRepository,
             channelRepository,
+            categoryRepository,
             localImportServer,
             okHttpClient,
             dispatchers

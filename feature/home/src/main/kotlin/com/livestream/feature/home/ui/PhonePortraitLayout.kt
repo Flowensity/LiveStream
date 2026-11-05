@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.ThemeMode
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.CategoryTabRow
@@ -88,6 +89,7 @@ fun PhonePortraitLayout(
     onToggleEpgSheet: () -> Unit = {},
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
+    onToggleBootStartup: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -167,19 +169,19 @@ fun PhonePortraitLayout(
                 }
             }
 
-            // 2. 下半部交互区 (Interaction Area)：One UI 大标题、纯净搜索框、药丸分类与频道流
+            // 2. 下半部交互区 (Interaction Area)：紧凑 One UI 排版
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // One UI 大标题与快捷胶囊栏 (Viewing Area Header)
+                // One UI 标题与设置入口
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -187,67 +189,61 @@ fun PhonePortraitLayout(
                         Text(
                             text = channelUiState.selectedCategory?.name ?: "直播频道",
                             color = OneUiTheme.colors.textPrimary,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "共 ${channelUiState.channels.size} 个频道 · 触控即播",
                             color = OneUiTheme.colors.textSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 2.dp)
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 1.dp)
                         )
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // 设置快捷胶囊
+                    Box(
+                        modifier = Modifier
+                            .clip(OneUiShapes.pill)
+                            .background(OneUiTheme.colors.cardSecondary)
+                            .clickable { onOpenSettings() }
+                            .padding(horizontal = 14.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // 设置胶囊
-                        val settingsPillShape = RoundedCornerShape(50)
-                        Box(
-                            modifier = Modifier
-                                .clip(settingsPillShape)
-                                .background(OneUiTheme.colors.cardSecondary)
-                                .clickable { onOpenSettings() }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "设置",
-                                color = OneUiTheme.colors.textPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            text = "设置",
+                            color = OneUiTheme.colors.textPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // One UI 标志性药丸胶囊搜索框 (Pill Search Box - 无任何图标)
-                val searchShape = RoundedCornerShape(24.dp)
+                // 紧凑药丸搜索框 (Pill Search Box)
+                val searchShape = OneUiShapes.pill
                 OutlinedTextField(
                     value = channelUiState.searchQuery,
                     onValueChange = onSearchQueryChanged,
                     placeholder = {
                         Text(
-                            text = "搜索频道名称或编号...",
+                            text = "搜索频道...",
                             color = OneUiTheme.colors.textMuted,
-                            fontSize = 13.sp
+                            fontSize = 12.sp
                         )
                     },
                     trailingIcon = {
                         if (channelUiState.searchQuery.isNotEmpty()) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
+                                    .clip(OneUiShapes.pill)
                                     .clickable { onSearchQueryChanged("") }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = "清空",
                                     color = OneUiTheme.colors.textMuted,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -268,7 +264,7 @@ fun PhonePortraitLayout(
                         .padding(horizontal = 16.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // 横向滑动分类药丸栏
                 CategoryTabRow(
@@ -278,15 +274,16 @@ fun PhonePortraitLayout(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
-                // 频道卡片列表
+                // 频道列表 (直通到底部导航区域，充实紧凑)
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .weight(1f)
+                        .navigationBarsPadding(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(
                         items = channelUiState.channels,
@@ -297,56 +294,6 @@ fun PhonePortraitLayout(
                             isActive = channel.id == channelUiState.activeChannelId,
                             onChannelClick = onChannelSelected,
                             onFavoriteToggle = onFavoriteToggle
-                        )
-                    }
-                }
-            }
-
-            // 3. One UI 底部导航栏 (Samsung 纯文字 Segmented Pill Tab Bar - 无任何图标)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, OneUiTheme.colors.divider))
-                    .background(OneUiTheme.colors.cardBackground)
-                    .navigationBarsPadding()
-                    .padding(vertical = 10.dp, horizontal = 20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Tab 1: 频道 (选中态)
-                    val activePillShape = RoundedCornerShape(50)
-                    Box(
-                        modifier = Modifier
-                            .clip(activePillShape)
-                            .background(OneUiTheme.colors.accentSoft)
-                            .padding(horizontal = 28.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "频道",
-                            color = OneUiTheme.colors.accent,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // Tab 2: 设置
-                    val inactivePillShape = RoundedCornerShape(50)
-                    Box(
-                        modifier = Modifier
-                            .clip(inactivePillShape)
-                            .clickable { onOpenSettings() }
-                            .padding(horizontal = 28.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "设置",
-                            color = OneUiTheme.colors.textSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -363,7 +310,8 @@ fun PhonePortraitLayout(
             onCloseImportDialog = onCloseImportDialog,
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
-            onThemeModeSelected = onThemeModeSelected
+            onThemeModeSelected = onThemeModeSelected,
+            onToggleBootStartup = onToggleBootStartup
         )
 
         // EPG 节目单排期弹窗

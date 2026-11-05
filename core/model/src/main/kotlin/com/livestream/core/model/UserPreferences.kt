@@ -32,5 +32,6 @@ data class UserPreferences(
     val isSurfaceViewPreferred: Boolean = true,
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val isBootStartupEnabled: Boolean = false
 )

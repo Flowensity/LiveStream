@@ -99,6 +99,7 @@ fun TabletDualPaneLayout(
     onToggleEpgSheet: () -> Unit = {},
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
+    onToggleBootStartup: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -111,23 +112,12 @@ fun TabletDualPaneLayout(
         isFullscreen = false
     }
 
-    // 全屏时沉浸式隐藏系统状态栏与导航栏
+    // 平板全屏时沉浸式隐藏系统状态栏与导航栏
     DisposableEffect(isFullscreen) {
         val window = activity?.window
-        if (window != null) {
-            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-            if (isFullscreen) {
-                insetsController.hide(WindowInsetsCompat.Type.systemBars())
-                insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else {
-                insetsController.show(WindowInsetsCompat.Type.systemBars())
-            }
-        }
+        com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, isFullscreen)
         onDispose {
-            activity?.window?.let { win ->
-                WindowCompat.getInsetsController(win, win.decorView)
-                    .show(WindowInsetsCompat.Type.systemBars())
-            }
+            com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, false)
         }
     }
 
@@ -373,7 +363,8 @@ fun TabletDualPaneLayout(
             onCloseImportDialog = onCloseImportDialog,
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
-            onThemeModeSelected = onThemeModeSelected
+            onThemeModeSelected = onThemeModeSelected,
+            onToggleBootStartup = onToggleBootStartup
         )
 
         // 5. EPG 节目排期弹窗

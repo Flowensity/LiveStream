@@ -108,6 +108,19 @@ class ChannelRepositoryImpl @Inject constructor(
 
     override suspend fun saveChannels(channels: List<Channel>) {
         withContext(dispatchers.io) {
+            val referencedCategoryIds = channels.map { it.categoryId }.distinct()
+            for (catId in referencedCategoryIds) {
+                if (categoryDao.getCategoryById(catId) == null) {
+                    categoryDao.insertCategory(
+                        com.livestream.core.database.entity.CategoryEntity(
+                            id = catId,
+                            name = "自定义源",
+                            group = com.livestream.core.model.ChannelCategoryGroup.CUSTOM.name,
+                            orderIndex = 999
+                        )
+                    )
+                }
+            }
             channelDao.insertChannels(channels.map { it.toEntity() })
         }
     }

@@ -60,14 +60,13 @@ fun CategoryTabRow(
 
                 Box(
                     modifier = Modifier
-                        .height(34.dp)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = category.name,
                         color = targetTextColor,
-                        fontSize = 13.sp,
+                        fontSize = 12.5.sp,
                         fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
                     )
                 }

@@ -10,6 +10,7 @@ data class SettingsUiState(
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val isBootStartupEnabled: Boolean = false,
     val isSettingsOpen: Boolean = false,
     val isImportDialogOpen: Boolean = false,
     val importText: String = "",

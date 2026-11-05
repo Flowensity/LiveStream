@@ -42,4 +42,8 @@ class UserPreferencesRepositoryImpl @Inject constructor(
     override suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
         dataStore.setThemeMode(mode)
     }
+
+    override suspend fun setBootStartupEnabled(enabled: Boolean) {
+        dataStore.setBootStartupEnabled(enabled)
+    }
 }

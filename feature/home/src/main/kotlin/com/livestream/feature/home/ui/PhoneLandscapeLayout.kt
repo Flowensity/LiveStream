@@ -84,12 +84,22 @@ fun PhoneLandscapeLayout(
     onToggleEpgSheet: () -> Unit = {},
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
+    onToggleBootStartup: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
     val controlHelper = remember { DeviceControlHelper(context) }
+
+    // 手机横屏播放时强制隐藏状态栏与导航栏，实现沉浸式全屏观影
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val window = activity?.window
+        com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, true)
+        onDispose {
+            com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, false)
+        }
+    }
 
     var gestureHudState by remember { mutableStateOf<GestureHudState>(GestureHudState.Hidden) }
     var currentBrightness by remember { mutableFloatStateOf(0.7f) }
@@ -234,7 +244,8 @@ fun PhoneLandscapeLayout(
             onCloseImportDialog = onCloseImportDialog,
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
-            onThemeModeSelected = onThemeModeSelected
+            onThemeModeSelected = onThemeModeSelected,
+            onToggleBootStartup = onToggleBootStartup
         )
 
         // 7. EPG 节目排期弹窗
