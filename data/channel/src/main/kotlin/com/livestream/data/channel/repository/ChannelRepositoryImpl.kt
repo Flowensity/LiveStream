@@ -114,16 +114,26 @@ class ChannelRepositoryImpl @Inject constructor(
 
     override suspend fun checkAndSeedDefaultChannels() {
         withContext(dispatchers.io) {
-            if (channelDao.getChannelCount() == 0) {
-                categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
-                channelDao.insertChannels(PresetChannelDataProvider.allDefaultChannels.map { it.toEntity() })
-                liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
-            } else {
-                val satellite = categoryDao.getCategoryById("satellite")
-                if (satellite != null && satellite.name != "地方卫视") {
-                    categoryDao.insertCategory(satellite.copy(name = "地方卫视"))
+            // Always ensure predefined categories are up-to-date (e.g. 地方卫视)
+            categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
+
+            // Preserve user-favorite and user-hidden settings for existing channels
+            val existingChannels = channelDao.getAllChannelsSync().associateBy { it.id }
+            val channelsToUpsert = PresetChannelDataProvider.allDefaultChannels.map { defaultChannel ->
+                val existing = existingChannels[defaultChannel.id]
+                if (existing != null) {
+                    defaultChannel.copy(
+                        isFavorite = existing.isFavorite,
+                        isHidden = existing.isHidden
+                    ).toEntity()
+                } else {
+                    defaultChannel.toEntity()
                 }
             }
+            channelDao.insertChannels(channelsToUpsert)
+
+            // Upsert all preset official sources so satellite and CCTV sources are always populated
+            liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
         }
     }
 }

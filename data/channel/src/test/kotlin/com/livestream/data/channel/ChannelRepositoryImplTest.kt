@@ -87,7 +87,7 @@ class ChannelRepositoryImplTest {
 
     @Test
     fun `test checkAndSeedDefaultChannels seeds data when empty`() = runTest(testDispatcher) {
-        coEvery { channelDao.getChannelCount() } returns 0
+        coEvery { channelDao.getAllChannelsSync() } returns emptyList()
 
         val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
         repo.checkAndSeedDefaultChannels()
@@ -95,5 +95,29 @@ class ChannelRepositoryImplTest {
         coVerify(exactly = 1) { categoryDao.insertCategories(any()) }
         coVerify(exactly = 1) { channelDao.insertChannels(any()) }
         coVerify(exactly = 1) { liveSourceDao.insertSources(any()) }
+    }
+
+    @Test
+    fun `test checkAndSeedDefaultChannels preserves user favorites on existing channels`() = runTest(testDispatcher) {
+        val existingCctv1 = ChannelEntity(
+            id = "cctv_600001859",
+            name = "CCTV-1 综合",
+            channelNumber = 1,
+            categoryId = "cctv",
+            isFavorite = true,
+            isHidden = false
+        )
+        coEvery { channelDao.getAllChannelsSync() } returns listOf(existingCctv1)
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        repo.checkAndSeedDefaultChannels()
+
+        coVerify(exactly = 1) {
+            channelDao.insertChannels(match { channels ->
+                val cctv1 = channels.firstOrNull { it.id == "cctv_600001859" }
+                val satellite = channels.firstOrNull { it.id == "weishi_600002309" }
+                cctv1 != null && cctv1.isFavorite && satellite != null
+            })
+        }
     }
 }

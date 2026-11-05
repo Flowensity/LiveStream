@@ -9,14 +9,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,13 +29,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.theme.OneUiDimensions
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 
 /**
- * Samsung One UI 风格二次退出确认弹窗：
- * 1. 采用 One UI 标志性大圆角 (26.dp)
- * 2. 区分主次胶囊按钮，默认聚焦在取消按钮防止误触
- * 3. 完美适配浅色与深色主题
+ * TeleflowTv 规范二次退出确认弹窗 (ExitConfirmView, 284dp 居中浮动面板)
  */
 @Composable
 fun ExitConfirmDialog(
@@ -66,88 +63,93 @@ fun ExitConfirmDialog(
                 .background(Color.Black.copy(alpha = 0.65f)),
             contentAlignment = Alignment.Center
         ) {
-            val dialogShape = RoundedCornerShape(26.dp)
-            val pillShape = RoundedCornerShape(50)
+            val panelShape = OneUiShapes.panel
+            val pillShape = OneUiShapes.pill
 
             Box(
                 modifier = Modifier
-                    .width(360.dp)
-                    .border(BorderStroke(1.dp, OneUiTheme.colors.divider), dialogShape)
-                    .background(OneUiTheme.colors.cardBackground, dialogShape)
-                    .padding(26.dp)
+                    .width(OneUiDimensions.panelExitConfirmWidth)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), panelShape)
+                    .background(OneUiTheme.colors.panelBackground, panelShape)
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "退出应用",
+                        text = "LiveStream",
                         color = OneUiTheme.colors.textPrimary,
-                        fontSize = 19.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "确定要退出 LiveStream 电视直播应用吗？",
+                        text = "电视直播 · 官方高清源",
                         color = OneUiTheme.colors.textSecondary,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 20.sp
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "是否确定退出应用程序？",
+                        color = OneUiTheme.colors.textMuted,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // 取消按钮（次级操作，默认高亮聚焦）
-                        TvFocusableBox(
-                            onClick = onDismiss,
-                            shape = pillShape,
-                            unfocusedBackgroundColor = OneUiTheme.colors.cardSecondary,
-                            focusedBackgroundColor = OneUiTheme.colors.cardSecondary,
-                            focusedBorderColor = OneUiTheme.colors.accent,
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(cancelFocusRequester)
-                        ) { isFocused ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "取消",
-                                    color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // 1. 继续观看按钮 (次级操作，默认高亮聚焦)
+                    TvFocusableBox(
+                        onClick = onDismiss,
+                        shape = pillShape,
+                        unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                        focusedBackgroundColor = OneUiTheme.colors.accent,
+                        focusedBorderColor = OneUiTheme.colors.accent,
+                        focusedBorderWidth = 2.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp)
+                            .focusRequester(cancelFocusRequester)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "继续观看",
+                                color = if (isFocused) Color.White else OneUiTheme.colors.accent,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
+                    }
 
-                        // 确认退出按钮（主要操作，柔和红色胶囊）
-                        TvFocusableBox(
-                            onClick = onConfirm,
-                            shape = pillShape,
-                            unfocusedBackgroundColor = OneUiTheme.colors.statusError,
-                            focusedBackgroundColor = OneUiTheme.colors.statusError,
-                            focusedBorderColor = OneUiTheme.colors.accent,
-                            modifier = Modifier.weight(1f)
-                        ) { isFocused ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "退出",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 2. 退出应用按钮 (危险警示按钮，TeleflowTv #DB332A)
+                    TvFocusableBox(
+                        onClick = onConfirm,
+                        shape = pillShape,
+                        unfocusedBackgroundColor = OneUiTheme.colors.dangerSoft,
+                        focusedBackgroundColor = OneUiTheme.colors.danger,
+                        focusedBorderColor = OneUiTheme.colors.danger,
+                        focusedBorderWidth = 2.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "退出应用",
+                                color = if (isFocused) Color.White else OneUiTheme.colors.danger,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

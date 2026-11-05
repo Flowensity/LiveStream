@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -46,15 +46,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.theme.OneUiDimensions
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.settings.SettingsUiState
 
 /**
- * Samsung One UI 风格系统与播放偏好设置面板：
- * 1. 采用 One UI 标志性分组卡片式布局 (Grouped Card Containers)
- * 2. 圆润胶囊组件与高雅精致的层次感设计
- * 3. 完备的三星明暗主题模式切换 (浅色 / 深色 / 跟随系统)
- * 4. 局域网扫码推送与 M3U 导入卡片无缝融合
+ * TeleflowTv 规范系统与播放偏好设置面板 (AppSettingsView, 440dp 居中浮动模态)
  */
 @Composable
 fun SettingsDialog(
@@ -89,59 +87,69 @@ fun SettingsDialog(
                 .background(Color.Black.copy(alpha = 0.65f)),
             contentAlignment = Alignment.Center
         ) {
-            val panelShape = RoundedCornerShape(22.dp)
+            val panelShape = OneUiShapes.panel
             val scrollState = rememberScrollState()
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
-                    .widthIn(max = 380.dp)
-                    .border(BorderStroke(1.dp, OneUiTheme.colors.divider), panelShape)
-                    .background(OneUiTheme.colors.background, panelShape)
-                    .padding(16.dp)
+                    .widthIn(max = 440.dp)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), panelShape)
+                    .background(OneUiTheme.colors.panelBackground, panelShape)
+                    .padding(20.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(scrollState)
                 ) {
-                    // 1. One UI 顶部导航操作栏 (无任何图标，紧凑布局)
+                    // 1. One UI 顶部大标题与完成胶囊按钮
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "设置",
-                            color = OneUiTheme.colors.textPrimary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column {
+                            Text(
+                                text = "应用设置",
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "播放偏好与系统设置",
+                                color = OneUiTheme.colors.textSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
 
                         TvFocusableBox(
                             onClick = onCloseSettings,
-                            shape = RoundedCornerShape(50),
-                            unfocusedBackgroundColor = OneUiTheme.colors.accent,
-                            focusedBackgroundColor = OneUiTheme.colors.accent
+                            shape = OneUiShapes.pill,
+                            unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                            focusedBackgroundColor = OneUiTheme.colors.accent,
+                            focusedBorderColor = OneUiTheme.colors.accent,
+                            focusedBorderWidth = 1.5.dp
                         ) { isFocused ->
                             Text(
                                 text = "完成",
-                                color = Color.White,
+                                color = if (isFocused) Color.White else OneUiTheme.colors.textPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. 分组卡片 1：解码与渲染引擎 (紧凑排版)
+                    // 2. 分组卡片 1：播放与渲染引擎
                     SettingsSectionTitle("播放与渲染")
                     OneUiGroupCard {
                         SettingToggleRow(
                             title = "硬件加速解码",
-                            subtitle = "启用 MediaCodec GPU 硬解，低功耗高帧率",
+                            subtitle = "MediaCodec GPU 硬解，低功耗高帧率",
                             checked = uiState.isHardwareDecodePreferred,
                             onCheckedChange = onToggleHardwareDecode,
                             modifier = Modifier.focusRequester(firstFocusRequester)
@@ -149,58 +157,50 @@ fun SettingsDialog(
                         OneUiCardDivider()
                         SettingToggleRow(
                             title = "SurfaceView 渲染图层",
-                            subtitle = "独立硬件图层，关闭后切换为 TextureView",
+                            subtitle = "独立硬件视频图层，关闭切换为 TextureView",
                             checked = uiState.isSurfaceViewPreferred,
-                            onToggleSurfaceView
+                            onCheckedChange = onToggleSurfaceView
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // 3. 分组卡片 2：外观与明暗主题 (纯文字 One UI 胶囊标签，无任何 Emoji 图标)
+                    // 3. 分组卡片 2：外观与明暗主题 (TeleflowTv Segmented Options)
                     SettingsSectionTitle("外观与主题")
                     OneUiGroupCard {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             ThemeMode.values().forEach { mode ->
                                 val isSelected = uiState.themeMode == mode
                                 val label = when (mode) {
                                     ThemeMode.SYSTEM -> "跟随系统"
-                                    ThemeMode.DARK -> "深色"
-                                    ThemeMode.LIGHT -> "浅色"
+                                    ThemeMode.DARK -> "深色模式"
+                                    ThemeMode.LIGHT -> "浅色模式"
                                 }
 
-                                val pillShape = RoundedCornerShape(12.dp)
+                                val pillShape = OneUiShapes.pill
                                 TvFocusableBox(
                                     onClick = { onThemeModeSelected(mode) },
                                     shape = pillShape,
-                                    unfocusedBackgroundColor = if (isSelected) OneUiTheme.colors.accentSoft else OneUiTheme.colors.cardSecondary,
-                                    focusedBackgroundColor = if (isSelected) OneUiTheme.colors.accentSoft else OneUiTheme.colors.cardSecondary,
+                                    unfocusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.accentSoft,
                                     focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp,
                                     modifier = Modifier.weight(1f)
                                 ) { isFocused ->
-                                    val borderStroke = if (isSelected) {
-                                        BorderStroke(1.5.dp, OneUiTheme.colors.accent)
-                                    } else {
-                                        null
-                                    }
-
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .then(
-                                                if (borderStroke != null) Modifier.border(borderStroke, pillShape) else Modifier
-                                            )
-                                            .padding(vertical = 10.dp),
+                                            .padding(vertical = 9.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = label,
-                                            color = if (isSelected || isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                                            color = if (isSelected) Color.White else if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
@@ -210,50 +210,54 @@ fun SettingsDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // 4. 分组卡片 3：自定义资源管理 (紧凑纯文字排版)
+                    // 4. 分组卡片 3：自定义频道源管理
                     SettingsSectionTitle("频道源管理")
                     OneUiGroupCard {
                         TvFocusableBox(
                             onClick = onOpenImportDialog,
-                            shape = RoundedCornerShape(16.dp),
+                            shape = OneUiShapes.cardMedium,
                             unfocusedBackgroundColor = Color.Transparent,
-                            focusedBackgroundColor = OneUiTheme.colors.cardSecondary,
-                            modifier = Modifier.fillMaxWidth()
+                            focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                            focusedBorderColor = OneUiTheme.colors.accent,
+                            focusedBorderWidth = 1.5.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(OneUiDimensions.rowHeightSetting)
                         ) { isFocused ->
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "导入 M3U 直播源",
+                                        text = "导入 M3U 播放列表",
                                         color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = "支持扫码推送、网络链接与文件内容",
+                                        text = "支持局域网扫码直推、网络链接与文件",
                                         color = OneUiTheme.colors.textSecondary,
                                         fontSize = 11.sp,
-                                        modifier = Modifier.padding(top = 2.dp)
+                                        modifier = Modifier.padding(top = 1.dp)
                                     )
                                 }
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
+                                        .clip(OneUiShapes.pill)
                                         .background(OneUiTheme.colors.accentSoft)
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        .padding(horizontal = 12.dp, vertical = 5.dp)
                                 ) {
                                     Text(
                                         text = "导入",
                                         color = OneUiTheme.colors.accent,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -262,7 +266,7 @@ fun SettingsDialog(
                 }
             }
 
-            // 内嵌导入 M3U 弹窗 (One UI Modal)
+            // 内嵌导入 M3U 弹窗 (TeleflowTv Modal)
             if (uiState.isImportDialogOpen) {
                 Box(
                     modifier = Modifier
@@ -270,15 +274,15 @@ fun SettingsDialog(
                         .background(Color.Black.copy(alpha = 0.75f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    val importDialogShape = RoundedCornerShape(22.dp)
+                    val importDialogShape = OneUiShapes.panel
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.92f)
-                            .widthIn(max = 380.dp)
-                            .border(BorderStroke(1.dp, OneUiTheme.colors.divider), importDialogShape)
-                            .background(OneUiTheme.colors.background, importDialogShape)
-                            .padding(16.dp)
+                            .widthIn(max = 420.dp)
+                            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), importDialogShape)
+                            .background(OneUiTheme.colors.panelBackground, importDialogShape)
+                            .padding(20.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
@@ -292,32 +296,33 @@ fun SettingsDialog(
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                TvFocusableBox(
-                                    onClick = onCloseImportDialog,
-                                    shape = RoundedCornerShape(50),
-                                    unfocusedBackgroundColor = OneUiTheme.colors.cardSecondary,
-                                    focusedBackgroundColor = OneUiTheme.colors.cardSecondary
-                                ) { isFocused ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.surfacePill)
+                                        .clickable { onCloseImportDialog() }
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
                                         text = "关闭",
-                                        color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                                        color = OneUiTheme.colors.textSecondary,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                            // 1. Android TV 局域网扫码推送区域 (无图标)
+                            // 1. Android TV 局域网扫码推送区域
                             if (uiState.qrBitmap != null && uiState.localServerUrl != null) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .border(BorderStroke(1.dp, OneUiTheme.colors.divider), RoundedCornerShape(14.dp))
-                                        .background(OneUiTheme.colors.cardBackground, RoundedCornerShape(14.dp))
-                                        .padding(10.dp),
+                                        .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), OneUiShapes.cardMedium)
+                                        .background(OneUiTheme.colors.cardBackground, OneUiShapes.cardMedium)
+                                        .padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Image(
@@ -327,21 +332,21 @@ fun SettingsDialog(
                                             .size(80.dp)
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(Color.White)
-                                            .padding(3.dp)
+                                            .padding(4.dp)
                                     )
 
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(14.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "局域网扫码直推",
+                                            text = "局域网扫码输入",
                                             color = OneUiTheme.colors.accent,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold
                                         )
-                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "同网络手机访问：",
+                                            text = "手机浏览器访问：",
                                             color = OneUiTheme.colors.textSecondary,
                                             fontSize = 11.sp
                                         )
@@ -360,7 +365,7 @@ fun SettingsDialog(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                             }
 
                             Text(
@@ -386,11 +391,11 @@ fun SettingsDialog(
                                     focusedContainerColor = OneUiTheme.colors.cardSecondary,
                                     unfocusedContainerColor = OneUiTheme.colors.cardSecondary,
                                     focusedBorderColor = OneUiTheme.colors.accent,
-                                    unfocusedBorderColor = OneUiTheme.colors.divider,
+                                    unfocusedBorderColor = OneUiTheme.colors.borderSubtle,
                                     focusedTextColor = OneUiTheme.colors.textPrimary,
                                     unfocusedTextColor = OneUiTheme.colors.textPrimary
                                 ),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = OneUiShapes.cardSmall,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
@@ -398,7 +403,7 @@ fun SettingsDialog(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = uiState.importError,
-                                    color = OneUiTheme.colors.statusError,
+                                    color = OneUiTheme.colors.danger,
                                     fontSize = 11.sp
                                 )
                             }
@@ -413,25 +418,26 @@ fun SettingsDialog(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TvFocusableBox(
-                                    onClick = onCloseImportDialog,
-                                    shape = RoundedCornerShape(50),
-                                    unfocusedBackgroundColor = OneUiTheme.colors.cardSecondary,
-                                    focusedBackgroundColor = OneUiTheme.colors.cardSecondary
-                                ) { isFocused ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.surfacePill)
+                                        .clickable { onCloseImportDialog() }
+                                        .padding(horizontal = 16.dp, vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
                                         text = "取消",
-                                        color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                                        color = OneUiTheme.colors.textSecondary,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
 
@@ -440,7 +446,7 @@ fun SettingsDialog(
                                 Button(
                                     onClick = onConfirmImport,
                                     enabled = !uiState.isImporting,
-                                    shape = RoundedCornerShape(50),
+                                    shape = OneUiShapes.pill,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = OneUiTheme.colors.accent,
                                         disabledContainerColor = OneUiTheme.colors.accent.copy(alpha = 0.5f)
@@ -478,11 +484,11 @@ private fun SettingsSectionTitle(title: String) {
 private fun OneUiGroupCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val cardShape = RoundedCornerShape(16.dp)
+    val cardShape = OneUiShapes.cardMedium
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .border(BorderStroke(1.dp, OneUiTheme.colors.divider), cardShape)
+            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
             .background(OneUiTheme.colors.cardBackground, cardShape)
     ) {
         content()
@@ -510,7 +516,8 @@ private fun SettingToggleRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .height(OneUiDimensions.rowHeightSetting)
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -535,7 +542,7 @@ private fun SettingToggleRow(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = OneUiTheme.colors.accent,
                 uncheckedThumbColor = OneUiTheme.colors.textMuted,
-                uncheckedTrackColor = OneUiTheme.colors.cardSecondary
+                uncheckedTrackColor = OneUiTheme.colors.surfacePill
             )
         )
     }

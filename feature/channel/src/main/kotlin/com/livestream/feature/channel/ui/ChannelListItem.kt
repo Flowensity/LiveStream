@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,14 +28,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.theme.OneUiDimensions
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 
 /**
- * Samsung One UI 风格频道卡片组件：
- * 1. 采用 One UI 标志性圆角卡片 (18.dp) 与极细柔和边缘分割
- * 2. 活跃播放频道呈现专属浅蓝高光底衬与焦点边框
- * 3. 序号采用精致的小圆角药丸胶囊微容器排版
- * 4. 优化单手触控与电视遥控器双模交互体验
+ * TeleflowTv 规范频道列表行 (item_channel, 48dp 标准行高)
  */
 @Composable
 fun ChannelListItem(
@@ -45,21 +44,21 @@ fun ChannelListItem(
     modifier: Modifier = Modifier,
     programTitle: String? = null
 ) {
-    val cardShape = RoundedCornerShape(18.dp)
+    val rowShape = RoundedCornerShape(14.dp)
 
     TvFocusableBox(
         onClick = { onChannelClick(channel) },
-        shape = cardShape,
-        unfocusedBackgroundColor = if (isActive) OneUiTheme.colors.accentSoft else OneUiTheme.colors.cardBackground,
-        focusedBackgroundColor = if (isActive) OneUiTheme.colors.accentSoft else OneUiTheme.colors.cardSecondary,
+        shape = rowShape,
+        unfocusedBackgroundColor = if (isActive) OneUiTheme.colors.accentSoft else Color.Transparent,
+        focusedBackgroundColor = OneUiTheme.colors.accentSoft,
         focusedBorderColor = OneUiTheme.colors.accent,
         focusedBorderWidth = 2.dp,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .height(OneUiDimensions.rowHeightChannel)
     ) { isFocused ->
-        val borderModifier = if (!isActive && !isFocused) {
-            Modifier.border(BorderStroke(1.dp, OneUiTheme.colors.divider), cardShape)
-        } else if (isActive && !isFocused) {
-            Modifier.border(BorderStroke(1.dp, OneUiTheme.colors.accent.copy(alpha = 0.5f)), cardShape)
+        val borderModifier = if (isActive && !isFocused) {
+            Modifier.border(BorderStroke(1.dp, OneUiTheme.colors.accent.copy(alpha = 0.4f)), rowShape)
         } else {
             Modifier
         }
@@ -68,7 +67,7 @@ fun ChannelListItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(borderModifier)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -76,79 +75,59 @@ fun ChannelListItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // 1. 频道序号徽章 (One UI Squircle Badge)
+                // 1. 频道序号 (34dp 宽度，TeleflowTv 规范)
                 Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (isActive) OneUiTheme.colors.accent.copy(alpha = 0.15f)
-                            else OneUiTheme.colors.cardSecondary
-                        )
-                        .padding(horizontal = 9.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.width(OneUiDimensions.badgeChannelNumberWidth),
+                    contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
                         text = "%02d".format(channel.channelNumber),
-                        color = if (isActive || isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                        color = when {
+                            isFocused -> OneUiTheme.colors.accent
+                            isActive -> OneUiTheme.colors.accent
+                            else -> OneUiTheme.colors.textSecondary
+                        },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
-                // 2. 频道名称与当前节目信息
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isActive) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .background(OneUiTheme.colors.statusSuccess, CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        Text(
-                            text = channel.name,
-                            color = if (isActive) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                            fontSize = 15.sp,
-                            fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    if (!programTitle.isNullOrBlank()) {
-                        Text(
-                            text = programTitle,
-                            color = if (isActive) OneUiTheme.colors.accent.copy(alpha = 0.85f) else OneUiTheme.colors.textMuted,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
-                }
+                // 2. 频道名称
+                Text(
+                    text = channel.name,
+                    color = when {
+                        isFocused -> OneUiTheme.colors.accent
+                        isActive -> OneUiTheme.colors.accent
+                        else -> OneUiTheme.colors.textPrimary
+                    },
+                    fontSize = 15.sp,
+                    fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // 3. 收藏胶囊按钮 (无任何图标，纯文字 One UI 胶囊)
-            val favShape = RoundedCornerShape(50)
+            // 3. 收藏状态胶囊 (无图标，简洁文本)
+            val favPillShape = OneUiShapes.pill
             Box(
                 modifier = Modifier
-                    .clip(favShape)
+                    .clip(favPillShape)
                     .background(
                         if (channel.isFavorite) OneUiTheme.colors.accentSoft
-                        else OneUiTheme.colors.cardSecondary
+                        else OneUiTheme.colors.surfacePill
                     )
                     .clickable { onFavoriteToggle(channel) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (channel.isFavorite) "已收藏" else "收藏",
-                    color = if (channel.isFavorite) OneUiTheme.colors.accent else OneUiTheme.colors.textMuted,
+                    color = if (channel.isFavorite) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )

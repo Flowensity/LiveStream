@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -26,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,7 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.core.ui.component.StreamLoadingIndicator
-import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.theme.OneUiDimensions
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.player.PlayerUiState
 import java.text.SimpleDateFormat
@@ -42,7 +43,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Samsung One UI 风格播放器控制浮层 (OSD)
+ * Samsung One UI / TeleflowTv 规范播放器控制浮层 (ChannelBarView HUD)
  */
 @Composable
 fun PlayerOverlay(
@@ -53,10 +54,10 @@ fun PlayerOverlay(
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        // 1. 中间加载与切台状态
+        // 1. 中间加载与切台状态 (Waiting Indicator)
         if (uiState.isBuffering && uiState.status != PlaybackStatus.ERROR) {
             val statusText = when (uiState.status) {
-                PlaybackStatus.SWITCHING -> "正在切换频道..."
+                PlaybackStatus.SWITCHING -> "正在换台..."
                 PlaybackStatus.RESOLVING -> "正在解析直播信号..."
                 PlaybackStatus.PREPARING -> "正在初始化解码器..."
                 else -> "正在缓冲数据..."
@@ -69,13 +70,13 @@ fun PlayerOverlay(
 
         // 2. 播放异常提示卡片 (One UI Error Dialog Card)
         if (uiState.status == PlaybackStatus.ERROR && uiState.error != null) {
-            val errCardShape = RoundedCornerShape(24.dp)
+            val errCardShape = OneUiShapes.dialog
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .border(BorderStroke(1.dp, OneUiTheme.colors.divider), errCardShape)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), errCardShape)
                     .background(
-                        color = OneUiTheme.colors.cardBackground.copy(alpha = 0.95f),
+                        color = OneUiTheme.colors.panelBackground,
                         shape = errCardShape
                     )
                     .padding(24.dp)
@@ -86,15 +87,16 @@ fun PlayerOverlay(
                 ) {
                     Text(
                         text = "播放异常",
-                        color = OneUiTheme.colors.statusError,
-                        fontSize = 20.sp,
+                        color = OneUiTheme.colors.danger,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = uiState.error.message,
                         color = OneUiTheme.colors.textSecondary,
-                        fontSize = 14.sp
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Row(
@@ -103,19 +105,24 @@ fun PlayerOverlay(
                     ) {
                         Button(
                             onClick = onRetry,
-                            shape = RoundedCornerShape(50),
+                            shape = OneUiShapes.pill,
                             colors = ButtonDefaults.buttonColors(containerColor = OneUiTheme.colors.accent),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("重试", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("重试", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                         if (uiState.totalSources > 1) {
                             OutlinedButton(
                                 onClick = onSwitchSource,
-                                shape = RoundedCornerShape(50),
+                                shape = OneUiShapes.pill,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = OneUiTheme.colors.textPrimary),
+                                border = BorderStroke(1.dp, OneUiTheme.colors.borderSubtle),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("换线 (${uiState.activeSourceIndex + 1}/${uiState.totalSources})")
+                                Text(
+                                    "换线 (${uiState.activeSourceIndex + 1}/${uiState.totalSources})",
+                                    fontSize = 13.sp
+                                )
                             }
                         }
                     }
@@ -125,243 +132,186 @@ fun PlayerOverlay(
 
         // 3. 数字键换台悬浮窗
         if (uiState.quickChannelNumber.isNotEmpty()) {
-            val quickShape = RoundedCornerShape(18.dp)
+            val quickShape = OneUiShapes.cardMedium
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(32.dp)
-                    .border(BorderStroke(1.dp, Color(0x33FFFFFF)), quickShape)
-                    .background(Color(0xDD1A1B20), quickShape)
+                    .padding(24.dp)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), quickShape)
+                    .background(OneUiTheme.colors.panelBackground, quickShape)
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = uiState.quickChannelNumber,
                         color = OneUiTheme.colors.accent,
-                        fontSize = 36.sp,
+                        fontSize = 32.sp,
                         fontWeight = FontWeight.Black
                     )
                     Text(
                         text = "正在换台...",
-                        color = OneUiTheme.colors.textMuted,
-                        fontSize = 12.sp
+                        color = OneUiTheme.colors.textSecondary,
+                        fontSize = 11.sp
                     )
                 }
             }
         }
 
-        // 4. OSD 顶部与底部面板（带淡入淡出动画）
+        // 4. TeleflowTv 规范底部浮动 HUD (ChannelBarView)
         AnimatedVisibility(
-            visible = uiState.isOsdVisible,
+            visible = uiState.isOsdVisible && uiState.activeChannel != null,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // 顶部频道信息渐变栏
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent)
-                            )
-                        )
-                        .padding(horizontal = 24.dp, vertical = 18.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val channelNum = uiState.activeChannel?.channelNumber?.let { "%02d".format(it) } ?: "--"
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(OneUiTheme.colors.accent.copy(alpha = 0.25f))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = channelNum,
-                                        color = OneUiTheme.colors.accent,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Black
-                                    )
-                                }
+            val channel = uiState.activeChannel ?: return@AnimatedVisibility
+            val panelShape = OneUiShapes.panel
+            val totalSrc = uiState.totalSources.coerceAtLeast(1)
+            val currentIdx = (uiState.activeSourceIndex + 1).coerceIn(1, totalSrc)
 
-                                Spacer(modifier = Modifier.width(12.dp))
+            Box(
+                modifier = Modifier
+                    .padding(bottom = 24.dp, start = 16.dp, end = 16.dp)
+                    .widthIn(max = OneUiDimensions.hudChannelBarWidth)
+                    .fillMaxWidth()
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), panelShape)
+                    .background(OneUiTheme.colors.panelBackground, panelShape)
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    // 第 1 行：频道名称 + 状态/线路胶囊标签
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            val numStr = "%02d".format(channel.channelNumber)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(OneUiTheme.colors.accentSoft)
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = uiState.activeChannel?.name ?: "未选频道",
-                                    color = Color.White,
-                                    fontSize = 20.sp,
+                                    text = numStr,
+                                    color = OneUiTheme.colors.accent,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-
-                                if (uiState.totalSources > 0) {
-                                    val lineIndex = uiState.activeSourceIndex + 1
-                                    val lineBadge = "线路 $lineIndex/${uiState.totalSources} [${uiState.activeSource?.protocol ?: "AUTO"}]"
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = lineBadge,
-                                        color = Color(0xFFC5C8D4),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(50))
-                                            .background(Color(0x33FFFFFF))
-                                            .padding(horizontal = 10.dp, vertical = 3.dp)
-                                    )
-                                }
                             }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = channel.name,
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
 
-                            // EPG 节目单展示 (双行优雅对齐，带微型胶囊徽章，长标题单行截断省略，无任何图标)
-                            if (uiState.activeChannel != null) {
-                                val currentProg = uiState.currentProgram
-                                val nextProg = uiState.nextProgram
+                        // 右侧线路/比例胶囊徽章
+                        Box(
+                            modifier = Modifier
+                                .clip(OneUiShapes.pill)
+                                .background(OneUiTheme.colors.surfacePill)
+                                .clickable { onSwitchSource() }
+                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "线路 $currentIdx/$totalSrc",
+                                color = OneUiTheme.colors.accent,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
 
-                                if (currentProg != null || nextProg != null) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        if (currentProg != null) {
-                                            val timeStr = "${formatTime(currentProg.startTimestamp)} - ${formatTime(currentProg.endTimestamp)}"
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                // [播出] 胶囊徽章
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(4.dp))
-                                                        .background(OneUiTheme.colors.accent)
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "播出",
-                                                        color = Color.White,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = currentProg.title,
-                                                    color = OneUiTheme.colors.accent,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.weight(1f, fill = false)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = timeStr,
-                                                    color = Color(0xFFA0A4B2),
-                                                    fontSize = 11.sp
-                                                )
+                    // 第 2 行：源详情与分辨率（仅当存在真实分辨率时展示，绝无空占位）
+                    val sourceName = uiState.activeSource?.name ?: "官方源"
+                    val metrics = uiState.metrics
+                    val resolutionText = if (metrics.videoWidth > 0 && metrics.videoHeight > 0) {
+                        val badge = when {
+                            metrics.videoWidth >= 7680 || metrics.videoHeight >= 4320 -> "8K UHD"
+                            metrics.videoWidth >= 3840 || metrics.videoHeight >= 2160 -> "4K UHD"
+                            metrics.videoWidth >= 1920 || metrics.videoHeight >= 1080 -> "1080P FHD"
+                            metrics.videoWidth >= 1280 || metrics.videoHeight >= 720 -> "720P HD"
+                            else -> "SD"
+                        }
+                        " · $badge (${metrics.videoWidth}×${metrics.videoHeight})"
+                    } else ""
 
-                                                if (onOpenEpgSchedule != null) {
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(50))
-                                                            .background(OneUiTheme.colors.accent.copy(alpha = 0.25f))
-                                                            .clickable { onOpenEpgSchedule() }
-                                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = "节目单",
-                                                            color = OneUiTheme.colors.accent,
-                                                            fontSize = 11.sp,
-                                                            fontWeight = FontWeight.SemiBold
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
+                    val sourceSubText = "$sourceName$resolutionText"
+                    Text(
+                        text = sourceSubText,
+                        color = OneUiTheme.colors.textSecondary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
 
-                                        if (nextProg != null) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                // [下期] 胶囊徽章
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(4.dp))
-                                                        .background(Color(0x33FFFFFF))
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "下期",
-                                                        color = Color(0xFFD0D3DC),
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = nextProg.title,
-                                                    color = Color(0xFFD0D3DC),
-                                                    fontSize = 12.sp,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.weight(1f, fill = false)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = formatTime(nextProg.startTimestamp),
-                                                    color = Color(0xFF8E92A0),
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
-                                    }
+                    // 第 3 行：当前正在播出节目 (EPG Now)
+                    val currentProg = uiState.currentProgram
+                    if (currentProg != null) {
+                        val startTime = formatTime(currentProg.startTimestamp)
+                        val endTime = formatTime(currentProg.endTimestamp)
+                        val nowText = "▶ 正在播出  $startTime-$endTime  ${currentProg.title}"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = nowText,
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (onOpenEpgSchedule != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.accentSoft)
+                                        .clickable { onOpenEpgSchedule() }
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "节目单",
+                                        color = OneUiTheme.colors.accent,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
                     }
-                }
 
-                // 底部性能指标统计渐变栏
-                val metrics = uiState.metrics
-                val statItems = mutableListOf<String>()
-                if (metrics.videoWidth > 0 && metrics.videoHeight > 0) {
-                    statItems.add("分辨率: ${metrics.videoWidth}x${metrics.videoHeight}")
-                }
-                if (metrics.frameRate > 0) {
-                    statItems.add("帧率: %.1f fps".format(metrics.frameRate))
-                }
-                if (metrics.bitrateBps > 0) {
-                    statItems.add("码率: %.1f Mbps".format(metrics.bitrateBps / 1_000_000.0))
-                }
-                if (metrics.bufferedDurationMs > 0) {
-                    statItems.add("缓冲: %.1fs".format(metrics.bufferedDurationMs / 1000.0))
-                }
-                if (metrics.switchDurationMs > 0) {
-                    statItems.add("切台: ${metrics.switchDurationMs}ms")
-                }
-
-                if (statItems.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
-                                )
-                            )
-                            .padding(horizontal = 24.dp, vertical = 14.dp)
-                    ) {
+                    // 第 4 行：稍后预告节目 (EPG Next)
+                    val nextProg = uiState.nextProgram
+                    if (nextProg != null) {
+                        val nextTime = formatTime(nextProg.startTimestamp)
+                        val nextText = "稍后播出  $nextTime  ${nextProg.title}"
                         Text(
-                            text = statItems.joinToString("  •  "),
-                            color = Color(0xFF9EA2B0),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            text = nextText,
+                            color = OneUiTheme.colors.textSecondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 1.dp)
                         )
                     }
                 }

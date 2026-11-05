@@ -19,15 +19,20 @@ import androidx.compose.ui.unit.dp
 
 data class OneUiColors(
     val background: Color,
+    val panelBackground: Color,
     val cardBackground: Color,
     val cardSecondary: Color,
     val cardElevated: Color,
+    val surfacePill: Color,
     val textPrimary: Color,
     val textSecondary: Color,
     val textMuted: Color,
     val divider: Color,
+    val borderSubtle: Color,
     val accent: Color,
     val accentSoft: Color,
+    val danger: Color,
+    val dangerSoft: Color,
     val statusSuccess: Color,
     val statusWarning: Color,
     val statusError: Color,
@@ -36,15 +41,20 @@ data class OneUiColors(
 
 val OneUiLightTokens = OneUiColors(
     background = OneUiLightBackground,
+    panelBackground = OneUiLightPanel,
     cardBackground = OneUiLightCard,
     cardSecondary = OneUiLightCardSecondary,
     cardElevated = OneUiLightCardElevated,
+    surfacePill = OneUiLightPill,
     textPrimary = OneUiLightTextPrimary,
     textSecondary = OneUiLightTextSecondary,
     textMuted = OneUiLightTextMuted,
     divider = OneUiLightDivider,
+    borderSubtle = OneUiLightBorderSubtle,
     accent = OneUiLightAccent,
     accentSoft = OneUiLightAccentSoft,
+    danger = OneUiLightDanger,
+    dangerSoft = OneUiLightDangerSoft,
     statusSuccess = OneUiStatusSuccess,
     statusWarning = OneUiStatusWarning,
     statusError = OneUiStatusError,
@@ -53,15 +63,20 @@ val OneUiLightTokens = OneUiColors(
 
 val OneUiDarkTokens = OneUiColors(
     background = OneUiDarkBackground,
+    panelBackground = OneUiDarkPanel,
     cardBackground = OneUiDarkCard,
     cardSecondary = OneUiDarkCardSecondary,
     cardElevated = OneUiDarkCardElevated,
+    surfacePill = OneUiDarkPill,
     textPrimary = OneUiDarkTextPrimary,
     textSecondary = OneUiDarkTextSecondary,
     textMuted = OneUiDarkTextMuted,
     divider = OneUiDarkDivider,
+    borderSubtle = OneUiDarkBorderSubtle,
     accent = OneUiDarkAccent,
     accentSoft = OneUiDarkAccentSoft,
+    danger = OneUiDarkDanger,
+    dangerSoft = OneUiDarkDangerSoft,
     statusSuccess = OneUiStatusSuccess,
     statusWarning = OneUiStatusWarning,
     statusError = OneUiStatusError,
@@ -77,16 +92,29 @@ object OneUiTheme {
         get() = LocalOneUiColors.current
 
     val shapes = OneUiShapes
+    val dimensions = OneUiDimensions
 }
 
 object OneUiShapes {
     val cardSmall = RoundedCornerShape(12.dp)
     val cardMedium = RoundedCornerShape(18.dp)
-    val cardLarge = RoundedCornerShape(22.dp)
+    val cardLarge = RoundedCornerShape(24.dp)
+    val panel = RoundedCornerShape(24.dp)
     val pill = RoundedCornerShape(50)
     val searchBar = RoundedCornerShape(24.dp)
     val dialog = RoundedCornerShape(26.dp)
     val bottomSheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+}
+
+object OneUiDimensions {
+    val panelPlaylistWidth = 316.dp
+    val panelSettingsWidth = 460.dp
+    val panelSettingsPhoneWidth = 360.dp
+    val panelExitConfirmWidth = 284.dp
+    val hudChannelBarWidth = 440.dp
+    val rowHeightChannel = 48.dp
+    val rowHeightSetting = 52.dp
+    val badgeChannelNumberWidth = 34.dp
 }
 
 private val DarkColorScheme = darkColorScheme(
@@ -162,6 +190,31 @@ val AppAccentSoft: Color
     @Composable
     @ReadOnlyComposable
     get() = OneUiTheme.colors.accentSoft
+
+val AppPanelBackground: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = OneUiTheme.colors.panelBackground
+
+val AppSurfacePill: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = OneUiTheme.colors.surfacePill
+
+val AppBorderSubtle: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = OneUiTheme.colors.borderSubtle
+
+val AppDanger: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = OneUiTheme.colors.danger
+
+val AppDangerSoft: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = OneUiTheme.colors.dangerSoft
 
 @Composable
 fun LiveStreamTheme(

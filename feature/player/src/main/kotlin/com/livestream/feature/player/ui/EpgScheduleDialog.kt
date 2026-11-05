@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.EpgProgram
 import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -81,15 +82,15 @@ fun EpgScheduleDialog(
                 .background(Color.Black.copy(alpha = 0.65f)),
             contentAlignment = Alignment.Center
         ) {
-            val sheetShape = RoundedCornerShape(26.dp)
+            val sheetShape = OneUiShapes.panel
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
-                    .widthIn(max = 400.dp)
+                    .widthIn(max = 420.dp)
                     .fillMaxHeight(0.82f)
-                    .border(BorderStroke(1.dp, OneUiTheme.colors.divider), sheetShape)
-                    .background(OneUiTheme.colors.background, sheetShape)
+                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), sheetShape)
+                    .background(OneUiTheme.colors.panelBackground, sheetShape)
                     .padding(18.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

@@ -31,6 +31,9 @@ interface ChannelDao {
     @Query("SELECT COUNT(*) FROM channels")
     suspend fun getChannelCount(): Int
 
+    @Query("SELECT * FROM channels")
+    suspend fun getAllChannelsSync(): List<ChannelEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChannels(channels: List<ChannelEntity>)
 
