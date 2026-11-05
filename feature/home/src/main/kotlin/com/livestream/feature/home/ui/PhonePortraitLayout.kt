@@ -2,6 +2,10 @@ package com.livestream.feature.home.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,13 +28,19 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +63,7 @@ import com.livestream.feature.player.ui.LiveVideoSurface
 import com.livestream.feature.player.ui.PlayerOverlay
 import com.livestream.feature.player.ui.WebPlaybackContainer
 import com.livestream.feature.settings.SettingsUiState
+import com.livestream.feature.settings.ui.SettingsContent
 import com.livestream.feature.settings.ui.SettingsDialog
 import com.livestream.playback.api.web.WebPlaybackController
 
@@ -100,6 +111,12 @@ fun PhonePortraitLayout(
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+    var isSettingsViewActive by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isSettingsViewActive) {
+        isSettingsViewActive = false
+        onCloseSettings()
+    }
 
     Box(
         modifier = modifier
@@ -150,19 +167,19 @@ fun PhonePortraitLayout(
                     onOpenEpgSchedule = onToggleEpgSheet
                 )
 
-                // 右下角全屏胶囊药丸按钮 (点击画面唤出 OSD 出现，无任何图标)
+                // 右上角全屏胶囊药丸按钮 (点击画面唤出 OSD 出现，无任何图标)
                 if (playerUiState.isOsdVisible) {
-                    val fsPillShape = RoundedCornerShape(50)
+                    val fsPillShape = OneUiShapes.pill
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(14.dp)
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
                             .border(BorderStroke(1.dp, Color(0x33FFFFFF)), fsPillShape)
                             .background(Color(0xCC101114), fsPillShape)
                             .clickable {
                                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                             }
-                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = "全屏",
@@ -175,184 +192,262 @@ fun PhonePortraitLayout(
             }
 
             // 2. 下半部交互区 (Interaction Area)：紧凑 One UI 排版
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // One UI 标题与分类快速切换器 (‹ 分类名 ›) + 设置入口
-                val categories = channelUiState.categories
-                val currentCategoryIndex = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
-                val currentCategoryTitle = channelUiState.selectedCategory?.name ?: "全部频道"
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (categories.size > 1) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(OneUiShapes.pill)
-                                    .background(OneUiTheme.colors.surfacePill)
-                                    .clickable {
-                                        val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
-                                        onCategorySelected(categories[prevIdx])
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "‹",
-                                    color = OneUiTheme.colors.textPrimary,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        Column(modifier = Modifier.weight(1f, fill = false)) {
-                            Text(
-                                text = currentCategoryTitle,
-                                color = OneUiTheme.colors.textPrimary,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "共 ${channelUiState.channels.size} 个频道",
-                                color = OneUiTheme.colors.textSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-
-                        if (categories.size > 1) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(OneUiShapes.pill)
-                                    .background(OneUiTheme.colors.surfacePill)
-                                    .clickable {
-                                        val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
-                                        onCategorySelected(categories[nextIdx])
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "›",
-                                    color = OneUiTheme.colors.textPrimary,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // 设置快捷胶囊
-                    Box(
-                        modifier = Modifier
-                            .clip(OneUiShapes.pill)
-                            .background(OneUiTheme.colors.cardSecondary)
-                            .clickable { onOpenSettings() }
-                            .padding(horizontal = 14.dp, vertical = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "设置",
-                            color = OneUiTheme.colors.textPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // 紧凑药丸搜索框 (Pill Search Box)
-                val searchShape = OneUiShapes.pill
-                OutlinedTextField(
-                    value = channelUiState.searchQuery,
-                    onValueChange = onSearchQueryChanged,
-                    placeholder = {
-                        Text(
-                            text = "搜索频道...",
-                            color = OneUiTheme.colors.textMuted,
-                            fontSize = 12.sp
-                        )
-                    },
-                    trailingIcon = {
-                        if (channelUiState.searchQuery.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(OneUiShapes.pill)
-                                    .clickable { onSearchQueryChanged("") }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "清空",
-                                    color = OneUiTheme.colors.textMuted,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = OneUiTheme.colors.cardSecondary,
-                        unfocusedContainerColor = OneUiTheme.colors.cardSecondary,
-                        focusedBorderColor = OneUiTheme.colors.accent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = OneUiTheme.colors.textPrimary,
-                        unfocusedTextColor = OneUiTheme.colors.textPrimary
-                    ),
-                    shape = searchShape,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 频道列表 (直通到底部导航区域，充实紧凑)
-                LazyColumn(
+            if (isSettingsViewActive) {
+                // 设置展示区（展示在节目所在的这一块区域）
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .navigationBarsPadding(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(
-                        items = channelUiState.channels,
-                        key = { it.id }
-                    ) { channel ->
-                        ChannelListItem(
-                            channel = channel,
-                            isActive = channel.id == channelUiState.activeChannelId,
-                            onChannelClick = onChannelSelected,
-                            onFavoriteToggle = onFavoriteToggle
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // 顶部导航栏：返回节目列表与标题
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(OneUiShapes.pill)
+                                    .background(OneUiTheme.colors.cardSecondary)
+                                    .clickable {
+                                        isSettingsViewActive = false
+                                        onCloseSettings()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "‹ 节目列表",
+                                    color = OneUiTheme.colors.accent,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Text(
+                                text = "系统与设置",
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val settingsScrollState = rememberScrollState()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(settingsScrollState)
+                            .padding(horizontal = 16.dp)
+                            .navigationBarsPadding()
+                    ) {
+                        SettingsContent(
+                            uiState = settingsUiState,
+                            onOpenImportDialog = onOpenImportDialog,
+                            onOpenSourceManagement = onOpenSourceManagement,
+                            onThemeModeSelected = onThemeModeSelected,
+                            onToggleHardwareDecode = onToggleHardwareDecode,
+                            onToggleSurfaceView = onToggleSurfaceView,
+                            onToggleBootStartup = onToggleBootStartup
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+            } else {
+                // 原有频道列表交互区
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // One UI 标题与分类快速切换器 (‹ 分类名 ›) + 设置入口
+                    val categories = channelUiState.categories
+                    val currentCategoryIndex = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
+                    val currentCategoryTitle = channelUiState.selectedCategory?.name ?: "全部频道"
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (categories.size > 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.surfacePill)
+                                        .clickable {
+                                            val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
+                                            onCategorySelected(categories[prevIdx])
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "‹",
+                                        color = OneUiTheme.colors.textPrimary,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
+                                Text(
+                                    text = currentCategoryTitle,
+                                    color = OneUiTheme.colors.textPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "共 ${channelUiState.channels.size} 个频道",
+                                    color = OneUiTheme.colors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+
+                            if (categories.size > 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.surfacePill)
+                                        .clickable {
+                                            val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
+                                            onCategorySelected(categories[nextIdx])
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "›",
+                                        color = OneUiTheme.colors.textPrimary,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // 设置快捷胶囊
+                        Box(
+                            modifier = Modifier
+                                .clip(OneUiShapes.pill)
+                                .background(OneUiTheme.colors.cardSecondary)
+                                .clickable {
+                                    isSettingsViewActive = true
+                                    onOpenSettings()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "设置",
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // 紧凑药丸搜索框 (Pill Search Box)
+                    val searchShape = OneUiShapes.pill
+                    OutlinedTextField(
+                        value = channelUiState.searchQuery,
+                        onValueChange = onSearchQueryChanged,
+                        placeholder = {
+                            Text(
+                                text = "搜索频道...",
+                                color = OneUiTheme.colors.textMuted,
+                                fontSize = 12.sp
+                            )
+                        },
+                        trailingIcon = {
+                            if (channelUiState.searchQuery.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OneUiShapes.pill)
+                                        .clickable { onSearchQueryChanged("") }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "清空",
+                                        color = OneUiTheme.colors.textMuted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = OneUiTheme.colors.cardSecondary,
+                            unfocusedContainerColor = OneUiTheme.colors.cardSecondary,
+                            focusedBorderColor = OneUiTheme.colors.accent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = OneUiTheme.colors.textPrimary,
+                            unfocusedTextColor = OneUiTheme.colors.textPrimary
+                        ),
+                        shape = searchShape,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // 频道列表 (直通到底部导航区域，充实紧凑)
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .navigationBarsPadding(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(
+                            items = channelUiState.channels,
+                            key = { it.id }
+                        ) { channel ->
+                            ChannelListItem(
+                                channel = channel,
+                                isActive = channel.id == channelUiState.activeChannelId,
+                                onChannelClick = onChannelSelected,
+                                onFavoriteToggle = onFavoriteToggle
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 设置弹窗
+        // 设置弹窗 (竖屏模式下 isSettingsOpen 置为 false，避免在右侧展开侧边抽屉，但保留导入对话框与自定义源管理对话框)
         SettingsDialog(
-            uiState = settingsUiState,
+            uiState = settingsUiState.copy(isSettingsOpen = false),
             onCloseSettings = onCloseSettings,
             onToggleHardwareDecode = onToggleHardwareDecode,
             onToggleSurfaceView = onToggleSurfaceView,

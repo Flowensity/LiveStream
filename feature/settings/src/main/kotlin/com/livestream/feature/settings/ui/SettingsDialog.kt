@@ -199,201 +199,18 @@ fun SettingsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .verticalScroll(scrollState),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            .verticalScroll(scrollState)
                     ) {
-                        // 频道源管理卡片
-                        SettingsSectionTitle("频道源管理")
-                        OneUiGroupCard {
-                            TvFocusableBox(
-                                onClick = onOpenImportDialog,
-                                shape = OneUiShapes.cardMedium,
-                                unfocusedBackgroundColor = Color.Transparent,
-                                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
-                                focusedBorderColor = OneUiTheme.colors.accent,
-                                focusedBorderWidth = 1.5.dp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 48.dp)
-                            ) { isFocused ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(end = 8.dp)
-                                    ) {
-                                        Text(
-                                            text = "导入 M3U 播放列表",
-                                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = "局域网扫码推送 / 网络链接",
-                                            color = OneUiTheme.colors.textSecondary,
-                                            fontSize = 10.sp,
-                                            lineHeight = 13.sp,
-                                            modifier = Modifier.padding(top = 1.dp)
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OneUiShapes.pill)
-                                            .background(OneUiTheme.colors.accentSoft)
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = "导入",
-                                            color = OneUiTheme.colors.accent,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-
-                            OneUiCardDivider()
-
-                            TvFocusableBox(
-                                onClick = onOpenSourceManagement,
-                                shape = OneUiShapes.cardMedium,
-                                unfocusedBackgroundColor = Color.Transparent,
-                                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
-                                focusedBorderColor = OneUiTheme.colors.accent,
-                                focusedBorderWidth = 1.5.dp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 48.dp)
-                            ) { isFocused ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(end = 8.dp)
-                                    ) {
-                                        Text(
-                                            text = "自定义源管理",
-                                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = if (uiState.customChannels.isNotEmpty()) {
-                                                "已导入 ${uiState.customChannels.size} 个节目 (${uiState.customSources.size} 个源)"
-                                            } else {
-                                                "管理或删除自定义源与节目"
-                                            },
-                                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
-                                            fontSize = 10.sp,
-                                            lineHeight = 13.sp,
-                                            modifier = Modifier.padding(top = 1.dp)
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OneUiShapes.pill)
-                                            .background(
-                                                if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accentSoft
-                                                else OneUiTheme.colors.surfacePill
-                                            )
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = if (uiState.customChannels.isNotEmpty()) "管理" else "查看",
-                                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // 界面主题模式卡片
-                        SettingsSectionTitle("界面主题")
-                        OneUiGroupCard {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val modes = listOf(
-                                    ThemeMode.LIGHT to "浅色",
-                                    ThemeMode.DARK to "深色",
-                                    ThemeMode.SYSTEM to "跟随系统"
-                                )
-                                modes.forEach { (mode, label) ->
-                                    val isSelected = uiState.themeMode == mode
-                                    TvFocusableBox(
-                                        onClick = { onThemeModeSelected(mode) },
-                                        shape = OneUiShapes.pill,
-                                        unfocusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.surfacePill,
-                                        focusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.accentSoft,
-                                        focusedBorderColor = OneUiTheme.colors.accent,
-                                        focusedBorderWidth = 1.5.dp,
-                                        modifier = Modifier.weight(1f)
-                                    ) { isFocused ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 7.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                color = if (isSelected) Color.White else if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // 播放与渲染引擎卡片
-                        SettingsSectionTitle("画面与解码")
-                        OneUiGroupCard {
-                            SettingToggleRow(
-                                title = "硬件加速解码",
-                                subtitle = "MediaCodec GPU 硬解，低功耗高帧率",
-                                checked = uiState.isHardwareDecodePreferred,
-                                onCheckedChange = onToggleHardwareDecode,
-                                modifier = Modifier.focusRequester(firstFocusRequester)
-                            )
-                            OneUiCardDivider()
-                            SettingToggleRow(
-                                title = "SurfaceView 优先",
-                                subtitle = "专用硬件视频图层，画面流畅",
-                                checked = uiState.isSurfaceViewPreferred,
-                                onCheckedChange = onToggleSurfaceView
-                            )
-                        }
-
-                        // 系统设置卡片（开机自启动）
-                        SettingsSectionTitle("系统设置")
-                        OneUiGroupCard {
-                            SettingToggleRow(
-                                title = "开机自启动",
-                                subtitle = "设备开机后自动拉起直播并播放",
-                                checked = uiState.isBootStartupEnabled,
-                                onCheckedChange = onToggleBootStartup
-                            )
-                        }
-
+                        SettingsContent(
+                            uiState = uiState,
+                            onOpenImportDialog = onOpenImportDialog,
+                            onOpenSourceManagement = onOpenSourceManagement,
+                            onThemeModeSelected = onThemeModeSelected,
+                            onToggleHardwareDecode = onToggleHardwareDecode,
+                            onToggleSurfaceView = onToggleSurfaceView,
+                            onToggleBootStartup = onToggleBootStartup,
+                            firstFocusRequester = firstFocusRequester
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
@@ -944,6 +761,217 @@ fun SettingsDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SettingsContent(
+    uiState: SettingsUiState,
+    onOpenImportDialog: () -> Unit,
+    onOpenSourceManagement: () -> Unit,
+    onThemeModeSelected: (ThemeMode) -> Unit,
+    onToggleHardwareDecode: (Boolean) -> Unit,
+    onToggleSurfaceView: (Boolean) -> Unit,
+    onToggleBootStartup: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    firstFocusRequester: FocusRequester? = null
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // 频道源管理卡片
+        SettingsSectionTitle("频道源管理")
+        OneUiGroupCard {
+            TvFocusableBox(
+                onClick = onOpenImportDialog,
+                shape = OneUiShapes.cardMedium,
+                unfocusedBackgroundColor = Color.Transparent,
+                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                focusedBorderColor = OneUiTheme.colors.accent,
+                focusedBorderWidth = 1.5.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 48.dp)
+            ) { isFocused ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "导入 M3U 播放列表",
+                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "局域网扫码推送 / 网络链接",
+                            color = OneUiTheme.colors.textSecondary,
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
+                            modifier = Modifier.padding(top = 1.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(OneUiShapes.pill)
+                            .background(OneUiTheme.colors.accentSoft)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "导入",
+                            color = OneUiTheme.colors.accent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            OneUiCardDivider()
+
+            TvFocusableBox(
+                onClick = onOpenSourceManagement,
+                shape = OneUiShapes.cardMedium,
+                unfocusedBackgroundColor = Color.Transparent,
+                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                focusedBorderColor = OneUiTheme.colors.accent,
+                focusedBorderWidth = 1.5.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 48.dp)
+            ) { isFocused ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "自定义源管理",
+                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (uiState.customChannels.isNotEmpty()) {
+                                "已导入 ${uiState.customChannels.size} 个节目 (${uiState.customSources.size} 个源)"
+                            } else {
+                                "管理或删除自定义源与节目"
+                            },
+                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
+                            modifier = Modifier.padding(top = 1.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(OneUiShapes.pill)
+                            .background(
+                                if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accentSoft
+                                else OneUiTheme.colors.surfacePill
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (uiState.customChannels.isNotEmpty()) "管理" else "查看",
+                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // 界面主题模式卡片
+        SettingsSectionTitle("界面主题")
+        OneUiGroupCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val modes = listOf(
+                    ThemeMode.LIGHT to "浅色",
+                    ThemeMode.DARK to "深色",
+                    ThemeMode.SYSTEM to "跟随系统"
+                )
+                modes.forEach { (mode, label) ->
+                    val isSelected = uiState.themeMode == mode
+                    TvFocusableBox(
+                        onClick = { onThemeModeSelected(mode) },
+                        shape = OneUiShapes.pill,
+                        unfocusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.surfacePill,
+                        focusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.accentSoft,
+                        focusedBorderColor = OneUiTheme.colors.accent,
+                        focusedBorderWidth = 1.5.dp,
+                        modifier = Modifier.weight(1f)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.White else if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 画面与解码卡片
+        SettingsSectionTitle("画面与解码")
+        OneUiGroupCard {
+            val hwdModifier = if (firstFocusRequester != null) Modifier.focusRequester(firstFocusRequester) else Modifier
+            SettingToggleRow(
+                title = "硬件加速解码",
+                subtitle = "MediaCodec GPU 硬解，低功耗高帧率",
+                checked = uiState.isHardwareDecodePreferred,
+                onCheckedChange = onToggleHardwareDecode,
+                modifier = hwdModifier
+            )
+            OneUiCardDivider()
+            SettingToggleRow(
+                title = "SurfaceView 优先",
+                subtitle = "专用硬件视频图层，画面流畅",
+                checked = uiState.isSurfaceViewPreferred,
+                onCheckedChange = onToggleSurfaceView
+            )
+        }
+
+        // 系统设置卡片（开机自启动）
+        SettingsSectionTitle("系统设置")
+        OneUiGroupCard {
+            SettingToggleRow(
+                title = "开机自启动",
+                subtitle = "设备开机后自动拉起直播并播放",
+                checked = uiState.isBootStartupEnabled,
+                onCheckedChange = onToggleBootStartup
+            )
         }
     }
 }

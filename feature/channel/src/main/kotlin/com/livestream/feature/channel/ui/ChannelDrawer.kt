@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
@@ -67,10 +68,20 @@ fun ChannelDrawer(
     modifier: Modifier = Modifier
 ) {
     val activeItemFocusRequester = remember { FocusRequester() }
+    val listState = rememberLazyListState()
 
-    LaunchedEffect(uiState.isDrawerOpen, uiState.selectedCategory?.id) {
-        if (uiState.isDrawerOpen) {
-            delay(150)
+    LaunchedEffect(uiState.isDrawerOpen, uiState.selectedCategory?.id, uiState.channels) {
+        if (uiState.isDrawerOpen && uiState.channels.isNotEmpty()) {
+            val hasActive = uiState.channels.any { it.id == uiState.activeChannelId }
+            val targetIdx = if (hasActive) {
+                uiState.channels.indexOfFirst { it.id == uiState.activeChannelId }
+            } else {
+                0
+            }
+            if (targetIdx in uiState.channels.indices) {
+                listState.scrollToItem(maxOf(0, targetIdx - 1))
+            }
+            delay(100)
             try {
                 activeItemFocusRequester.requestFocus()
             } catch (_: Exception) {}
@@ -301,7 +312,15 @@ fun ChannelDrawer(
                             }
                         }
                     } else {
+                        val hasActive = uiState.channels.any { it.id == uiState.activeChannelId }
+                        val targetIdx = if (hasActive) {
+                            uiState.channels.indexOfFirst { it.id == uiState.activeChannelId }
+                        } else {
+                            0
+                        }
+
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -311,8 +330,8 @@ fun ChannelDrawer(
                                 key = { _, ch -> ch.id }
                             ) { index, channel ->
                                 val isActive = channel.id == uiState.activeChannelId
-                                val isFirstOrActive = isActive || (uiState.activeChannelId == null && index == 0)
-                                val itemModifier = if (isFirstOrActive) {
+                                val isFocusTarget = index == targetIdx
+                                val itemModifier = if (isFocusTarget) {
                                     Modifier.focusRequester(activeItemFocusRequester)
                                 } else {
                                     Modifier
