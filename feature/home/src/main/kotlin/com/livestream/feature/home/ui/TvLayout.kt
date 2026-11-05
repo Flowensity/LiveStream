@@ -117,14 +117,34 @@ fun TvLayout(
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                // 侧边栏展开时，右键或返回键便捷退出
+                // 侧边栏展开时：左右方向键切换分类，返回键/退出键关闭侧边栏
                 if (channelUiState.isDrawerOpen) {
-                    if (keyEvent.key == Key.DirectionRight || keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                        onCloseDrawer()
-                        focusRequester.requestFocus()
-                        return@onKeyEvent true
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            val categories = channelUiState.categories
+                            if (categories.isNotEmpty()) {
+                                val currIdx = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
+                                val prevIdx = if (currIdx <= 0) categories.size - 1 else currIdx - 1
+                                onCategorySelected(categories[prevIdx])
+                            }
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionRight -> {
+                            val categories = channelUiState.categories
+                            if (categories.isNotEmpty()) {
+                                val currIdx = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
+                                val nextIdx = (currIdx + 1) % categories.size
+                                onCategorySelected(categories[nextIdx])
+                            }
+                            return@onKeyEvent true
+                        }
+                        Key.Back, Key.Escape -> {
+                            onCloseDrawer()
+                            focusRequester.requestFocus()
+                            return@onKeyEvent true
+                        }
+                        else -> return@onKeyEvent false
                     }
-                    return@onKeyEvent false
                 }
 
                 // 设置展开时交由弹窗，若内嵌导入弹窗打开则先关闭导入

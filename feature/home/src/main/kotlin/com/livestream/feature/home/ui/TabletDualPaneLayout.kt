@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -53,9 +54,9 @@ import com.livestream.core.ui.theme.AppSurfaceElevated
 import com.livestream.core.ui.theme.AppTextMuted
 import com.livestream.core.ui.theme.AppTextPrimary
 import com.livestream.core.ui.theme.FocusHighlight
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
-import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
@@ -139,48 +140,86 @@ fun TabletDualPaneLayout(
                         .padding(16.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // 顶部标题与设置
+                        val categories = channelUiState.categories
+                        val currentCategoryIndex = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
+                        val currentCategoryTitle = channelUiState.selectedCategory?.name ?: "全部频道"
+
+                        // 顶部标题与分类快速切换 (‹ 分类名 ›) + 设置
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "频道导航",
-                                color = AppTextPrimary,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                val settingsPill = RoundedCornerShape(50)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(settingsPill)
-                                        .background(OneUiTheme.colors.cardSecondary)
-                                        .clickable { onOpenSettings() }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "设置",
-                                        color = OneUiTheme.colors.textPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                if (categories.size > 1) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(OneUiShapes.pill)
+                                            .background(OneUiTheme.colors.surfacePill)
+                                            .clickable {
+                                                val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
+                                                onCategorySelected(categories[prevIdx])
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = "‹", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
+
+                                Text(
+                                    text = currentCategoryTitle,
+                                    color = AppTextPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+
+                                if (categories.size > 1) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(OneUiShapes.pill)
+                                            .background(OneUiTheme.colors.surfacePill)
+                                            .clickable {
+                                                val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
+                                                onCategorySelected(categories[nextIdx])
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = "›", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(OneUiShapes.pill)
+                                    .background(OneUiTheme.colors.cardSecondary)
+                                    .clickable { onOpenSettings() }
+                                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = "设置",
+                                    color = OneUiTheme.colors.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // One UI 药丸搜索框
                         OutlinedTextField(
                             value = channelUiState.searchQuery,
                             onValueChange = onSearchQueryChanged,
-                            placeholder = { Text("搜索频道...", color = OneUiTheme.colors.textMuted, fontSize = 13.sp) },
+                            placeholder = { Text("搜索频道...", color = OneUiTheme.colors.textMuted, fontSize = 12.sp) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = OneUiTheme.colors.cardSecondary,
@@ -190,17 +229,7 @@ fun TabletDualPaneLayout(
                                 focusedTextColor = OneUiTheme.colors.textPrimary,
                                 unfocusedTextColor = OneUiTheme.colors.textPrimary
                             ),
-                            shape = RoundedCornerShape(24.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // 分类导航标签栏
-                        CategoryTabRow(
-                            categories = channelUiState.categories,
-                            selectedCategory = channelUiState.selectedCategory,
-                            onCategorySelected = onCategorySelected,
+                            shape = OneUiShapes.pill,
                             modifier = Modifier.fillMaxWidth()
                         )
 

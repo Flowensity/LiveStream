@@ -41,6 +41,8 @@ fun TvFocusableBox(
     shape: Shape = RoundedCornerShape(14.dp),
     focusedBorderWidth: Dp = 2.dp,
     focusedBorderColor: Color = OneUiTheme.colors.accent,
+    unfocusedBorderWidth: Dp = 1.dp,
+    unfocusedBorderColor: Color? = null,
     unfocusedBackgroundColor: Color = OneUiTheme.colors.cardBackground,
     focusedBackgroundColor: Color = OneUiTheme.colors.cardSecondary,
     scaleOnFocus: Float = 1.03f,
@@ -56,10 +58,10 @@ fun TvFocusableBox(
     )
 
     val currentBackground = if (isFocused) focusedBackgroundColor else unfocusedBackgroundColor
-    val borderStroke = if (isFocused) {
-        BorderStroke(focusedBorderWidth, focusedBorderColor)
-    } else {
-        null
+    val borderStroke = when {
+        isFocused -> BorderStroke(focusedBorderWidth, focusedBorderColor)
+        unfocusedBorderColor != null -> BorderStroke(unfocusedBorderWidth, unfocusedBorderColor)
+        else -> null
     }
 
     Box(

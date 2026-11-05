@@ -34,6 +34,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,7 +68,7 @@ fun ChannelDrawer(
 ) {
     val activeItemFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(uiState.isDrawerOpen) {
+    LaunchedEffect(uiState.isDrawerOpen, uiState.selectedCategory?.id) {
         if (uiState.isDrawerOpen) {
             delay(150)
             try {
@@ -79,6 +84,9 @@ fun ChannelDrawer(
         modifier = modifier
     ) {
         val drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+        val categories = uiState.categories
+        val currentCategoryIndex = categories.indexOfFirst { it.id == uiState.selectedCategory?.id }
+        val currentCategoryTitle = uiState.selectedCategory?.name ?: "频道列表"
 
         Box(
             modifier = Modifier
@@ -88,12 +96,36 @@ fun ChannelDrawer(
                 .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), drawerShape)
                 .background(OneUiTheme.colors.panelBackground)
                 .padding(vertical = 12.dp)
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown) {
+                        when (keyEvent.key) {
+                            Key.DirectionLeft -> {
+                                if (categories.isNotEmpty()) {
+                                    val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
+                                    onCategorySelected(categories[prevIdx])
+                                }
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                if (categories.isNotEmpty()) {
+                                    val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
+                                    onCategorySelected(categories[nextIdx])
+                                }
+                                true
+                            }
+                            Key.Back, Key.Escape -> {
+                                onCloseDrawer()
+                                true
+                            }
+                            else -> false
+                        }
+                    } else {
+                        false
+                    }
+                }
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // 1. One UI 顶部大标题与分组快速切换器 (‹ 分类名 ›)
-                val categories = uiState.categories
-                val currentCategoryIndex = categories.indexOfFirst { it.id == uiState.selectedCategory?.id }
-                val currentCategoryTitle = uiState.selectedCategory?.name ?: "频道列表"
 
                 Row(
                     modifier = Modifier
@@ -165,15 +197,9 @@ fun ChannelDrawer(
                     }
                 }
 
-                // 2. 分类药丸横向滚动栏 (Pill Chips)
-                CategoryTabRow(
-                    categories = categories,
-                    selectedCategory = uiState.selectedCategory,
-                    onCategorySelected = onCategorySelected,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // 3. 搜索框 (TeleflowTv Quick Channel Search Bar, 34dp 高度)
+                // 2. 搜索框 (TeleflowTv Quick Channel Search Bar, 34dp 高度)
                 val searchShape = RoundedCornerShape(17.dp)
                 Box(
                     modifier = Modifier

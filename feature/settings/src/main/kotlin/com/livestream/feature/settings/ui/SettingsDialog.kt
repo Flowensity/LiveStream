@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +45,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -310,7 +316,7 @@ fun SettingsDialog(
             }
         }
 
-        // 内嵌导入 M3U 弹窗
+        // 内嵌导入 M3U 弹窗 (宽度约 260~270dp，较原先减半)
         if (uiState.isImportDialogOpen) {
             Box(
                 modifier = Modifier
@@ -322,11 +328,10 @@ fun SettingsDialog(
 
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.92f)
-                        .widthIn(max = 420.dp)
+                        .width(268.dp)
                         .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), importDialogShape)
                         .background(OneUiTheme.colors.panelBackground, importDialogShape)
-                        .padding(18.dp)
+                        .padding(14.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
@@ -335,9 +340,9 @@ fun SettingsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "导入 M3U 播放列表",
+                                text = "导入 M3U 列表",
                                 color = OneUiTheme.colors.textPrimary,
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             TvFocusableBox(
@@ -351,14 +356,14 @@ fun SettingsDialog(
                                 Text(
                                     text = "关闭",
                                     color = if (isFocused) Color.White else OneUiTheme.colors.textSecondary,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // 1. Android TV 局域网扫码推送区域（带放大按钮）
                         if (uiState.qrBitmap != null && uiState.localServerUrl != null) {
@@ -367,46 +372,42 @@ fun SettingsDialog(
                                     .fillMaxWidth()
                                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), OneUiShapes.cardMedium)
                                     .background(OneUiTheme.colors.cardBackground, OneUiShapes.cardMedium)
-                                    .padding(12.dp),
+                                    .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(6.dp))
                                         .clickable { isQrEnlarged = true }
                                 ) {
                                     Image(
                                         bitmap = uiState.qrBitmap.asImageBitmap(),
                                         contentDescription = "局域网推送二维码",
                                         modifier = Modifier
-                                            .size(76.dp)
+                                            .size(62.dp)
                                             .background(Color.White)
-                                            .padding(3.dp)
+                                            .padding(2.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "局域网扫码输入",
+                                        text = "局域网扫码推流",
                                         color = OneUiTheme.colors.accent,
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "手机浏览器访问：",
-                                        color = OneUiTheme.colors.textSecondary,
-                                        fontSize = 11.sp
                                     )
                                     Text(
                                         text = uiState.localServerUrl,
                                         color = OneUiTheme.colors.textPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
 
                                     // 二维码放大按钮 (TvFocusableBox)
                                     TvFocusableBox(
@@ -420,22 +421,22 @@ fun SettingsDialog(
                                         Text(
                                             text = "放大二维码",
                                             color = if (isFocused) Color.White else OneUiTheme.colors.accent,
-                                            fontSize = 11.sp,
+                                            fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                         )
                                     }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         // 2. M3U 订阅链接或内容直接输入框
                         Text(
-                            text = "或手动粘贴订阅链接 / M3U 文本：",
+                            text = "或粘贴链接 / M3U 文本：",
                             color = OneUiTheme.colors.textSecondary,
-                            fontSize = 11.5.sp,
-                            modifier = Modifier.padding(bottom = 6.dp)
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
 
                         val inputShape = OneUiShapes.cardMedium
@@ -444,22 +445,22 @@ fun SettingsDialog(
                             onValueChange = onImportTextChanged,
                             textStyle = TextStyle(
                                 color = OneUiTheme.colors.textPrimary,
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             ),
                             cursorBrush = SolidColor(OneUiTheme.colors.accent),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(88.dp)
+                                .height(64.dp)
                                 .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), inputShape)
                                 .background(OneUiTheme.colors.cardBackground, inputShape)
-                                .padding(10.dp),
+                                .padding(8.dp),
                             decorationBox = { innerTextField ->
                                 if (uiState.importText.isEmpty()) {
                                     Text(
-                                        text = "支持 http(s):// 开头的订阅地址，GitHub 链接，或 #EXTM3U 完整源文本...",
+                                        text = "支持 http(s):// 地址、GitHub 订阅或 M3U 文本...",
                                         color = OneUiTheme.colors.textMuted,
-                                        fontSize = 11.sp,
-                                        lineHeight = 15.sp
+                                        fontSize = 10.5.sp,
+                                        lineHeight = 14.sp
                                     )
                                 }
                                 innerTextField()
@@ -467,27 +468,27 @@ fun SettingsDialog(
                         )
 
                         if (uiState.importError != null) {
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = uiState.importError,
                                 color = OneUiTheme.colors.danger,
-                                fontSize = 11.5.sp,
+                                fontSize = 11.sp,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
 
                         if (uiState.importSuccessCount != null) {
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "成功导入 ${uiState.importSuccessCount} 个频道及播放源！",
+                                text = "成功导入 ${uiState.importSuccessCount} 个频道！",
                                 color = OneUiTheme.colors.statusSuccess,
-                                fontSize = 11.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -506,13 +507,13 @@ fun SettingsDialog(
                                 Text(
                                     text = "取消",
                                     color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             TvFocusableBox(
                                 onClick = { if (!uiState.isImporting) onConfirmImport() },
@@ -523,11 +524,11 @@ fun SettingsDialog(
                                 focusedBorderWidth = 2.dp
                             ) { _ ->
                                 Text(
-                                    text = if (uiState.isImporting) "正在导入..." else "确认导入",
+                                    text = if (uiState.isImporting) "导入中..." else "确认导入",
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                    fontSize = 11.5.sp,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                                 )
                             }
                         }
@@ -536,34 +537,58 @@ fun SettingsDialog(
             }
         }
 
-        // 3. 二维码全屏居中超大放大弹窗
+        // 3. 二维码全屏居中超大放大弹窗 (支持电视遥控器一键关闭)
         if (isQrEnlarged && uiState.qrBitmap != null) {
+            val qrCloseFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(isQrEnlarged) {
+                if (isQrEnlarged) {
+                    kotlinx.coroutines.delay(100)
+                    try {
+                        qrCloseFocusRequester.requestFocus()
+                    } catch (_: Exception) {}
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.9f))
-                    .clickable { isQrEnlarged = false },
+                    .background(Color.Black.copy(alpha = 0.92f))
+                    .clickable { isQrEnlarged = false }
+                    .focusable()
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown &&
+                            (keyEvent.key == Key.Back ||
+                             keyEvent.key == Key.Escape ||
+                             keyEvent.key == Key.DirectionCenter ||
+                             keyEvent.key == Key.Enter)
+                        ) {
+                            isQrEnlarged = false
+                            true
+                        } else {
+                            false
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(24.dp)
+                    modifier = Modifier.padding(20.dp)
                 ) {
                     Text(
                         text = "手机扫码推流至电视",
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Box(
                         modifier = Modifier
-                            .size(260.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .size(240.dp)
+                            .clip(RoundedCornerShape(14.dp))
                             .background(Color.White)
-                            .padding(10.dp),
+                            .padding(8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -573,11 +598,11 @@ fun SettingsDialog(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = uiState.localServerUrl ?: "",
                         color = OneUiTheme.colors.accent,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -588,14 +613,15 @@ fun SettingsDialog(
                         unfocusedBackgroundColor = Color(0x33FFFFFF),
                         focusedBackgroundColor = OneUiTheme.colors.accent,
                         focusedBorderColor = Color.White,
-                        focusedBorderWidth = 2.dp
+                        focusedBorderWidth = 2.dp,
+                        modifier = Modifier.focusRequester(qrCloseFocusRequester)
                     ) { _ ->
                         Text(
                             text = "关闭放大",
                             color = Color.White,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp)
                         )
                     }
                 }

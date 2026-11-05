@@ -45,7 +45,6 @@ import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
-import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
 import com.livestream.feature.player.ui.EpgScheduleDialog
@@ -177,7 +176,11 @@ fun PhonePortraitLayout(
             ) {
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // One UI 标题与设置入口
+                // One UI 标题与分类快速切换器 (‹ 分类名 ›) + 设置入口
+                val categories = channelUiState.categories
+                val currentCategoryIndex = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
+                val currentCategoryTitle = channelUiState.selectedCategory?.name ?: "全部频道"
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -185,20 +188,71 @@ fun PhonePortraitLayout(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = channelUiState.selectedCategory?.name ?: "直播频道",
-                            color = OneUiTheme.colors.textPrimary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "共 ${channelUiState.channels.size} 个频道 · 触控即播",
-                            color = OneUiTheme.colors.textSecondary,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 1.dp)
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (categories.size > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(OneUiShapes.pill)
+                                    .background(OneUiTheme.colors.surfacePill)
+                                    .clickable {
+                                        val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
+                                        onCategorySelected(categories[prevIdx])
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "‹",
+                                    color = OneUiTheme.colors.textPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
+                            Text(
+                                text = currentCategoryTitle,
+                                color = OneUiTheme.colors.textPrimary,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "共 ${channelUiState.channels.size} 个频道",
+                                color = OneUiTheme.colors.textSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        if (categories.size > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(OneUiShapes.pill)
+                                    .background(OneUiTheme.colors.surfacePill)
+                                    .clickable {
+                                        val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
+                                        onCategorySelected(categories[nextIdx])
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "›",
+                                    color = OneUiTheme.colors.textPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     // 设置快捷胶囊
                     Box(
@@ -265,16 +319,6 @@ fun PhonePortraitLayout(
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
-
-                // 横向滑动分类药丸栏
-                CategoryTabRow(
-                    categories = channelUiState.categories,
-                    selectedCategory = channelUiState.selectedCategory,
-                    onCategorySelected = onCategorySelected,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
 
                 // 频道列表 (直通到底部导航区域，充实紧凑)
                 LazyColumn(

@@ -107,7 +107,7 @@ object OneUiShapes {
 }
 
 object OneUiDimensions {
-    val panelPlaylistWidth = 316.dp
+    val panelPlaylistWidth = 264.dp
     val panelSettingsWidth = 460.dp
     val panelSettingsPhoneWidth = 360.dp
     val panelExitConfirmWidth = 284.dp

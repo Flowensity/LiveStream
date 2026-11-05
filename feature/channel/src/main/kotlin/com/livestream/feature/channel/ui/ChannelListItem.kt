@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,7 +43,7 @@ fun ChannelListItem(
     onFavoriteToggle: (Channel) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rowShape = RoundedCornerShape(12.dp)
+    val rowShape = RoundedCornerShape(10.dp)
 
     TvFocusableBox(
         onClick = { onChannelClick(channel) },
@@ -51,21 +52,16 @@ fun ChannelListItem(
         focusedBackgroundColor = OneUiTheme.colors.accentSoft,
         focusedBorderColor = OneUiTheme.colors.accent,
         focusedBorderWidth = 2.dp,
+        unfocusedBorderColor = if (isActive) OneUiTheme.colors.accent.copy(alpha = 0.5f) else null,
+        unfocusedBorderWidth = 1.dp,
         modifier = modifier
             .fillMaxWidth()
-            .height(OneUiDimensions.rowHeightChannel)
+            .height(42.dp)
     ) { isFocused ->
-        val borderModifier = if (isActive && !isFocused) {
-            Modifier.border(BorderStroke(1.dp, OneUiTheme.colors.accent.copy(alpha = 0.45f)), rowShape)
-        } else {
-            Modifier
-        }
-
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .then(borderModifier)
-                .padding(horizontal = 12.dp),
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -73,10 +69,10 @@ fun ChannelListItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // 1. 统一标准尺寸的序号胶囊容器 (34dp x 24dp)
+                // 1. 统一标准尺寸的序号胶囊容器 (32dp x 22dp)
                 Box(
                     modifier = Modifier
-                        .size(width = 34.dp, height = 24.dp)
+                        .size(width = 32.dp, height = 22.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(
                             if (isActive || isFocused) OneUiTheme.colors.accentSoft
@@ -92,7 +88,7 @@ fun ChannelListItem(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // 2. 频道名称
                 Text(
@@ -102,7 +98,7 @@ fun ChannelListItem(
                         isActive -> OneUiTheme.colors.accent
                         else -> OneUiTheme.colors.textPrimary
                     },
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

@@ -202,7 +202,7 @@ fun PlayerOverlay(
                             val numStr = "%02d".format(channel.channelNumber)
                             Box(
                                 modifier = Modifier
-                                    .size(width = 34.dp, height = 24.dp)
+                                    .size(width = 32.dp, height = 22.dp)
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(OneUiTheme.colors.accentSoft),
                                 contentAlignment = Alignment.Center
@@ -210,7 +210,7 @@ fun PlayerOverlay(
                                 Text(
                                     text = numStr,
                                     color = OneUiTheme.colors.accent,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
