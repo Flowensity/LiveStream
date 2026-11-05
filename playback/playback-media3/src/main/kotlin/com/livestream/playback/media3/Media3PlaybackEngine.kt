@@ -57,21 +57,21 @@ class Media3PlaybackEngine @Inject constructor(
             setEnableDecoderFallback(true) // 硬件解码器个别崩溃时允许内部安全回退
         }
 
-        // 2. 结合低延迟直播特点的精细化缓冲控制
+        // 2. 结合低延迟直播特点的精细化缓冲控制（首帧极速起播优化）
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 1500,
                 /* maxBufferMs = */ 5000,
-                /* bufferForPlaybackMs = */ 500,
+                /* bufferForPlaybackMs = */ 250, // 调优：由 500ms 降至 250ms，显著提升安卓 TV 首帧呈现出图速度
                 /* bufferForPlaybackAfterRebufferMs = */ 1000
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        // 3. 定制 HTTP 数据源工厂（支持自定义 User-Agent 与请求头）
+        // 3. 定制 HTTP 数据源工厂（缩短握手超时至 3000ms，加速死源剔除并防止 IPv6 握手阻塞）
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setConnectTimeoutMs(8000)
-            .setReadTimeoutMs(8000)
+            .setConnectTimeoutMs(3000) // 调优：由 8000ms 降至 3000ms
+            .setReadTimeoutMs(4000)    // 调优：由 8000ms 降至 4000ms
             .setAllowCrossProtocolRedirects(true)
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)

@@ -360,6 +360,8 @@ fun TabletDualPaneLayout(
                                 isFullscreen = !isFullscreen
                                 if (isFullscreen && activity?.resources?.configuration?.orientation != Configuration.ORIENTATION_LANDSCAPE) {
                                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                } else if (!isFullscreen) {
+                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                                 }
                             }
                             .padding(horizontal = 14.dp, vertical = 8.dp)

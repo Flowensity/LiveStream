@@ -187,7 +187,7 @@ class PlayerViewModel @Inject constructor(
         _uiState.update { it.copy(isEpgSheetVisible = false) }
     }
 
-    fun onNumberKeyInput(digit: Int) {
+    fun onNumberKeyInput(digit: Int, onChannelConfirmed: ((Channel) -> Unit)? = null) {
         val currentNumber = _uiState.value.quickChannelNumber + digit
         _uiState.update { it.copy(quickChannelNumber = currentNumber, isOsdVisible = true) }
 
@@ -199,7 +199,12 @@ class PlayerViewModel @Inject constructor(
                 val channels = channelRepository.observeAllVisibleChannels().firstOrNull() ?: emptyList()
                 val targetChannel = channels.find { it.channelNumber == channelNum }
                 if (targetChannel != null) {
-                    playChannel(targetChannel)
+                    showOsd(5000L)
+                    if (onChannelConfirmed != null) {
+                        onChannelConfirmed(targetChannel)
+                    } else {
+                        playChannel(targetChannel)
+                    }
                 }
             }
             _uiState.update { it.copy(quickChannelNumber = "") }

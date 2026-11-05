@@ -177,7 +177,7 @@ fun PhonePortraitLayout(
                             .border(BorderStroke(1.dp, Color(0x33FFFFFF)), fsPillShape)
                             .background(Color(0xCC101114), fsPillShape)
                             .clickable {
-                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                             }
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {

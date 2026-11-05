@@ -12,5 +12,6 @@ data class CustomPlaylistSource(
     val url: String,
     val channelCount: Int,
     val channelIds: List<String> = emptyList(),
+    val matchedSourceIds: List<String> = emptyList(),
     val timestamp: Long = System.currentTimeMillis()
 )

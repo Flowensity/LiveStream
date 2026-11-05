@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,6 +28,9 @@ class ChannelRepositoryImpl @Inject constructor(
     private val dispatchers: AppDispatchers
 ) : ChannelRepository {
 
+    private var hasSeeded = false
+    private val seedMutex = kotlinx.coroutines.sync.Mutex()
+
     override fun observeAllVisibleChannels(): Flow<List<Channel>> {
         return channelDao.observeAllVisibleChannels()
             .onStart { checkAndSeedDefaultChannels() }
@@ -35,7 +40,6 @@ class ChannelRepositoryImpl @Inject constructor(
 
     override fun observeChannelsByCategory(categoryId: String): Flow<List<Channel>> {
         return channelDao.observeChannelsByCategory(categoryId)
-            .onStart { checkAndSeedDefaultChannels() }
             .map { list -> list.map { it.toDomain() } }
             .flowOn(dispatchers.io)
     }
@@ -151,6 +155,13 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteSourcesByIds(sourceIds: List<String>) {
+        if (sourceIds.isEmpty()) return
+        withContext(dispatchers.io) {
+            liveSourceDao.deleteSourcesByIds(sourceIds)
+        }
+    }
+
     override suspend fun deleteAllCustomChannelsAndSources() {
         withContext(dispatchers.io) {
             channelDao.deleteAllCustomChannels()
@@ -160,27 +171,34 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     override suspend fun checkAndSeedDefaultChannels() {
+        if (hasSeeded) return
         withContext(dispatchers.io) {
-            // Always ensure predefined categories are up-to-date (e.g. 地方卫视)
-            categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
+            seedMutex.withLock {
+                if (hasSeeded) return@withLock
 
-            // Preserve user-favorite and user-hidden settings for existing channels
-            val existingChannels = channelDao.getAllChannelsSync().associateBy { it.id }
-            val channelsToUpsert = PresetChannelDataProvider.allDefaultChannels.map { defaultChannel ->
-                val existing = existingChannels[defaultChannel.id]
-                if (existing != null) {
-                    defaultChannel.copy(
-                        isFavorite = existing.isFavorite,
-                        isHidden = existing.isHidden
-                    ).toEntity()
-                } else {
-                    defaultChannel.toEntity()
+                // Always ensure predefined categories are up-to-date (e.g. 地方卫视)
+                categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
+
+                // Preserve user-favorite and user-hidden settings for existing channels
+                val existingChannels = channelDao.getAllChannelsSync().associateBy { it.id }
+                val channelsToUpsert = PresetChannelDataProvider.allDefaultChannels.map { defaultChannel ->
+                    val existing = existingChannels[defaultChannel.id]
+                    if (existing != null) {
+                        defaultChannel.copy(
+                            isFavorite = existing.isFavorite,
+                            isHidden = existing.isHidden
+                        ).toEntity()
+                    } else {
+                        defaultChannel.toEntity()
+                    }
                 }
-            }
-            channelDao.insertChannels(channelsToUpsert)
+                channelDao.insertChannels(channelsToUpsert)
 
-            // Upsert all preset official sources so satellite and CCTV sources are always populated
-            liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
+                // Upsert all preset official sources so satellite and CCTV sources are always populated
+                liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
+
+                hasSeeded = true
+            }
         }
     }
 }

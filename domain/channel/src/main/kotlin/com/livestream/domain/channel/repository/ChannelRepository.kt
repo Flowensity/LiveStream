@@ -45,6 +45,8 @@ interface ChannelRepository {
 
     suspend fun deleteChannelsByIds(channelIds: List<String>)
 
+    suspend fun deleteSourcesByIds(sourceIds: List<String>)
+
     suspend fun deleteAllCustomChannelsAndSources()
 
     suspend fun checkAndSeedDefaultChannels()

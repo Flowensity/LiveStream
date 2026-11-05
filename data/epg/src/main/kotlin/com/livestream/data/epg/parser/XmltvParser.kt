@@ -12,8 +12,12 @@ import javax.xml.parsers.SAXParserFactory
 
 object XmltvParser {
 
-    private val DATE_FORMAT_WITH_TZ = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
-    private val DATE_FORMAT_WITHOUT_TZ = SimpleDateFormat("yyyyMMddHHmmss", Locale.US)
+    private val DATE_FORMAT_WITH_TZ = ThreadLocal.withInitial {
+        SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
+    }
+    private val DATE_FORMAT_WITHOUT_TZ = ThreadLocal.withInitial {
+        SimpleDateFormat("yyyyMMddHHmmss", Locale.US)
+    }
     private val saxParserFactory: SAXParserFactory by lazy {
         SAXParserFactory.newInstance().apply {
             isNamespaceAware = false
@@ -119,9 +123,9 @@ object XmltvParser {
         val trimmed = timeString.trim()
         return try {
             if (trimmed.contains(" ") || trimmed.contains("+") || trimmed.contains("-")) {
-                DATE_FORMAT_WITH_TZ.parse(trimmed)?.time ?: 0L
+                DATE_FORMAT_WITH_TZ.get()?.parse(trimmed)?.time ?: 0L
             } else {
-                DATE_FORMAT_WITHOUT_TZ.parse(trimmed)?.time ?: 0L
+                DATE_FORMAT_WITHOUT_TZ.get()?.parse(trimmed)?.time ?: 0L
             }
         } catch (_: Exception) {
             0L

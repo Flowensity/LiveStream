@@ -194,7 +194,7 @@ fun PhoneLandscapeLayout(
                         .border(btnBorder, pillShape)
                         .background(btnBg, pillShape)
                         .clickable {
-                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                         }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {

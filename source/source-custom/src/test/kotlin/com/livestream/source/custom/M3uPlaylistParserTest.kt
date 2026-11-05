@@ -47,15 +47,18 @@ class M3uPlaylistParserTest {
     }
 
     @Test
-    fun `test security url validator rejects malicious schemes and private ips`() {
+    fun `test security url validator rejects malicious schemes and loopback addresses but allows lan iptv`() {
         assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("file:///system/build.prop"))
         assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("content://media/external/images"))
         assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("javascript:alert(1)"))
         assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("http://localhost:8080/live"))
         assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("http://127.0.0.1/live.m3u8"))
-        assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("http://192.168.1.1/live.m3u8"))
-        assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("http://10.0.0.1/live.m3u8"))
-        assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("http://172.16.0.1/live.m3u8"))
+        assertFalse(M3uPlaylistParser.isSafeAndValidStreamUrl("http://0.0.0.0:52026/"))
+
+        // 家庭局域网 IPTV / UDPXY 代理流放行
+        assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("http://192.168.1.1:4022/udp/239.3.1.1:5140"))
+        assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("http://10.0.0.1:4022/udp/239.3.1.2:5140"))
+        assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("http://172.16.0.1:4022/udp/239.3.1.3:5140"))
 
         assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("https://live.cctv.cn/live.m3u8"))
         assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("http://stream.example.com/dash/channel.mpd"))

@@ -48,6 +48,8 @@ interface PlaybackOrchestrator {
 
     val latencyTracker: LatencyTracker? get() = null
 
+    val watchdogStallTimeoutMs: Long get() = 4500L
+
     fun playChannel(channel: Channel, preferredSourceId: String? = null)
 
     fun previewChannel(channel: Channel) {}
@@ -69,4 +71,6 @@ interface PlaybackOrchestrator {
     fun attachOutput(output: Any?)
 
     fun detachOutput()
+
+    fun updateStallTimeout(timeoutMs: Long) {}
 }

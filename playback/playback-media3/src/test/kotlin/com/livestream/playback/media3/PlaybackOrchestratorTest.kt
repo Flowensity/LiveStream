@@ -277,4 +277,78 @@ class PlaybackOrchestratorTest {
         assertEquals(100.0, report.successRatePercent, 0.01)
         assertTrue(report.meetsP95Target)
     }
+
+    @Test
+    fun `test fallback to backup source uses 100ms rapid retry delay`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        // 模拟首选源发生错误（触发源回退）
+        engineStateFlow.value = EngineState.Error(
+            PlaybackErrorInfo(PlaybackErrorType.NETWORK_TIMEOUT, "网络连接超时", canRetry = true)
+        )
+        testScheduler.runCurrent()
+
+        // 推进 120ms（超过 100ms 快速换线延时）
+        advanceTimeBy(120L)
+        advanceUntilIdle()
+
+        assertEquals("src_2", orchestrator.orchestratorState.value.currentSource?.id)
+        assertEquals(1, orchestrator.orchestratorState.value.currentSourceIndex)
+    }
+
+    @Test
+    fun `test updateStallTimeout dynamically updates orchestrator watchdog`() = runTest(testDispatcher) {
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
+        orchestrator.updateStallTimeout(1200L)
+        assertEquals(1200L, orchestrator.watchdogStallTimeoutMs)
+    }
+
+    @Test
+    fun `test switchNextSource cycling through all sources transitions to ERROR to allow self-healing`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, sourceAdapterRegistry, webPlaybackController, networkMonitor, latencyTracker, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        // 第一次换线 -> 切到 source 2
+        orchestrator.switchNextSource()
+        advanceUntilIdle()
+        assertEquals("src_2", orchestrator.orchestratorState.value.currentSource?.id)
+
+        // 第二次换线 -> 尝试完所有备选源且未成功起播，转入 ERROR 状态以激活网络自愈
+        orchestrator.switchNextSource()
+        advanceUntilIdle()
+        assertEquals(PlaybackStatus.ERROR, orchestrator.orchestratorState.value.status)
+        assertEquals(PlaybackErrorType.NETWORK_TIMEOUT, orchestrator.orchestratorState.value.errorInfo?.errorType)
+    }
+
+    @Test
+    fun `test user preferences channelSwitchTimeoutMs dynamically updates watchdog`() = runTest(testDispatcher) {
+        val prefsFlow = MutableStateFlow(com.livestream.core.model.UserPreferences(channelSwitchTimeoutMs = 6000L))
+        val userPrefsRepo = mockk<com.livestream.domain.channel.repository.UserPreferencesRepository> {
+            every { userPreferences } returns prefsFlow
+        }
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers,
+            userPrefsRepo
+        )
+        advanceUntilIdle()
+        assertEquals(6000L, orchestrator.watchdogStallTimeoutMs)
+
+        prefsFlow.value = com.livestream.core.model.UserPreferences(channelSwitchTimeoutMs = 3000L)
+        advanceUntilIdle()
+        assertEquals(3000L, orchestrator.watchdogStallTimeoutMs)
+    }
 }

@@ -223,6 +223,7 @@ class SettingsViewModel @Inject constructor(
                 url = if (downloadUrl.startsWith("http")) downloadUrl else "",
                 channelCount = parsed.channels.size,
                 channelIds = parsed.channels.map { it.id },
+                matchedSourceIds = matchedSources.map { it.id },
                 timestamp = System.currentTimeMillis()
             )
             userPreferencesRepository.saveCustomPlaylistSource(record)
@@ -271,6 +272,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             if (source.channelIds.isNotEmpty()) {
                 channelRepository.deleteChannelsByIds(source.channelIds)
+            }
+            if (source.matchedSourceIds.isNotEmpty()) {
+                channelRepository.deleteSourcesByIds(source.matchedSourceIds)
             }
             userPreferencesRepository.removeCustomPlaylistSource(source.id)
         }

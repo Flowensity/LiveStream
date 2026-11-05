@@ -105,7 +105,8 @@ object M3uPlaylistParser {
     }
 
     /**
-     * URL 安全检查（阻止 SSRF、私有内网探测及危险协议如 file://, content://, javascript://）
+     * URL 安全检查（阻止本地回环攻击与危险 URI 协议如 file://, content://, javascript://；
+     * 允许公网 HTTP/HTTPS 以及家庭局域网 IPTV/UDPXY 代理流如 192.168.x.x, 10.x.x.x）
      */
     fun isSafeAndValidStreamUrl(url: String): Boolean {
         return try {
@@ -116,22 +117,10 @@ object M3uPlaylistParser {
             }
 
             val host = uri.host?.lowercase() ?: return false
-            if (host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0") {
+            // 禁止本机回环地址，防止 SSRF 探测本机应用服务
+            if (host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" ||
+                host == "ip6-localhost" || host == "ip6-loopback") {
                 return false
-            }
-
-            // 禁止 10.x.x.x, 192.168.x.x, 172.16.x.x ~ 172.31.x.x 常见内网私有地址
-            if (host.startsWith("10.") || host.startsWith("192.168.")) {
-                return false
-            }
-            if (host.startsWith("172.")) {
-                val parts = host.split('.')
-                if (parts.size >= 2) {
-                    val secondOctet = parts[1].toIntOrNull()
-                    if (secondOctet != null && secondOctet in 16..31) {
-                        return false
-                    }
-                }
             }
 
             true

@@ -185,4 +185,23 @@ class SettingsViewModelTest {
 
         coVerify(exactly = 1) { channelRepository.deleteChannelById("user_ch_123") }
     }
+
+    @Test
+    fun `deleteCustomPlaylistSource deletes both channelIds and matchedSourceIds`() = runTest(testDispatcher) {
+        val source = com.livestream.core.model.CustomPlaylistSource(
+            id = "test_src_1",
+            name = "Test Playlist",
+            url = "http://example.com/playlist.m3u",
+            channelCount = 2,
+            channelIds = listOf("ch_1", "ch_2"),
+            matchedSourceIds = listOf("matched_src_1", "matched_src_2")
+        )
+
+        viewModel.deleteCustomPlaylistSource(source)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteChannelsByIds(listOf("ch_1", "ch_2")) }
+        coVerify(exactly = 1) { channelRepository.deleteSourcesByIds(listOf("matched_src_1", "matched_src_2")) }
+        coVerify(exactly = 1) { userPreferencesRepository.removeCustomPlaylistSource("test_src_1") }
+    }
 }

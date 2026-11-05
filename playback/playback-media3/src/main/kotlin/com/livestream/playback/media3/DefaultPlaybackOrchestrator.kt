@@ -9,6 +9,7 @@ import com.livestream.core.model.PlaybackErrorType
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.core.model.SourceResolution
 import com.livestream.domain.channel.repository.ChannelRepository
+import com.livestream.domain.channel.repository.UserPreferencesRepository
 import com.livestream.playback.api.OrchestratorState
 import com.livestream.playback.api.PlaybackEngine
 import com.livestream.playback.api.PlaybackOrchestrator
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -44,7 +46,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     override val webPlaybackController: WebPlaybackController,
     private val networkMonitor: NetworkMonitor,
     override val latencyTracker: LatencyTracker,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
+    private val userPreferencesRepository: UserPreferencesRepository? = null
 ) : PlaybackOrchestrator {
 
     private val orchestratorScope = CoroutineScope(SupervisorJob() + dispatchers.main)
@@ -67,7 +70,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var currentRetryCount: Int = 0
 
     // 缓冲卡死看门狗（超时自动换线或自愈）
-    private val watchdog = PlaybackWatchdog(dispatchers) {
+    internal val watchdog = PlaybackWatchdog(dispatchers) {
         val currentMetrics = _orchestratorState.value.metrics
         _orchestratorState.value = _orchestratorState.value.copy(
             metrics = currentMetrics.copy(stallCount = currentMetrics.stallCount + 1)
@@ -79,12 +82,25 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         const val MAX_RETRY_COUNT = 3
     }
 
+    private val statusFlow = _orchestratorState
+        .map { it.status }
+        .stateIn(orchestratorScope, SharingStarted.Eagerly, PlaybackStatus.IDLE)
+
     init {
         // 启动卡顿看门狗监听
-        val statusFlow = _orchestratorState
-            .map { it.status }
-            .stateIn(orchestratorScope, SharingStarted.Eagerly, PlaybackStatus.IDLE)
         watchdog.start(statusFlow)
+
+        // 监听并动态同步用户设置的换台/缓冲卡死超时时间
+        userPreferencesRepository?.let { repo ->
+            orchestratorScope.launch {
+                repo.userPreferences
+                    .map { it.channelSwitchTimeoutMs }
+                    .distinctUntilChanged()
+                    .collect { timeoutMs ->
+                        watchdog.updateStallTimeout(timeoutMs)
+                    }
+            }
+        }
 
         // 监听网络连通性自愈事件：从断网恢复连网时，自动尝试重连恢复播放
         orchestratorScope.launch {
@@ -170,6 +186,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         // 1. 协同取消旧播放与解析任务，杜绝旧任务回调污染新状态
         activePlayJob?.cancel()
         currentRetryCount = 0
+        watchdog.start(statusFlow)
 
         // 记录切台起始时间点
         switchStartTimeMs = System.currentTimeMillis()
@@ -360,7 +377,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             currentSourceIndex++
             activePlayJob?.cancel()
             activePlayJob = orchestratorScope.launch {
-                delay(300) // 平滑延时避免突发震荡
+                delay(100) // 调优：由 300ms 降至 100ms 快速换线切换备用源
                 executeSourcePlayback(currentToken)
             }
             return
@@ -477,10 +494,24 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         }
     }
 
+    override val watchdogStallTimeoutMs: Long get() = watchdog.stallTimeoutMs
+
     override fun switchNextSource() {
         if (availableSources.size <= 1) return
         val currentToken = activeSessionToken
-        currentSourceIndex = (currentSourceIndex + 1) % availableSources.size
+        val nextIndex = currentSourceIndex + 1
+        if (nextIndex >= availableSources.size && _orchestratorState.value.status != PlaybackStatus.PLAYING) {
+            // 所有备用源均已轮询尝试完毕且未成功起播，判定为网络超时，转入 ERROR 状态以激活网络自愈监听
+            handlePlaybackFailure(
+                PlaybackErrorInfo(
+                    errorType = PlaybackErrorType.NETWORK_TIMEOUT,
+                    message = "所有直播线路均连接超时，请检查网络",
+                    canRetry = true
+                )
+            )
+            return
+        }
+        currentSourceIndex = nextIndex % availableSources.size
         activePlayJob?.cancel()
         activePlayJob = orchestratorScope.launch {
             executeSourcePlayback(currentToken)
@@ -522,7 +553,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activeSessionToken++
         activePlayJob?.cancel()
         switchStartTimeMs = 0L
-        watchdog.stop()
+        watchdog.release()
         engine.release()
         webPlaybackController.stopAndDestroy()
         _orchestratorState.value = _orchestratorState.value.copy(
@@ -538,5 +569,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
 
     override fun detachOutput() {
         engine.detachSurface()
+    }
+
+    override fun updateStallTimeout(timeoutMs: Long) {
+        watchdog.updateStallTimeout(timeoutMs)
     }
 }

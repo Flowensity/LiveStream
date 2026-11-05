@@ -12,8 +12,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -147,24 +146,44 @@ class LocalImportServer @Inject constructor() {
         try {
             socket.use { s ->
                 s.soTimeout = 10000
-                val reader = BufferedReader(InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8))
+                val input = s.getInputStream()
                 val output = s.getOutputStream()
 
-                val requestLine = reader.readLine() ?: return@use
+                // 1. 读取 HTTP 头部字节序列（以 CRLFCRLF 或 LFLF 为界）
+                val headerBytes = ByteArrayOutputStream()
+                var b1: Int; var b2 = -1; var b3 = -1; var b4 = -1
+                var headerDone = false
+
+                while (!headerDone) {
+                    val b = input.read()
+                    if (b == -1) break
+                    headerBytes.write(b)
+                    b1 = b2
+                    b2 = b3
+                    b3 = b4
+                    b4 = b
+                    if (b1 == '\r'.code && b2 == '\n'.code && b3 == '\r'.code && b4 == '\n'.code) {
+                        headerDone = true
+                    } else if (b3 == '\n'.code && b4 == '\n'.code) {
+                        headerDone = true
+                    }
+                }
+
+                val headerText = headerBytes.toString(StandardCharsets.UTF_8.name())
+                val lines = headerText.lines()
+                if (lines.isEmpty()) return@use
+                val requestLine = lines[0].trim()
                 val parts = requestLine.split(" ")
                 if (parts.size < 2) return@use
                 val method = parts[0].uppercase()
                 val path = parts[1]
 
                 var contentLength = 0
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    if (line.isNullOrBlank()) break
-                    val header = line!!
-                    val colon = header.indexOf(':')
+                for (line in lines) {
+                    val colon = line.indexOf(':')
                     if (colon != -1) {
-                        val headerName = header.substring(0, colon).trim()
-                        val headerValue = header.substring(colon + 1).trim()
+                        val headerName = line.substring(0, colon).trim()
+                        val headerValue = line.substring(colon + 1).trim()
                         if (headerName.equals("Content-Length", ignoreCase = true)) {
                             contentLength = headerValue.toIntOrNull() ?: 0
                         }
@@ -179,15 +198,16 @@ class LocalImportServer @Inject constructor() {
                         sendResponse(output, 200, "OK", "text/html; charset=utf-8", HTML_PAGE)
                     }
                     method == "POST" && path.startsWith("/import") -> {
+                        // 2. 严谨按照 HTTP 规范以字节数 (Octets) 读取报文体，杜绝 UTF-8 中文字符数与字节数不一致导致的读取阻塞挂死
                         val body = if (contentLength > 0) {
-                            val buffer = CharArray(contentLength)
+                            val bodyBytes = ByteArray(contentLength)
                             var readTotal = 0
                             while (readTotal < contentLength) {
-                                val r = reader.read(buffer, readTotal, contentLength - readTotal)
+                                val r = input.read(bodyBytes, readTotal, contentLength - readTotal)
                                 if (r == -1) break
                                 readTotal += r
                             }
-                            String(buffer, 0, readTotal)
+                            String(bodyBytes, 0, readTotal, StandardCharsets.UTF_8)
                         } else {
                             ""
                         }

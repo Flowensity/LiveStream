@@ -86,7 +86,7 @@ fun HomeScreen(
                 onCategorySelected = { channelViewModel.selectCategory(it) },
                 onChannelSelected = {
                     homeViewModel.playChannel(it)
-                    channelViewModel.selectChannel(it)
+                    channelViewModel.closeDrawer()
                 },
                 onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
                 onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
@@ -126,7 +126,7 @@ fun HomeScreen(
                 onCategorySelected = { channelViewModel.selectCategory(it) },
                 onChannelSelected = {
                     homeViewModel.playChannel(it)
-                    channelViewModel.selectChannel(it)
+                    channelViewModel.closeDrawer()
                 },
                 onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
                 onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
@@ -164,7 +164,7 @@ fun HomeScreen(
                 onCategorySelected = { channelViewModel.selectCategory(it) },
                 onChannelSelected = {
                     homeViewModel.playChannel(it)
-                    channelViewModel.selectChannel(it)
+                    channelViewModel.closeDrawer()
                 },
                 onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
                 onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
@@ -211,13 +211,17 @@ fun HomeScreen(
                     homeViewModel.switchPreviousChannel()
                     playerViewModel.showOsd()
                 },
-                onNumberKeyInput = { playerViewModel.onNumberKeyInput(it) },
+                onNumberKeyInput = { digit ->
+                    playerViewModel.onNumberKeyInput(digit) { targetChannel ->
+                        homeViewModel.playChannel(targetChannel)
+                    }
+                },
                 onOpenDrawer = { channelViewModel.openDrawer() },
                 onCloseDrawer = { channelViewModel.closeDrawer() },
                 onCategorySelected = { channelViewModel.selectCategory(it) },
                 onChannelSelected = {
                     homeViewModel.playChannel(it)
-                    channelViewModel.selectChannel(it)
+                    channelViewModel.closeDrawer()
                 },
                 onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
                 onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },

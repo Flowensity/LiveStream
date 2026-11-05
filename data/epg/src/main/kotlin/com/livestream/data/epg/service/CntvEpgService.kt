@@ -26,45 +26,104 @@ class CntvEpgService @Inject constructor(
      * 根据频道名称或原始 ID 解析 CNTV 官方 EPG 频源码
      */
     fun resolveCntvChannelCode(channelName: String): String? {
+        if (channelName.isBlank()) return null
+
+        // 1. 检查独立的 4K / 8K 频道 (如 CCTV-4K, CCTV-8K)
+        val isCctv4k = Regex("""CCTV[-_ ]*4K""", RegexOption.IGNORE_CASE).containsMatchIn(channelName) &&
+            !Regex("""CCTV[-_ ]*(1[0-7]|[1-9])""", RegexOption.IGNORE_CASE).containsMatchIn(channelName)
+        if (isCctv4k) return "cctv4k"
+
+        val isCctv8k = Regex("""CCTV[-_ ]*8K""", RegexOption.IGNORE_CASE).containsMatchIn(channelName) &&
+            !Regex("""CCTV[-_ ]*(1[0-7]|[1-9])""", RegexOption.IGNORE_CASE).containsMatchIn(channelName)
+        if (isCctv8k) return "cctv8k"
+
+        // 2. 检查 CCTV-5+ 体育赛事
+        if (Regex("""CCTV[-_ ]*5\+|CCTV[-_ ]*5PLUS|体育赛事""", RegexOption.IGNORE_CASE).containsMatchIn(channelName)) {
+            return "cctv5plus"
+        }
+
+        // 3. 检查 CCTV 1-17 号数字频道 (支持 CCTV-1, CCTV1, CCTV-16 4K, CCTV1 高清 等各种格式)
+        val cctvNumMatch = Regex("""(?:CCTV|中央)[-_ ]*(1[0-7]|[1-9])(?!\d)""", RegexOption.IGNORE_CASE).find(channelName)
+        if (cctvNumMatch != null) {
+            val num = cctvNumMatch.groupValues[1].toInt()
+            return when (num) {
+                1 -> "cctv1"
+                2 -> "cctv2"
+                3 -> "cctv3"
+                4 -> "cctv4"
+                5 -> "cctv5"
+                6 -> "cctv6"
+                7 -> "cctv7"
+                8 -> "cctv8"
+                9 -> "cctvjilu"
+                10 -> "cctv10"
+                11 -> "cctv11"
+                12 -> "cctv12"
+                13 -> "cctv13"
+                14 -> "cctvchild"
+                15 -> "cctv15"
+                16 -> "cctv16"
+                17 -> "cctv17"
+                else -> null
+            }
+        }
+
+        // 4. 检查中央中文数字别名 (如 中央一台, 中央十六台)
+        val zhMatch = Regex("""中央([一二三四五六七八九十]+)台?""").find(channelName)
+        if (zhMatch != null) {
+            val zhNum = zhMatch.groupValues[1]
+            when (zhNum) {
+                "一" -> return "cctv1"
+                "二" -> return "cctv2"
+                "三" -> return "cctv3"
+                "四" -> return "cctv4"
+                "五" -> return "cctv5"
+                "六" -> return "cctv6"
+                "七" -> return "cctv7"
+                "八" -> return "cctv8"
+                "九" -> return "cctvjilu"
+                "十" -> return "cctv10"
+                "十一" -> return "cctv11"
+                "十二" -> return "cctv12"
+                "十三" -> return "cctv13"
+                "十四" -> return "cctvchild"
+                "十五" -> return "cctv15"
+                "十六" -> return "cctv16"
+                "十七" -> return "cctv17"
+            }
+        }
+
+        // 5. 检查带有中央/CCTV前缀的频道内容别名
+        if (channelName.contains("CCTV", ignoreCase = true) || channelName.contains("中央")) {
+            when {
+                channelName.contains("中文国际") -> return "cctv4"
+                channelName.contains("国防") || channelName.contains("军事") -> return "cctv7"
+                channelName.contains("纪录") -> return "cctvjilu"
+                channelName.contains("新闻") -> return "cctv13"
+                channelName.contains("少儿") -> return "cctvchild"
+                channelName.contains("奥林匹克") -> return "cctv16"
+                channelName.contains("农业") || channelName.contains("农村") -> return "cctv17"
+            }
+        }
+
+        // 6. 各省主要卫视 (自动匹配 高清, 4K, 1080P, HD 等后缀)
         val cleanName = channelName.replace(" ", "").replace("-", "").uppercase(Locale.getDefault())
-
         return when {
-            // CCTV 央视频道
-            cleanName.contains("CCTV1综合") || cleanName == "CCTV1" -> "cctv1"
-            cleanName.contains("CCTV2财经") || cleanName == "CCTV2" -> "cctv2"
-            cleanName.contains("CCTV3综艺") || cleanName == "CCTV3" -> "cctv3"
-            cleanName.contains("CCTV4") || cleanName.contains("中文国际") -> "cctv4"
-            cleanName.contains("CCTV5+") || cleanName.contains("体育赛事") -> "cctv5plus"
-            cleanName.contains("CCTV5体育") || cleanName == "CCTV5" -> "cctv5"
-            cleanName.contains("CCTV6电影") || cleanName == "CCTV6" -> "cctv6"
-            cleanName.contains("CCTV7国防") || cleanName.contains("军事") || cleanName == "CCTV7" -> "cctv7"
-            cleanName.contains("CCTV8电视剧") || cleanName == "CCTV8" -> "cctv8"
-            cleanName.contains("CCTV9纪录") || cleanName.contains("纪录") || cleanName == "CCTV9" -> "cctvjilu"
-            cleanName.contains("CCTV10科教") || cleanName == "CCTV10" -> "cctv10"
-            cleanName.contains("CCTV11戏曲") || cleanName == "CCTV11" -> "cctv11"
-            cleanName.contains("CCTV12社会") || cleanName.contains("法") || cleanName == "CCTV12" -> "cctv12"
-            cleanName.contains("CCTV13新闻") || cleanName == "CCTV13" -> "cctv13"
-            cleanName.contains("CCTV14少儿") || cleanName.contains("少儿") || cleanName == "CCTV14" -> "cctvchild"
-            cleanName.contains("CCTV15音乐") || cleanName == "CCTV15" -> "cctv15"
-            cleanName.contains("CCTV16奥林匹克") || cleanName == "CCTV16" -> "cctv16"
-            cleanName.contains("CCTV17农业") || cleanName.contains("农村") || cleanName == "CCTV17" -> "cctv17"
-
-            // 各省主要卫视
-            cleanName.contains("北京卫视") -> "btv1"
+            cleanName.contains("北京卫视") || cleanName.contains("BTV北京卫视") -> "btv1"
             cleanName.contains("江苏卫视") -> "jiangsu"
-            cleanName.contains("东方卫视") -> "dongfang"
+            cleanName.contains("东方卫视") || cleanName.contains("上海卫视") -> "dongfang"
             cleanName.contains("浙江卫视") -> "zhejiang"
             cleanName.contains("湖南卫视") -> "hunan"
             cleanName.contains("湖北卫视") -> "hubei"
             cleanName.contains("广东卫视") -> "guangdong"
             cleanName.contains("广西卫视") -> "guangxi"
             cleanName.contains("黑龙江卫视") -> "heilongjiang"
-            cleanName.contains("海南卫视") -> "hainan"
+            cleanName.contains("海南卫视") || cleanName.contains("旅游卫视") -> "hainan"
             cleanName.contains("重庆卫视") -> "chongqing"
             cleanName.contains("深圳卫视") -> "shenzhen"
             cleanName.contains("四川卫视") -> "sichuan"
             cleanName.contains("河南卫视") -> "henan"
-            cleanName.contains("福建") || cleanName.contains("东南卫视") -> "dongnan"
+            cleanName.contains("东南卫视") || cleanName.contains("福建东南") || cleanName.contains("福建卫视") -> "dongnan"
             cleanName.contains("贵州卫视") -> "guizhou"
             cleanName.contains("江西卫视") -> "jiangxi"
             cleanName.contains("辽宁卫视") -> "liaoning"
@@ -72,7 +131,11 @@ class CntvEpgService @Inject constructor(
             cleanName.contains("河北卫视") -> "hebei"
             cleanName.contains("山东卫视") -> "shandong"
             cleanName.contains("天津卫视") -> "tianjin"
-
+            cleanName.contains("陕西卫视") -> "shanxi1"
+            cleanName.contains("吉林卫视") -> "jilin"
+            cleanName.contains("内蒙古卫视") -> "neimenggu"
+            cleanName.contains("新疆卫视") -> "xinjiang"
+            cleanName.contains("云南卫视") -> "yunnan"
             else -> null
         }
     }
