@@ -1,16 +1,19 @@
 package com.livestream.data.channel.repository
 
 import com.livestream.core.common.dispatcher.AppDispatchers
+import com.livestream.core.database.dao.CategoryDao
 import com.livestream.core.database.dao.ChannelDao
 import com.livestream.core.database.dao.LiveSourceDao
 import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
 import com.livestream.data.channel.mapper.toDomain
 import com.livestream.data.channel.mapper.toEntity
+import com.livestream.data.channel.preset.PresetChannelDataProvider
 import com.livestream.domain.channel.repository.ChannelRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,17 +22,20 @@ import javax.inject.Singleton
 class ChannelRepositoryImpl @Inject constructor(
     private val channelDao: ChannelDao,
     private val liveSourceDao: LiveSourceDao,
+    private val categoryDao: CategoryDao,
     private val dispatchers: AppDispatchers
 ) : ChannelRepository {
 
     override fun observeAllVisibleChannels(): Flow<List<Channel>> {
         return channelDao.observeAllVisibleChannels()
+            .onStart { checkAndSeedDefaultChannels() }
             .map { list -> list.map { it.toDomain() } }
             .flowOn(dispatchers.io)
     }
 
     override fun observeChannelsByCategory(categoryId: String): Flow<List<Channel>> {
         return channelDao.observeChannelsByCategory(categoryId)
+            .onStart { checkAndSeedDefaultChannels() }
             .map { list -> list.map { it.toDomain() } }
             .flowOn(dispatchers.io)
     }
@@ -103,6 +109,16 @@ class ChannelRepositoryImpl @Inject constructor(
     override suspend fun saveSources(sources: List<LiveSource>) {
         withContext(dispatchers.io) {
             liveSourceDao.insertSources(sources.map { it.toEntity() })
+        }
+    }
+
+    override suspend fun checkAndSeedDefaultChannels() {
+        withContext(dispatchers.io) {
+            if (channelDao.getChannelCount() == 0) {
+                categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
+                channelDao.insertChannels(PresetChannelDataProvider.allDefaultChannels.map { it.toEntity() })
+                liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ class HomeViewModel @Inject constructor(
         hasInitiatedStartupPlay = true
 
         viewModelScope.launch {
+            channelRepository.checkAndSeedDefaultChannels()
             val channels = channelRepository.observeAllVisibleChannels().firstOrNull() ?: emptyList()
             if (channels.isEmpty()) return@launch
 

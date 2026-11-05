@@ -49,9 +49,13 @@ class DefaultWebPlaybackController @Inject constructor(
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun loadOfficialUrl(url: String, container: Any?) {
+        val viewGroup = container as? ViewGroup ?: return
+        if (targetUrl == url && webView != null && parentContainer == viewGroup) {
+            return
+        }
+
         stopAndDestroy()
 
-        val viewGroup = container as? ViewGroup ?: return
         targetUrl = url
         parentContainer = viewGroup
 
@@ -65,13 +69,17 @@ class DefaultWebPlaybackController @Inject constructor(
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
+                databaseEnabled = true
                 mediaPlaybackRequiresUserGesture = false
                 loadWithOverviewMode = true
                 useWideViewPort = true
+                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 }
             }
+
+            webChromeClient = WebChromeClient()
 
             webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -83,6 +91,27 @@ class DefaultWebPlaybackController @Inject constructor(
                     super.onPageFinished(view, url)
                     loadTimeoutJob?.cancel()
                     _webState.value = WebPlaybackState.Ready
+
+                    // 沉浸式全屏播放加固：隐藏网页非视频元素，全屏铺满视频并启动自动播放
+                    val cssAndPlayJs = """
+                        (function() {
+                            try {
+                                var style = document.createElement('style');
+                                style.innerHTML = 'header, footer, .tv-main-con-r, .tv-zhan, .header-b, .header, .searchMinHeight > div:not(.tv-main-con-l) { display: none !important; } ' +
+                                    'body, html, #app, .tv-home, .tv, .tv-main, .tv-main-con, .tv-main-con-l, .tv-main-con-l-vid, live-player, video { ' +
+                                    'width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; ' +
+                                    'margin: 0 !important; padding: 0 !important; background-color: #000000 !important; ' +
+                                    'position: absolute !important; top: 0 !important; left: 0 !important; z-index: 999999 !important; }';
+                                document.head.appendChild(style);
+                                var vids = document.getElementsByTagName('video');
+                                for (var i = 0; i < vids.length; i++) {
+                                    vids[i].muted = false;
+                                    vids[i].play();
+                                }
+                            } catch(e) {}
+                        })();
+                    """.trimIndent()
+                    view?.evaluateJavascript(cssAndPlayJs, null)
                 }
 
                 override fun onReceivedError(

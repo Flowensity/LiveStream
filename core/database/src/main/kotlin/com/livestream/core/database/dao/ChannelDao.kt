@@ -28,6 +28,9 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE channel_number = :number LIMIT 1")
     suspend fun getChannelByNumber(number: Int): ChannelEntity?
 
+    @Query("SELECT COUNT(*) FROM channels")
+    suspend fun getChannelCount(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChannels(channels: List<ChannelEntity>)
 

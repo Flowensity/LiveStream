@@ -36,4 +36,6 @@ interface ChannelRepository {
     suspend fun saveChannels(channels: List<Channel>)
 
     suspend fun saveSources(sources: List<LiveSource>)
+
+    suspend fun checkAndSeedDefaultChannels()
 }

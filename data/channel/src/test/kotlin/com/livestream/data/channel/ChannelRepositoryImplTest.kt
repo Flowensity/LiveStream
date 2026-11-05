@@ -2,6 +2,7 @@ package com.livestream.data.channel
 
 import app.cash.turbine.test
 import com.livestream.core.common.dispatcher.AppDispatchers
+import com.livestream.core.database.dao.CategoryDao
 import com.livestream.core.database.dao.ChannelDao
 import com.livestream.core.database.dao.LiveSourceDao
 import com.livestream.core.database.entity.ChannelEntity
@@ -22,6 +23,7 @@ class ChannelRepositoryImplTest {
 
     private val channelDao = mockk<ChannelDao>(relaxed = true)
     private val liveSourceDao = mockk<LiveSourceDao>(relaxed = true)
+    private val categoryDao = mockk<CategoryDao>(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     private val testDispatchers = object : AppDispatchers {
@@ -41,7 +43,7 @@ class ChannelRepositoryImplTest {
     fun `test observeAllVisibleChannels maps entities properly`() = runTest(testDispatcher) {
         every { channelDao.observeAllVisibleChannels() } returns flowOf(listOf(sampleChannelEntity))
 
-        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, testDispatchers)
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
 
         repo.observeAllVisibleChannels().test {
             val list = awaitItem()
@@ -55,7 +57,7 @@ class ChannelRepositoryImplTest {
     fun `test toggleFavorite updates channelDao`() = runTest(testDispatcher) {
         coEvery { channelDao.updateFavoriteStatus("cctv1", true, any()) } returns Unit
 
-        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, testDispatchers)
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
         repo.toggleFavorite("cctv1", true)
 
         coVerify(exactly = 1) { channelDao.updateFavoriteStatus("cctv1", true, any()) }
@@ -73,7 +75,7 @@ class ChannelRepositoryImplTest {
         )
         every { liveSourceDao.observeSourcesByChannelId("cctv1") } returns flowOf(listOf(sourceEntity))
 
-        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, testDispatchers)
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
 
         repo.observeSourcesForChannel("cctv1").test {
             val list = awaitItem()
@@ -81,5 +83,17 @@ class ChannelRepositoryImplTest {
             assertEquals("s1", list.first().id)
             awaitComplete()
         }
+    }
+
+    @Test
+    fun `test checkAndSeedDefaultChannels seeds data when empty`() = runTest(testDispatcher) {
+        coEvery { channelDao.getChannelCount() } returns 0
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        repo.checkAndSeedDefaultChannels()
+
+        coVerify(exactly = 1) { categoryDao.insertCategories(any()) }
+        coVerify(exactly = 1) { channelDao.insertChannels(any()) }
+        coVerify(exactly = 1) { liveSourceDao.insertSources(any()) }
     }
 }

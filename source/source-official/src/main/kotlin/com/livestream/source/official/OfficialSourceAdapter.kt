@@ -3,6 +3,7 @@ package com.livestream.source.official
 import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.SourceResolution
+import com.livestream.core.model.StreamProtocol
 import com.livestream.core.network.NetworkProbe
 import com.livestream.core.network.ProbeResult
 import com.livestream.domain.channel.repository.ChannelRepository
@@ -25,12 +26,16 @@ class OfficialSourceAdapter @Inject constructor(
             return SourceResolution.Unavailable("官方公开资源地址未配置")
         }
 
-        return SourceResolution.NativeMedia(
-            uri = streamUrl,
-            protocol = source.protocol.name,
-            headersProfileId = source.headersProfileId,
-            drmProfileId = source.drmProfileId
-        )
+        return if (source.protocol == StreamProtocol.OFFICIAL_WEB) {
+            SourceResolution.OfficialWeb(uri = streamUrl)
+        } else {
+            SourceResolution.NativeMedia(
+                uri = streamUrl,
+                protocol = source.protocol.name,
+                headersProfileId = source.headersProfileId,
+                drmProfileId = source.drmProfileId
+            )
+        }
     }
 
     override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
