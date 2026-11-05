@@ -41,4 +41,5 @@ dependencies {
     implementation(libs.tv.material)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
 }

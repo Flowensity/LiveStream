@@ -1,0 +1,201 @@
+package com.livestream.feature.home.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.livestream.core.model.Channel
+import com.livestream.core.model.ChannelCategory
+import com.livestream.core.ui.theme.DarkBackground
+import com.livestream.core.ui.theme.DarkSurface
+import com.livestream.core.ui.theme.DarkSurfaceElevated
+import com.livestream.core.ui.theme.FocusHighlight
+import com.livestream.core.ui.theme.TextMuted
+import com.livestream.core.ui.theme.TextPrimary
+import com.livestream.feature.channel.ChannelUiState
+import com.livestream.feature.channel.ui.CategoryTabRow
+import com.livestream.feature.channel.ui.ChannelListItem
+import com.livestream.feature.player.PlayerUiState
+import com.livestream.feature.player.ui.LiveVideoSurface
+import com.livestream.feature.player.ui.PlayerOverlay
+import com.livestream.feature.settings.SettingsUiState
+import com.livestream.feature.settings.ui.SettingsDialog
+
+/**
+ * 平板电脑分栏响应式布局（Tablet Dual-Pane）：
+ * 左栏 (340dp)：常驻频道导航、搜索、分类筛选与快捷设置入口
+ * 右栏 (自适应宽)：全尺寸播放区域与技术统计浮层
+ */
+@Composable
+fun TabletDualPaneLayout(
+    playerUiState: PlayerUiState,
+    channelUiState: ChannelUiState,
+    settingsUiState: SettingsUiState,
+    onSurfaceAttached: (android.view.SurfaceView) -> Unit,
+    onSurfaceDetached: () -> Unit,
+    onToggleOsd: () -> Unit,
+    onRetry: () -> Unit,
+    onSwitchSource: () -> Unit,
+    onCategorySelected: (ChannelCategory) -> Unit,
+    onChannelSelected: (Channel) -> Unit,
+    onFavoriteToggle: (Channel) -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onCloseSettings: () -> Unit,
+    onToggleHardwareDecode: (Boolean) -> Unit,
+    onToggleSurfaceView: (Boolean) -> Unit,
+    onOpenImportDialog: () -> Unit,
+    onCloseImportDialog: () -> Unit,
+    onImportTextChanged: (String) -> Unit,
+    onConfirmImport: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DarkBackground)
+    ) {
+        // 1. 左栏：常驻频道导航与管理面板
+        Box(
+            modifier = Modifier
+                .width(360.dp)
+                .fillMaxHeight()
+                .background(DarkSurface)
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 顶部标题
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "频道导航",
+                        color = TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Box(
+                        modifier = Modifier
+                            .background(DarkSurfaceElevated, RoundedCornerShape(6.dp))
+                            .clickable { onOpenSettings() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(text = "⚙ 设置", color = TextPrimary, fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 搜索框
+                OutlinedTextField(
+                    value = channelUiState.searchQuery,
+                    onValueChange = onSearchQueryChanged,
+                    placeholder = { Text("搜索频道...", color = TextMuted, fontSize = 13.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = DarkSurfaceElevated,
+                        unfocusedContainerColor = DarkBackground,
+                        focusedBorderColor = FocusHighlight,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 分类导航标签栏
+                CategoryTabRow(
+                    categories = channelUiState.categories,
+                    selectedCategory = channelUiState.selectedCategory,
+                    onCategorySelected = onCategorySelected,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // 频道列表
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(
+                        items = channelUiState.channels,
+                        key = { it.id }
+                    ) { channel ->
+                        ChannelListItem(
+                            channel = channel,
+                            isActive = channel.id == channelUiState.activeChannelId,
+                            onChannelClick = onChannelSelected,
+                            onFavoriteToggle = onFavoriteToggle
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. 右栏：全尺寸播放器区域
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .background(Color.Black)
+        ) {
+            LiveVideoSurface(
+                onSurfaceAttached = onSurfaceAttached,
+                onSurfaceDetached = onSurfaceDetached,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onToggleOsd() }
+            )
+
+            PlayerOverlay(
+                uiState = playerUiState,
+                onRetry = onRetry,
+                onSwitchSource = onSwitchSource
+            )
+        }
+    }
+
+    // 设置弹窗
+    SettingsDialog(
+        uiState = settingsUiState,
+        onCloseSettings = onCloseSettings,
+        onToggleHardwareDecode = onToggleHardwareDecode,
+        onToggleSurfaceView = onToggleSurfaceView,
+        onOpenImportDialog = onOpenImportDialog,
+        onCloseImportDialog = onCloseImportDialog,
+        onImportTextChanged = onImportTextChanged,
+        onConfirmImport = onConfirmImport
+    )
+}

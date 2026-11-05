@@ -11,7 +11,7 @@
 | **阶段三** | **原生播放器核心** | **已完成 (Completed)** | AndroidX Media3 集成、Media3PlaybackEngine、PlaybackOrchestrator 状态机、多源回退与防重入切台 |
 | **阶段四** | **频道和资源管理** | **已完成 (Completed)** | ChannelRepository、SourceAdapter 插件化体系、自定义直播源支持、回退策略 |
 | **阶段五** | **核心 UI 开发** | **已完成 (Completed)** | 首页、频道列表、全屏播放器、OSD 交互面板、收藏与设置 |
-| 阶段六 | 设备适配与交互 | 待开始 | Android TV D-pad 遥控器与焦点适配、手机竖屏/横屏手势、平板分栏布局 |
+| **阶段六** | **设备适配与交互** | **已完成 (Completed)** | Android TV D-pad 遥控器与焦点适配、手机竖屏/横屏手势、平板分栏布局 |
 | 阶段七 | EPG 与 WebView 兼容 | 待开始 | EPG 节目单展示、官方合规网页独立播放容器、崩溃恢复 |
 | 阶段八 | 性能优化与稳定性 | 待开始 | 首帧速度、切台耗时、内存监控、8小时持续播放与压力测试 |
 | 阶段九 | 发布准备与交付物整理 | 待开始 | 启动页、图标、权限说明、Release 构建、交付文档汇总 |
@@ -97,3 +97,33 @@
   - 覆盖 `PlayerViewModelTest`、`ChannelViewModelTest`、`SettingsViewModelTest`、`HomeViewModelTest`。
   - `./gradlew test`：全工程 694 个 Action 全部通过（100% 成功）。
   - `./gradlew assembleDebug`：成功构建包含 Phase 5 完整 UI 的调试 APK（`app-debug.apk`）。
+
+---
+
+## 阶段六详细执行日志
+
+- [x] **建立设备形态动态探测引擎 (`:core:ui`)**：
+  - `DeviceType` 四大交互形态枚举：`TV`、`PHONE_PORTRAIT`、`PHONE_LANDSCAPE`、`TABLET`。
+  - `DeviceDetector`：结合 `UiModeManager.currentModeType == UI_MODE_TYPE_TELEVISION`、`PackageManager.FEATURE_LEANBACK` 系统特征及屏幕尺寸分级（Window Size Class、`smallestScreenWidthDp >= 600dp`、`screenWidthDp >= 840dp`），精准划分宿主形态。
+  - `rememberDeviceType()`：Compose 响应式状态函数，在手机旋转、折叠屏展开或多窗口模式下自适应动态重组。
+- [x] **实现手机专属形态 (`PhonePortraitLayout` & `PhoneLandscapeLayout`)**：
+  - **手机竖屏模式**：上半屏 16:9 播放窗口（带全屏进入按钮与设置入口），下半屏自适应频道分类导航栏、搜索框与频道列表流，符合单手滑动触控习惯。
+  - **手机横屏全屏模式**：沉浸式视频渲染，引入 `playerTouchGestures` 手势控制：
+    - 屏幕左半屏纵向滑动：线性调节系统屏幕亮度（带 `GestureHud` 亮度百分比反馈）。
+    - 屏幕右半屏纵向滑动：平滑步进调节媒体系统音量（带 `GestureHud` 音量百分比反馈）。
+    - 双击画面：快速切线/换源。
+    - 顶部快捷栏提供一键"退出全屏"（自动旋转恢复竖屏）。
+- [x] **实现平板电脑分栏响应式布局 (`TabletDualPaneLayout`)**：
+  - 左侧常驻导航面板（宽度 360dp）：集成标题、搜索框、分类标签、频道列表与设置入口。
+  - 右侧全尺寸播放区域：自适应填充剩余大屏空间，展示高画质视频图层与指标。
+- [x] **增强 Android TV 遥控器与交互布局 (`TvLayout`)**：
+  - 沉浸式大屏全屏播放，顶层快捷键无缝消费。
+  - 遥控器 D-pad 方向键全键位拦截映射（上下切台、左右切线/OSD、OK 键唤出频道抽屉、MENU 打开设置、数字键 `0-9` 直接选台）。
+  - 全界面交互元素继承 `TvFocusableBox`，获焦触发微放大动效与高对比度高亮外框。
+- [x] **多端统一入口路由与返回键消费 (`HomeScreen`)**：
+  - `HomeScreen` 统一监听 `rememberDeviceType()` 并无缝路由至对应的宿主布局。
+  - 配合 `BackHandler` 实现优雅的返回键逐层退出（导入弹窗 -> 设置弹窗 -> 频道抽屉 -> OSD 隐藏 -> 系统返回）。
+- [x] **单元测试与构建验证**：
+  - 覆盖 `DeviceDetectorTest`（TV、平板、手机横屏/竖屏判断）与 `DeviceControlHelperTest`（音量百分比换算）。
+  - `./gradlew test`：全工程 700 个 Action 全部通过（100% 成功）。
+  - `./gradlew assembleDebug`：成功构建多端自适应调试 APK。
