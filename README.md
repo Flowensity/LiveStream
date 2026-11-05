@@ -11,8 +11,6 @@
 
 `LiveStream` 是一款基于 **AndroidX Media3 (ExoPlayer)** 和 **Jetpack Compose** 打造的高性能、高稳定性、模块化 Android 直播应用。面向中国大陆用户，完整适配 **Android TV / 电视盒子**、**Android 智能手机** 和 **Android 平板电脑**。
 
-本项目为**全新独立设计开发（Greenfield Development）**，不参考、不复制、不继承任何现有开源直播项目的代码或架构。
-
 ---
 
 ## 一、核心设计与产品原则
@@ -126,68 +124,7 @@
 
 ---
 
-## 四、性能基准与工程质量
-
-经过多轮性能调优与自动化压力验证，各项指标达到企业级高可用标准：
-
-| 性能与质量指标 | 验收目标 | 实测结果 | 验证测试类 |
-|---|---|---|---|
-| **首帧渲染耗时 (P95)** | $\le 2.5\text{s}$ | **1.35s** | `LatencyTrackerTest` |
-| **连续切台耗时 (P95)** | $\le 2.0\text{s}$ | **0.82s** | `LatencyTrackerTest` |
-| **100 次极速切台压力测试** | 0 状态倒流 / 0 崩溃 | **100% 成功收敛** | `ContinuousSwitchingStressTest` |
-| **8 小时连续播放可用性** | $\ge 99.0\%$ | **100% (含网络扰动自愈)** | `LongPlaybackStabilitySimulatorTest` |
-| **活跃 ExoPlayer 实例数** | 严格 $\le 1$ | **恒定 1 (全局单例复用)** | `ContinuousSwitchingStressTest` |
-| **官方 Web 容器泄漏防御** | 切换后泄漏数为 0 | **0 残留 (50 次交叉测试)** | `WebViewLeakStressTest` |
-| **单元与集成测试套件** | 全部通过 | **751/751 Passed (100%)** | 全模块单元测试套件 |
-
----
-
-## 五、环境要求与快速构建
-
-### 构建环境要求
-- **操作系统**：Linux / macOS / Windows
-- **JDK**：OpenJDK 17（推荐 Eclipse Temurin 17 或供应商认证版本）
-- **Android SDK**：API 34（Android 14.0）
-- **构建工具**：Android Gradle Plugin 8.2.2 + Gradle 8.5
-
-### 编译与运行命令
-
-```bash
-# 1. 运行全项目单元测试与极端场景压力测试套件
-./gradlew test
-
-# 2. 编译并打包 Debug APK
-./gradlew assembleDebug
-# 产物输出路径: app/build/outputs/apk/debug/app-debug.apk
-
-# 3. 编译并打包 Release APK (已集成签名与 ProGuard 规则)
-./gradlew assembleRelease
-# 产物输出路径: app/build/outputs/apk/release/app-release.apk
-
-# 4. 安装至连接的 Android TV 或手机设备
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
----
-
-## 六、架构文档导引
-
-深入了解各子系统的实现细节与设计决策，请查阅 `docs/architecture/` 目录下的专题文档：
-
-- [01 - 系统总体架构与模块划分规范](docs/architecture/01-system-overview-and-modular-structure.md)
-- [02 - Clean Architecture、MVVM 与单向数据流](docs/architecture/02-clean-architecture-and-data-flow.md)
-- [03 - 技术栈选型与依赖版本治理体系](docs/architecture/03-tech-stack-and-version-governance.md)
-- [04 - 数据模型、Room 数据库与存储设计](docs/architecture/04-data-models-and-storage.md)
-- [05 - Playback Orchestrator 状态机与 Media3 原生播放引擎](docs/architecture/05-playback-orchestrator-and-media3.md)
-- [06 - Source Adapter 插件规范与多协议解析](docs/architecture/06-source-adapter-specification.md)
-- [07 - EPG 节目单规范、流式 SAX 解析与数据流设计](docs/architecture/07-epg-specification.md)
-- [08 - 多端设备形态适配与交互设计规范](docs/architecture/08-multi-device-adaptation.md)
-- [09 - 性能调优指标、看门狗与高可用测试规范](docs/architecture/09-performance-optimization-and-benchmarking.md)
-- [10 - 发布规范与合规安全防护体系](docs/architecture/10-release-and-security-compliance.md)
-
----
-
-## 七、开源与免责声明
+## 四、开源与免责声明
 
 - 本项目采用自研架构开发，旨在为 Android 多端设备提供高质量、纯净、合规的流媒体播放体验。
 - 本项目不提供、不分发任何非法的 IPTV 直播源或盗版流媒体资源。
