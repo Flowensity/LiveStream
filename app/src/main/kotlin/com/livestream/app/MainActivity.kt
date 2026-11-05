@@ -1,5 +1,7 @@
 package com.livestream.app
 
+import android.graphics.Color as AndroidColor
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -51,6 +53,16 @@ class MainActivity : ComponentActivity() {
             android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
+
+        // 手机端真·沉浸式 Edge-to-Edge 适配
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = AndroidColor.TRANSPARENT
+        window.navigationBarColor = AndroidColor.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
+
         lifecycleScope.launch {
             channelRepository.checkAndSeedDefaultChannels()
         }

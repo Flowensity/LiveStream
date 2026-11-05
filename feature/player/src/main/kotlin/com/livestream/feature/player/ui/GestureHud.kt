@@ -54,28 +54,20 @@ fun GestureHud(
         ) {
             when (state) {
                 is GestureHudState.Volume -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🔊", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "音量 ${state.percentage}%",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = "音量 ${state.percentage}%",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 is GestureHudState.Brightness -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "☀", fontSize = 16.sp, color = OneUiTheme.colors.accent)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "亮度 ${state.percentage}%",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = "亮度 ${state.percentage}%",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 is GestureHudState.QuickSwitch -> {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

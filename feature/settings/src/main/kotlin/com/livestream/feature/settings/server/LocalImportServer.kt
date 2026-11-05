@@ -323,13 +323,13 @@ private const val HTML_PAGE = """<!DOCTYPE html>
 </head>
 <body>
   <div class="card">
-    <h1>📺 LiveStream 电视推送</h1>
+    <h1>LiveStream 电视推送</h1>
     <p class="desc">在同一 Wi-Fi 局域网内，直接粘贴 M3U 订阅 URL 或播放列表内容推送到电视。</p>
     <label for="content">M3U 订阅链接 (URL) 或 文本内容：</label>
     <textarea id="content" placeholder="输入 M3U 订阅网址 (如 https://example.com/tv.m3u)&#10;或直接粘贴 #EXTM3U 文本内容..."></textarea>
     <div class="btn-group">
-      <button class="btn-secondary" onclick="pasteContent()">📋 粘贴剪贴板</button>
-      <button class="btn-primary" id="submitBtn" onclick="sendToTv()">🚀 推送到电视</button>
+      <button class="btn-secondary" onclick="pasteContent()">粘贴剪贴板</button>
+      <button class="btn-primary" id="submitBtn" onclick="sendToTv()">推送到电视</button>
     </div>
     <div id="status"></div>
   </div>
@@ -363,14 +363,14 @@ private const val HTML_PAGE = """<!DOCTYPE html>
         var data = await res.json();
         if (data.success) {
           status.className = 'status-success';
-          status.textContent = '🎉 ' + (data.message || '成功推送到电视！');
+          status.textContent = data.message || '成功推送到电视！';
         } else {
           status.className = 'status-error';
-          status.textContent = '❌ ' + (data.message || '导入失败');
+          status.textContent = data.message || '导入失败';
         }
       } catch(e) {
         status.className = 'status-error';
-        status.textContent = '❌ 连接失败：' + e.message;
+        status.textContent = '连接失败：' + e.message;
       } finally {
         btn.disabled = false;
       }

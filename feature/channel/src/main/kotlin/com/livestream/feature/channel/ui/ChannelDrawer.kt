@@ -75,55 +75,55 @@ fun ChannelDrawer(
         exit = slideOutHorizontally(targetOffsetX = { -it }),
         modifier = modifier
     ) {
-        val drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+        val drawerShape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp)
 
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(370.dp)
+                .width(290.dp)
                 .clip(drawerShape)
                 .border(BorderStroke(1.dp, OneUiTheme.colors.divider), drawerShape)
                 .background(OneUiTheme.colors.background)
-                .padding(vertical = 18.dp)
+                .padding(vertical = 14.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // 1. 顶部标题与频道总数徽章
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "频道菜单",
                         color = OneUiTheme.colors.textPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
                     )
 
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
                             .background(OneUiTheme.colors.cardSecondary)
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "共 ${uiState.channels.size} 个",
                             color = OneUiTheme.colors.textSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // 2. One UI 药丸胶囊搜索框 (One UI Signature Pill Search Box)
+                // 2. One UI 药丸胶囊搜索框 (无图标)
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = onSearchQueryChanged,
-                    placeholder = { Text("搜索频道名称或编号...", color = OneUiTheme.colors.textMuted, fontSize = 13.sp) },
+                    placeholder = { Text("搜索频道...", color = OneUiTheme.colors.textMuted, fontSize = 12.sp) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = OneUiTheme.colors.cardSecondary,
@@ -133,13 +133,13 @@ fun ChannelDrawer(
                         focusedTextColor = OneUiTheme.colors.textPrimary,
                         unfocusedTextColor = OneUiTheme.colors.textPrimary
                     ),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(20.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 14.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // 3. 分类药丸横向导航栏
                 CategoryTabRow(
@@ -149,7 +149,7 @@ fun ChannelDrawer(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // 4. 频道卡片列表
                 if (uiState.channels.isEmpty()) {

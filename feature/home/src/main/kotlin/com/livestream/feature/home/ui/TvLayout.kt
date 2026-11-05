@@ -250,7 +250,7 @@ fun TvLayout(
                             shape = pillShape
                         ) { isFocused ->
                             Text(
-                                text = "📅 节目单",
+                                text = "节目单",
                                 color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -266,7 +266,7 @@ fun TvLayout(
                         shape = pillShape
                     ) { isFocused ->
                         Text(
-                            text = "⚙ 设置",
+                            text = "设置",
                             color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,

@@ -176,7 +176,7 @@ fun TabletDualPaneLayout(
                                             .padding(horizontal = 12.dp, vertical = 6.dp)
                                     ) {
                                         Text(
-                                            text = "📅 节目单",
+                                            text = "节目单",
                                             color = OneUiTheme.colors.accent,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold
@@ -193,7 +193,7 @@ fun TabletDualPaneLayout(
                                         .padding(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
                                     Text(
-                                        text = "⚙ 设置",
+                                        text = "设置",
                                         color = OneUiTheme.colors.textPrimary,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
@@ -313,7 +313,7 @@ fun TabletDualPaneLayout(
                                 .clickable { isFullscreen = false }
                                 .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
-                            Text(text = "✕ 退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
 
                         if (playerUiState.activeChannel != null) {
@@ -325,7 +325,7 @@ fun TabletDualPaneLayout(
                                     .clickable { onToggleEpgSheet() }
                                     .padding(horizontal = 14.dp, vertical = 7.dp)
                             ) {
-                                Text(text = "📅 节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text(text = "节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
@@ -350,7 +350,7 @@ fun TabletDualPaneLayout(
                                 .clickable { onOpenSettings() }
                                 .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
-                            Text(text = "⚙ 设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text(text = "设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -371,7 +371,7 @@ fun TabletDualPaneLayout(
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = if (isFullscreen) "⛶ 退出全屏" else "⛶ 平板全屏",
+                            text = if (isFullscreen) "退出全屏" else "平板全屏",
                             color = FocusHighlight,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold

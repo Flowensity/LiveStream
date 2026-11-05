@@ -22,7 +22,7 @@ object PresetChannelDataProvider {
         ),
         ChannelCategory(
             id = "satellite",
-            name = "各省卫视",
+            name = "地方卫视",
             group = ChannelCategoryGroup.SATELLITE,
             orderIndex = 2
         ),

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
@@ -112,7 +113,8 @@ fun ChannelListItem(
                             color = if (isActive) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                             fontSize = 15.sp,
                             fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.SemiBold,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -122,6 +124,7 @@ fun ChannelListItem(
                             color = if (isActive) OneUiTheme.colors.accent.copy(alpha = 0.85f) else OneUiTheme.colors.textMuted,
                             fontSize = 12.sp,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
@@ -130,19 +133,24 @@ fun ChannelListItem(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // 3. 收藏按钮（星星图标）
+            // 3. 收藏胶囊按钮 (无任何图标，纯文字 One UI 胶囊)
+            val favShape = RoundedCornerShape(50)
             Box(
                 modifier = Modifier
-                    .clip(CircleShape)
+                    .clip(favShape)
+                    .background(
+                        if (channel.isFavorite) OneUiTheme.colors.accentSoft
+                        else OneUiTheme.colors.cardSecondary
+                    )
                     .clickable { onFavoriteToggle(channel) }
-                    .padding(8.dp),
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (channel.isFavorite) "★" else "☆",
-                    color = if (channel.isFavorite) OneUiTheme.colors.statusWarning else OneUiTheme.colors.textMuted,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    text = if (channel.isFavorite) "已收藏" else "收藏",
+                    color = if (channel.isFavorite) OneUiTheme.colors.accent else OneUiTheme.colors.textMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }

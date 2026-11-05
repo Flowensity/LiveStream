@@ -182,7 +182,7 @@ fun PhoneLandscapeLayout(
                         }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "✕ 退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
 
                 if (playerUiState.activeChannel != null) {
@@ -194,7 +194,7 @@ fun PhoneLandscapeLayout(
                             .clickable { onToggleEpgSheet() }
                             .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
-                        Text(text = "📅 节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(text = "节目单", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -219,7 +219,7 @@ fun PhoneLandscapeLayout(
                         .clickable { onOpenSettings() }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "⚙ 设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(text = "设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }

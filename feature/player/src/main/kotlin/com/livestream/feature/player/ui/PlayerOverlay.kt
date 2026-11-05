@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.PlaybackStatus
@@ -217,45 +218,106 @@ fun PlayerOverlay(
                                 }
                             }
 
-                            // EPG 节目单展示
+                            // EPG 节目单展示 (双行优雅对齐，带微型胶囊徽章，长标题单行截断省略，无任何图标)
                             if (uiState.activeChannel != null) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    val currentProg = uiState.currentProgram
-                                    if (currentProg != null) {
-                                        val timeStr = "${formatTime(currentProg.startTimestamp)} - ${formatTime(currentProg.endTimestamp)}"
-                                        Text(
-                                            text = "播出: ${currentProg.title} ($timeStr)",
-                                            color = OneUiTheme.colors.accent,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                    val nextProg = uiState.nextProgram
-                                    if (nextProg != null) {
-                                        Text(
-                                            text = "下期: ${nextProg.title} (${formatTime(nextProg.startTimestamp)})",
-                                            color = Color(0xFFA0A4B2),
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    if (onOpenEpgSchedule != null) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50))
-                                                .background(OneUiTheme.colors.accent.copy(alpha = 0.25f))
-                                                .clickable { onOpenEpgSchedule() }
-                                                .padding(horizontal = 10.dp, vertical = 3.dp)
-                                        ) {
-                                            Text(
-                                                text = "📅 节目单",
-                                                color = OneUiTheme.colors.accent,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
+                                val currentProg = uiState.currentProgram
+                                val nextProg = uiState.nextProgram
+
+                                if (currentProg != null || nextProg != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        if (currentProg != null) {
+                                            val timeStr = "${formatTime(currentProg.startTimestamp)} - ${formatTime(currentProg.endTimestamp)}"
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // [播出] 胶囊徽章
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(OneUiTheme.colors.accent)
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "播出",
+                                                        color = Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = currentProg.title,
+                                                    color = OneUiTheme.colors.accent,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = timeStr,
+                                                    color = Color(0xFFA0A4B2),
+                                                    fontSize = 11.sp
+                                                )
+
+                                                if (onOpenEpgSchedule != null) {
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(50))
+                                                            .background(OneUiTheme.colors.accent.copy(alpha = 0.25f))
+                                                            .clickable { onOpenEpgSchedule() }
+                                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "节目单",
+                                                            color = OneUiTheme.colors.accent,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (nextProg != null) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // [下期] 胶囊徽章
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0x33FFFFFF))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "下期",
+                                                        color = Color(0xFFD0D3DC),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = nextProg.title,
+                                                    color = Color(0xFFD0D3DC),
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = formatTime(nextProg.startTimestamp),
+                                                    color = Color(0xFF8E92A0),
+                                                    fontSize = 11.sp
+                                                )
+                                            }
                                         }
                                     }
                                 }

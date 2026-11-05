@@ -118,6 +118,11 @@ class ChannelRepositoryImpl @Inject constructor(
                 categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
                 channelDao.insertChannels(PresetChannelDataProvider.allDefaultChannels.map { it.toEntity() })
                 liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
+            } else {
+                val satellite = categoryDao.getCategoryById("satellite")
+                if (satellite != null && satellite.name != "地方卫视") {
+                    categoryDao.insertCategory(satellite.copy(name = "地方卫视"))
+                }
             }
         }
     }

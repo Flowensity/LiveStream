@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -99,7 +100,9 @@ fun PhonePortraitLayout(
             .background(OneUiTheme.colors.background)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             // 1. 顶部视区 (Viewing Area)：16:9 播放窗口，带 One UI 优雅圆角下沿
             val playerCornerShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
@@ -140,7 +143,7 @@ fun PhonePortraitLayout(
                     onOpenEpgSchedule = onToggleEpgSheet
                 )
 
-                // 右下角全屏胶囊药丸按钮 (点击画面即可唤出 OSD 看到本按钮)
+                // 右下角全屏胶囊药丸按钮 (点击画面唤出 OSD 出现，无任何图标)
                 if (playerUiState.isOsdVisible) {
                     val fsPillShape = RoundedCornerShape(50)
                     Box(
@@ -155,7 +158,7 @@ fun PhonePortraitLayout(
                             .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
                         Text(
-                            text = "⛶ 全屏",
+                            text = "全屏",
                             color = OneUiTheme.colors.accent,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -164,7 +167,7 @@ fun PhonePortraitLayout(
                 }
             }
 
-            // 2. 下半部交互区 (Interaction Area)：One UI 大标题、搜索框、药丸分类与频道流
+            // 2. 下半部交互区 (Interaction Area)：One UI 大标题、纯净搜索框、药丸分类与频道流
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -207,11 +210,11 @@ fun PhonePortraitLayout(
                                     .clip(epgPillShape)
                                     .background(OneUiTheme.colors.accentSoft)
                                     .clickable { onToggleEpgSheet() }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "📅 节目单",
+                                    text = "节目单",
                                     color = OneUiTheme.colors.accent,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -226,11 +229,11 @@ fun PhonePortraitLayout(
                                 .clip(settingsPillShape)
                                 .background(OneUiTheme.colors.cardSecondary)
                                 .clickable { onOpenSettings() }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "⚙ 设置",
+                                text = "设置",
                                 color = OneUiTheme.colors.textPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -241,7 +244,7 @@ fun PhonePortraitLayout(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // One UI 标志性药丸胶囊搜索框 (Pill Search Box)
+                // One UI 标志性药丸胶囊搜索框 (Pill Search Box - 无任何图标)
                 val searchShape = RoundedCornerShape(24.dp)
                 OutlinedTextField(
                     value = channelUiState.searchQuery,
@@ -253,26 +256,19 @@ fun PhonePortraitLayout(
                             fontSize = 13.sp
                         )
                     },
-                    leadingIcon = {
-                        Text(
-                            text = "🔍",
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
-                    },
                     trailingIcon = {
                         if (channelUiState.searchQuery.isNotEmpty()) {
                             Box(
                                 modifier = Modifier
-                                    .clip(CircleShape)
+                                    .clip(RoundedCornerShape(50))
                                     .clickable { onSearchQueryChanged("") }
-                                    .padding(6.dp)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
                                 Text(
-                                    text = "✕",
+                                    text = "清空",
                                     color = OneUiTheme.colors.textMuted,
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                         }
@@ -326,67 +322,66 @@ fun PhonePortraitLayout(
                 }
             }
 
-            // 3. One UI 底部导航栏 (Samsung Bottom Navigation Bar)
+            // 3. One UI 底部导航栏 (Samsung 纯文字 Segmented Pill Tab Bar - 无任何图标)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(BorderStroke(1.dp, OneUiTheme.colors.divider))
                     .background(OneUiTheme.colors.cardBackground)
                     .navigationBarsPadding()
-                    .padding(vertical = 8.dp, horizontal = 24.dp)
+                    .padding(vertical = 10.dp, horizontal = 20.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Tab 1: 直播频道 (选中态)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(horizontal = 12.dp)
+                    // Tab 1: 频道 (选中态)
+                    val activePillShape = RoundedCornerShape(50)
+                    Box(
+                        modifier = Modifier
+                            .clip(activePillShape)
+                            .background(OneUiTheme.colors.accentSoft)
+                            .padding(horizontal = 22.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "📺", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "频道",
                             color = OneUiTheme.colors.accent,
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    // Tab 2: 节目排期
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    // Tab 2: 节目单
+                    val inactivePillShape = RoundedCornerShape(50)
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(inactivePillShape)
                             .clickable { onToggleEpgSheet() }
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .padding(horizontal = 22.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "📅", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "节目单",
                             color = OneUiTheme.colors.textSecondary,
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
 
-                    // Tab 3: 系统设置
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    // Tab 3: 设置
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(inactivePillShape)
                             .clickable { onOpenSettings() }
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .padding(horizontal = 22.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "⚙", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "设置",
                             color = OneUiTheme.colors.textSecondary,
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
