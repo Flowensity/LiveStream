@@ -24,6 +24,7 @@ import com.livestream.core.ui.theme.TextMuted
 import com.livestream.core.ui.theme.TextPrimary
 import com.livestream.domain.channel.repository.ChannelRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
+import com.livestream.playback.api.PlaybackOrchestrator
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -35,6 +36,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
+
+    @Inject
+    lateinit var playbackOrchestrator: PlaybackOrchestrator
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

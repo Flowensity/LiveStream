@@ -1,0 +1,164 @@
+package com.livestream.playback.media3
+
+import app.cash.turbine.test
+import com.livestream.core.common.dispatcher.AppDispatchers
+import com.livestream.core.model.Channel
+import com.livestream.core.model.LiveSource
+import com.livestream.core.model.PlaybackErrorInfo
+import com.livestream.core.model.PlaybackErrorType
+import com.livestream.core.model.PlaybackStatus
+import com.livestream.core.model.StreamProtocol
+import com.livestream.domain.channel.repository.ChannelRepository
+import com.livestream.playback.api.PlaybackEngine
+import com.livestream.playback.api.model.EngineState
+import com.livestream.playback.api.model.PlaybackMetrics
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Before
+import org.junit.Test
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class PlaybackOrchestratorTest {
+
+    private val engine = mockk<PlaybackEngine>(relaxed = true)
+    private val channelRepository = mockk<ChannelRepository>(relaxed = true)
+    private val testDispatcher = StandardTestDispatcher()
+
+    private val engineStateFlow = MutableStateFlow<EngineState>(EngineState.Idle)
+    private val playbackMetricsFlow = MutableStateFlow(PlaybackMetrics())
+
+    private val testDispatchers = object : AppDispatchers {
+        override val main: CoroutineDispatcher get() = testDispatcher
+        override val io: CoroutineDispatcher get() = testDispatcher
+        override val default: CoroutineDispatcher get() = testDispatcher
+    }
+
+    private val sampleChannel1 = Channel(
+        id = "cctv1",
+        name = "CCTV-1 综合",
+        channelNumber = 1,
+        categoryId = "cctv"
+    )
+
+    private val sampleChannel2 = Channel(
+        id = "cctv2",
+        name = "CCTV-2 财经",
+        channelNumber = 2,
+        categoryId = "cctv"
+    )
+
+    private val sampleSource1 = LiveSource(
+        id = "src_1",
+        channelId = "cctv1",
+        name = "线路1",
+        protocol = StreamProtocol.HLS,
+        adapterProviderId = "cctv",
+        priority = 10
+    )
+
+    private val sampleSource2 = LiveSource(
+        id = "src_2",
+        channelId = "cctv1",
+        name = "线路2(备用)",
+        protocol = StreamProtocol.HLS,
+        adapterProviderId = "cctv",
+        priority = 5
+    )
+
+    @Before
+    fun setUp() {
+        coEvery { engine.engineState } returns engineStateFlow
+        coEvery { engine.playbackMetrics } returns playbackMetricsFlow
+    }
+
+    @Test
+    fun `test playChannel successfully transitions to preparing and invokes engine`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { engine.prepare(match { it.sourceId == "src_1" }, true) }
+        assertEquals(PlaybackStatus.PREPARING, orchestrator.orchestratorState.value.status)
+        assertEquals("cctv1", orchestrator.orchestratorState.value.currentChannel?.id)
+        assertEquals("src_1", orchestrator.orchestratorState.value.currentSource?.id)
+    }
+
+    @Test
+    fun `test channel switching cancels previous job and plays new channel`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv2") } returns listOf(
+            sampleSource1.copy(id = "src_ch2", channelId = "cctv2")
+        )
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+
+        // 快速连续切台
+        orchestrator.playChannel(sampleChannel1)
+        orchestrator.playChannel(sampleChannel2)
+        advanceUntilIdle()
+
+        // 最终活跃频道必须为 cctv2
+        assertEquals("cctv2", orchestrator.orchestratorState.value.currentChannel?.id)
+        coVerify(exactly = 1) { engine.prepare(match { it.sourceId == "src_ch2" }, true) }
+    }
+
+    @Test
+    fun `test channel without sources results in error state`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns emptyList()
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        assertEquals(PlaybackStatus.ERROR, orchestrator.orchestratorState.value.status)
+        assertEquals(PlaybackErrorType.SOURCE_UNAVAILABLE, orchestrator.orchestratorState.value.errorInfo?.errorType)
+    }
+
+    @Test
+    fun `test source fallback when primary source fails`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        assertEquals("src_1", orchestrator.orchestratorState.value.currentSource?.id)
+
+        // 底层模拟主线路抛出网络错误
+        val error = PlaybackErrorInfo(PlaybackErrorType.NETWORK_TIMEOUT, "超时", canRetry = true)
+        engineStateFlow.value = EngineState.Error(error)
+        advanceUntilIdle()
+
+        // 验证自动回退并调用备用源 src_2
+        assertEquals("src_2", orchestrator.orchestratorState.value.currentSource?.id)
+        coVerify(exactly = 1) { engine.prepare(match { it.sourceId == "src_2" }, true) }
+    }
+
+    @Test
+    fun `test engine playing and buffering updates orchestrator state`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+
+        val orchestrator = DefaultPlaybackOrchestrator(engine, channelRepository, testDispatchers)
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        engineStateFlow.value = EngineState.Buffering
+        advanceUntilIdle()
+        assertEquals(PlaybackStatus.BUFFERING, orchestrator.orchestratorState.value.status)
+
+        engineStateFlow.value = EngineState.Playing
+        advanceUntilIdle()
+        assertEquals(PlaybackStatus.PLAYING, orchestrator.orchestratorState.value.status)
+    }
+}

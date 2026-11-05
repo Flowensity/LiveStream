@@ -60,6 +60,8 @@ dependencies {
     implementation(project(":domain:channel"))
     implementation(project(":data:channel"))
     implementation(project(":data:epg"))
+    implementation(project(":playback:playback-api"))
+    implementation(project(":playback:playback-media3"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

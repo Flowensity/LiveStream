@@ -1,0 +1,58 @@
+package com.livestream.playback.api
+
+import com.livestream.core.model.Channel
+import com.livestream.core.model.LiveSource
+import com.livestream.core.model.PlaybackErrorInfo
+import com.livestream.core.model.PlaybackStatus
+import com.livestream.playback.api.model.PlaybackMetrics
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * 切台方向枚举
+ */
+enum class SwitchDirection {
+    PREVIOUS,
+    NEXT
+}
+
+/**
+ * 调度器整体会话聚合状态
+ */
+data class OrchestratorState(
+    val status: PlaybackStatus = PlaybackStatus.IDLE,
+    val currentChannel: Channel? = null,
+    val currentSource: LiveSource? = null,
+    val errorInfo: PlaybackErrorInfo? = null,
+    val metrics: PlaybackMetrics = PlaybackMetrics()
+)
+
+/**
+ * 统一播放调度层契约
+ * 核心职责：
+ * 1. 接收切台/播放请求并维护单一活跃会话
+ * 2. 调度播放源与回退策略
+ * 3. 协同取消过期异步任务与解决切台竞争
+ * 4. 驱动状态机流转 (IDLE -> RESOLVING -> PREPARING -> BUFFERING -> READY -> PLAYING)
+ */
+interface PlaybackOrchestrator {
+
+    val orchestratorState: StateFlow<OrchestratorState>
+
+    fun playChannel(channel: Channel, preferredSourceId: String? = null)
+
+    fun switchChannel(direction: SwitchDirection)
+
+    fun retry()
+
+    fun pause()
+
+    fun resume()
+
+    fun stop()
+
+    fun release()
+
+    fun attachOutput(output: Any?)
+
+    fun detachOutput()
+}
