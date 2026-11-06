@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
@@ -22,8 +21,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.livestream.core.ui.device.DeviceType
+import com.livestream.core.ui.device.rememberDeviceType
 import com.livestream.core.ui.theme.AppSurface
 import com.livestream.core.ui.theme.AppSurfaceElevated
 import com.livestream.core.ui.theme.FocusHighlight
@@ -53,7 +56,10 @@ fun TvFocusableBox(
     content: @Composable BoxScope.(isFocused: Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val rawFocused by interactionSource.collectIsFocusedAsState()
+    val isTv = rememberDeviceType() == DeviceType.TV
+    val inputModeManager = LocalInputModeManager.current
+    val isFocused = rawFocused && (isTv || inputModeManager.inputMode == InputMode.Keyboard)
 
     val scale by animateFloatAsState(
         targetValue = if (isFocused) scaleOnFocus else 1.0f,
@@ -92,7 +98,6 @@ fun TvFocusableBox(
             )
             .background(currentBackground, shape)
             .then(clickModifier)
-            .focusable(interactionSource = interactionSource)
     ) {
         content(isFocused)
     }

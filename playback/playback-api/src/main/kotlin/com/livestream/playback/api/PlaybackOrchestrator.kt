@@ -26,6 +26,8 @@ data class OrchestratorState(
     val currentSource: LiveSource? = null,
     val currentSourceIndex: Int = 0,
     val totalSources: Int = 1,
+    val availableSources: List<LiveSource> = emptyList(),
+    val sourceLatenciesMs: Map<String, Long> = emptyMap(),
     val errorInfo: PlaybackErrorInfo? = null,
     val metrics: PlaybackMetrics = PlaybackMetrics(),
     val isOfficialWeb: Boolean = false,
@@ -57,6 +59,8 @@ interface PlaybackOrchestrator {
     fun switchChannel(direction: SwitchDirection)
 
     fun switchNextSource()
+
+    fun selectSource(sourceIndex: Int) {}
 
     fun retry()
 

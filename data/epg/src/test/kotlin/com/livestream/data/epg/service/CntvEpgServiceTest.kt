@@ -14,11 +14,11 @@ class CntvEpgServiceTest {
 
     @Before
     fun setUp() {
-        val dispatchers = AppDispatchers(
-            io = Dispatchers.Unconfined,
-            default = Dispatchers.Unconfined,
-            main = Dispatchers.Unconfined
-        )
+        val dispatchers = object : AppDispatchers {
+            override val io = Dispatchers.Unconfined
+            override val default = Dispatchers.Unconfined
+            override val main = Dispatchers.Unconfined
+        }
         service = CntvEpgService(
             okHttpClient = OkHttpClient(),
             dispatchers = dispatchers

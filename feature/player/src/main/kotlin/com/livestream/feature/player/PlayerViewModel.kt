@@ -114,6 +114,8 @@ class PlayerViewModel @Inject constructor(
                         activeSource = state.currentSource,
                         activeSourceIndex = state.currentSourceIndex,
                         totalSources = state.totalSources,
+                        availableSources = state.availableSources,
+                        sourceLatenciesMs = state.sourceLatenciesMs,
                         metrics = state.metrics,
                         error = state.errorInfo,
                         isOfficialWeb = state.isOfficialWeb,
@@ -129,7 +131,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun attachSurface(surfaceView: SurfaceView) {
+    fun attachSurface(surfaceView: Any) {
         playbackOrchestrator.attachOutput(surfaceView)
     }
 
@@ -154,6 +156,13 @@ class PlayerViewModel @Inject constructor(
         showOsd(4000L)
         viewModelScope.launch {
             playbackOrchestrator.switchNextSource()
+        }
+    }
+
+    fun selectSource(sourceIndex: Int) {
+        showOsd(4000L)
+        viewModelScope.launch {
+            playbackOrchestrator.selectSource(sourceIndex)
         }
     }
 

@@ -1,5 +1,6 @@
 package com.livestream.playback.api.web
 
+import com.livestream.core.model.VideoAspectRatio
 import kotlinx.coroutines.flow.StateFlow
 
 sealed interface WebPlaybackState {
@@ -22,7 +23,13 @@ interface WebPlaybackController {
 
     fun loadOfficialUrl(url: String, container: Any?)
 
+    fun setAspectRatio(aspectRatio: VideoAspectRatio) {}
+
     fun detachContainer(container: Any? = null) {}
+
+    fun pause() {}
+
+    fun resume() {}
 
     fun stopAndDestroy()
 

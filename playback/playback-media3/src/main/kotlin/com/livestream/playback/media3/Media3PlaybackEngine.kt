@@ -4,12 +4,15 @@ import android.content.Context
 import android.net.Uri
 import android.view.SurfaceView
 import android.view.TextureView
+import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+@OptIn(UnstableApi::class)
 @Singleton
 class Media3PlaybackEngine @Inject constructor(
     @ApplicationContext private val context: Context
@@ -41,21 +45,43 @@ class Media3PlaybackEngine @Inject constructor(
     private val _playbackMetrics = MutableStateFlow(PlaybackMetrics())
     override val playbackMetrics: StateFlow<PlaybackMetrics> = _playbackMetrics.asStateFlow()
 
-    // 正常前台直播只保留单例 ExoPlayer 实例
-    private val player: ExoPlayer by lazy {
-        createExoPlayer()
-    }
+    // 正常前台直播保留单例 ExoPlayer 实例，支持 release() 后按需安全重建
+    private var _player: ExoPlayer? = null
+    private val player: ExoPlayer
+        get() = _player ?: createExoPlayer().also { _player = it }
 
     private var currentMediaItem: PlaybackMediaItem? = null
     private var prepareStartTimeMs = 0L
+    private var attachedOutput: Any? = null
+    private var hardwareDecodePreferred: Boolean = true
 
     private fun createExoPlayer(): ExoPlayer {
-        // 1. 硬件解码优先策略（严格禁止默认启用软件解码扩展，仅使用平台硬件 MediaCodec）
+        // 1. 软硬解自适应策略：根据用户设置切换硬件 MediaCodec 优先或软件解码器优先，并开启安全回退
         val renderersFactory = DefaultRenderersFactory(context).apply {
-            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-            setMediaCodecSelector(MediaCodecSelector.DEFAULT)
-            setEnableDecoderFallback(true) // 硬件解码器个别崩溃时允许内部安全回退
+            if (hardwareDecodePreferred) {
+                setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+                setMediaCodecSelector(MediaCodecSelector.DEFAULT)
+            } else {
+                setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+                setMediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+                    val defaultList = MediaCodecSelector.DEFAULT.getDecoderInfos(
+                        mimeType,
+                        requiresSecureDecoder,
+                        requiresTunnelingDecoder
+                    )
+                    // 软件解码优先排序：将 c2.android / OMX.google 或 softwareOnly 解码器排在前面，同时保留硬解兜底
+                    defaultList.sortedByDescending { info ->
+                        !info.hardwareAccelerated ||
+                            info.name.startsWith("c2.android.", ignoreCase = true) ||
+                            info.name.startsWith("OMX.google.", ignoreCase = true)
+                    }
+                }
+            }
+            setEnableDecoderFallback(true) // 解码器异常时允许自动安全回退
         }
+        _playbackMetrics.value = _playbackMetrics.value.copy(
+            isHardwareAccelerated = hardwareDecodePreferred
+        )
 
         // 2. 结合低延迟直播特点的精细化缓冲控制（首帧极速起播优化）
         val loadControl = DefaultLoadControl.Builder()
@@ -77,13 +103,24 @@ class Media3PlaybackEngine @Inject constructor(
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
 
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+
         return ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
+            .setHandleAudioBecomingNoisy(true)
             .build()
             .apply {
                 playWhenReady = true
                 addListener(PlayerEventListener())
+                when (val output = attachedOutput) {
+                    is SurfaceView -> setVideoSurfaceView(output)
+                    is TextureView -> setVideoTextureView(output)
+                }
             }
     }
 
@@ -136,27 +173,28 @@ class Media3PlaybackEngine @Inject constructor(
 
     override fun play() {
         try {
-            player.play()
+            _player?.play()
         } catch (_: Throwable) {}
     }
 
     override fun pause() {
         try {
-            player.pause()
+            _player?.pause()
         } catch (_: Throwable) {}
     }
 
     override fun stop() {
         try {
-            player.stop()
+            _player?.stop()
         } catch (_: Throwable) {}
         _engineState.value = EngineState.Idle
     }
 
     override fun release() {
         try {
-            player.release()
+            _player?.release()
         } catch (_: Throwable) {}
+        _player = null
         _engineState.value = EngineState.Idle
     }
 
@@ -167,19 +205,62 @@ class Media3PlaybackEngine @Inject constructor(
     }
 
     override fun attachSurface(surfaceView: Any?) {
+        attachedOutput = surfaceView
         try {
             when (surfaceView) {
                 is SurfaceView -> player.setVideoSurfaceView(surfaceView)
                 is TextureView -> player.setVideoTextureView(surfaceView)
-                null -> player.clearVideoSurface()
+                null -> _player?.clearVideoSurface()
             }
         } catch (_: Throwable) {}
     }
 
     override fun detachSurface() {
+        attachedOutput = null
         try {
-            player.clearVideoSurface()
+            _player?.clearVideoSurface()
         } catch (_: Throwable) {}
+    }
+
+    override fun setHardwareDecodePreferred(preferred: Boolean) {
+        if (this.hardwareDecodePreferred == preferred) return
+        this.hardwareDecodePreferred = preferred
+        _playbackMetrics.value = _playbackMetrics.value.copy(
+            isHardwareAccelerated = preferred
+        )
+        val activePlayer = _player ?: return
+        val wasPlayWhenReady = activePlayer.playWhenReady
+        val mediaItemToRestore = currentMediaItem
+        try {
+            activePlayer.release()
+        } catch (_: Throwable) {}
+        _player = null
+        if (mediaItemToRestore != null) {
+            val newPlayer = player
+            val mimeType = when (mediaItemToRestore.protocol) {
+                StreamProtocol.HLS -> MimeTypes.APPLICATION_M3U8
+                StreamProtocol.DASH -> MimeTypes.APPLICATION_MPD
+                StreamProtocol.PROGRESSIVE_HTTP -> MimeTypes.VIDEO_MP4
+                StreamProtocol.OFFICIAL_WEB -> null
+            }
+            val liveConfig = MediaItem.LiveConfiguration.Builder()
+                .setTargetOffsetMs(3000)
+                .setMinOffsetMs(1000)
+                .setMaxOffsetMs(8000)
+                .build()
+            val builder = MediaItem.Builder()
+                .setUri(Uri.parse(mediaItemToRestore.uri))
+                .setMediaId(mediaItemToRestore.sourceId)
+                .setLiveConfiguration(liveConfig)
+            if (mimeType != null) {
+                builder.setMimeType(mimeType)
+            }
+            try {
+                newPlayer.setMediaItem(builder.build())
+                newPlayer.playWhenReady = wasPlayWhenReady
+                newPlayer.prepare()
+            } catch (_: Throwable) {}
+        }
     }
 
     private inner class PlayerEventListener : Player.Listener {

@@ -8,10 +8,16 @@ import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
+import com.livestream.core.model.VideoAspectRatio
 import com.livestream.domain.channel.repository.CategoryRepository
 import com.livestream.domain.channel.repository.ChannelRepository
+import com.livestream.domain.channel.repository.EpgRepository
 import com.livestream.domain.channel.repository.UserPreferencesRepository
 import com.livestream.feature.settings.server.LocalImportServer
+import com.livestream.feature.settings.server.WebChannelInfo
+import com.livestream.feature.settings.server.WebConsoleActions
+import com.livestream.playback.api.PlaybackOrchestrator
+import com.livestream.playback.api.SwitchDirection
 import com.livestream.source.custom.parser.M3uPlaylistParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,8 +40,28 @@ class SettingsViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val localImportServer: LocalImportServer,
     private val okHttpClient: OkHttpClient,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
+    private val epgRepository: EpgRepository?,
+    private val playbackOrchestrator: PlaybackOrchestrator?
 ) : ViewModel() {
+
+    constructor(
+        userPreferencesRepository: UserPreferencesRepository,
+        channelRepository: ChannelRepository,
+        categoryRepository: CategoryRepository,
+        localImportServer: LocalImportServer,
+        okHttpClient: OkHttpClient,
+        dispatchers: AppDispatchers
+    ) : this(
+        userPreferencesRepository = userPreferencesRepository,
+        channelRepository = channelRepository,
+        categoryRepository = categoryRepository,
+        localImportServer = localImportServer,
+        okHttpClient = okHttpClient,
+        dispatchers = dispatchers,
+        epgRepository = null,
+        playbackOrchestrator = null
+    )
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -47,6 +73,7 @@ class SettingsViewModel @Inject constructor(
                     current.copy(
                         isHardwareDecodePreferred = prefs.isHardwareDecodePreferred,
                         isSurfaceViewPreferred = prefs.isSurfaceViewPreferred,
+                        aspectRatio = prefs.aspectRatio,
                         channelSwitchTimeoutMs = prefs.channelSwitchTimeoutMs,
                         tvKeyMappingScheme = prefs.tvKeyMappingScheme,
                         themeMode = prefs.themeMode,
@@ -67,9 +94,32 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(customChannels = customChs) }
             }
         }
+
+        ensureLocalServerStarted()
+    }
+
+    fun ensureLocalServerStarted() {
+        localImportServer.registerActions(createWebConsoleActions())
+        val serverUrl = localImportServer.start { rawInput ->
+            importM3uInternal(rawInput)
+        }
+        if (!serverUrl.isNullOrBlank()) {
+            val qr = _uiState.value.qrBitmap ?: try {
+                LocalImportServer.generateQrCodeBitmap(serverUrl, 512)
+            } catch (_: Exception) {
+                null
+            }
+            _uiState.update {
+                it.copy(
+                    localServerUrl = serverUrl,
+                    qrBitmap = qr
+                )
+            }
+        }
     }
 
     fun openSettings() {
+        ensureLocalServerStarted()
         _uiState.update { it.copy(isSettingsOpen = true) }
     }
 
@@ -78,7 +128,11 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleSettings() {
-        _uiState.update { it.copy(isSettingsOpen = !it.isSettingsOpen) }
+        val nextOpen = !_uiState.value.isSettingsOpen
+        if (nextOpen) {
+            ensureLocalServerStarted()
+        }
+        _uiState.update { it.copy(isSettingsOpen = nextOpen) }
     }
 
     fun setHardwareDecodePreferred(preferred: Boolean) {
@@ -91,6 +145,17 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.setSurfaceViewPreferred(preferred)
         }
+    }
+
+    fun setVideoAspectRatio(ratio: VideoAspectRatio) {
+        viewModelScope.launch {
+            userPreferencesRepository.setVideoAspectRatio(ratio)
+        }
+    }
+
+    fun cycleVideoAspectRatio() {
+        val next = _uiState.value.aspectRatio.next()
+        setVideoAspectRatio(next)
     }
 
     fun setChannelSwitchTimeoutMs(timeoutMs: Long) {
@@ -118,36 +183,22 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun openImportDialog() {
-        val serverUrl = localImportServer.start { rawInput ->
-            importM3uInternal(rawInput)
-        }
-        val qr = serverUrl?.let {
-            try {
-                LocalImportServer.generateQrCodeBitmap(it, 512)
-            } catch (_: Exception) {
-                null
-            }
-        }
-
+        ensureLocalServerStarted()
         _uiState.update {
             it.copy(
                 isImportDialogOpen = true,
                 importText = "",
                 importSuccessCount = null,
-                importError = null,
-                localServerUrl = serverUrl,
-                qrBitmap = qr
+                importError = null
             )
         }
     }
 
     fun closeImportDialog() {
-        localImportServer.stop()
+        // 保持局域网遥控与推流服务后台常驻运行，确保关闭二维码或导入弹窗后手机端依然可随时遥控电视
         _uiState.update {
             it.copy(
-                isImportDialogOpen = false,
-                localServerUrl = null,
-                qrBitmap = null
+                isImportDialogOpen = false
             )
         }
     }
@@ -156,7 +207,69 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(importText = text, importError = null) }
     }
 
-    suspend fun importM3uInternal(input: String): Result<Int> = withContext(dispatchers.io) {
+    private fun createWebConsoleActions(): WebConsoleActions {
+        return object : WebConsoleActions {
+            override suspend fun getChannels(): List<WebChannelInfo> {
+                val activeId = playbackOrchestrator?.orchestratorState?.value?.currentChannel?.id
+                return channelRepository.getAllChannelsSync()
+                    .filter { !it.isHidden }
+                    .map { ch ->
+                        WebChannelInfo(
+                            id = ch.id,
+                            name = ch.name,
+                            channelNumber = ch.channelNumber,
+                            categoryId = ch.categoryId,
+                            isFavorite = ch.isFavorite,
+                            isPlaying = ch.id == activeId
+                        )
+                    }
+            }
+
+            override suspend fun playChannel(channelId: String): Boolean {
+                val ch = channelRepository.getChannelById(channelId) ?: return false
+                playbackOrchestrator?.playChannel(ch)
+                userPreferencesRepository.setLastPlayedChannelId(ch.id)
+                return true
+            }
+
+            override suspend fun toggleFavorite(channelId: String): Boolean {
+                val ch = channelRepository.getChannelById(channelId) ?: return false
+                channelRepository.toggleFavorite(ch.id, !ch.isFavorite)
+                return true
+            }
+
+            override suspend fun executeRemoteCommand(command: String): Boolean {
+                return when (command.uppercase(Locale.ROOT)) {
+                    "PREV_CHANNEL" -> {
+                        playbackOrchestrator?.switchChannel(SwitchDirection.PREVIOUS)
+                        true
+                    }
+                    "NEXT_CHANNEL" -> {
+                        playbackOrchestrator?.switchChannel(SwitchDirection.NEXT)
+                        true
+                    }
+                    "SWITCH_SOURCE" -> {
+                        playbackOrchestrator?.switchNextSource()
+                        true
+                    }
+                    "RETRY" -> {
+                        playbackOrchestrator?.retry()
+                        true
+                    }
+                    "ASPECT_RATIO" -> {
+                        cycleVideoAspectRatio()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+    }
+
+    suspend fun importM3uInternal(
+        input: String,
+        existingSourceToReplace: CustomPlaylistSource? = null
+    ): Result<Int> = withContext(dispatchers.io) {
         try {
             val trimmed = input.trim()
             var downloadUrl = trimmed
@@ -182,6 +295,16 @@ class SettingsViewModel @Inject constructor(
             val parsed = M3uPlaylistParser.parse(content)
             if (parsed.channels.isEmpty()) {
                 return@withContext Result.failure(Exception("未能从播放列表中解析出合法频道或所有源均被安全策略拦截"))
+            }
+
+            // 若是刷新已有订阅源，先清理该源旧频道与关联源，避免残留失效记录
+            if (existingSourceToReplace != null) {
+                if (existingSourceToReplace.channelIds.isNotEmpty()) {
+                    channelRepository.deleteChannelsByIds(existingSourceToReplace.channelIds)
+                }
+                if (existingSourceToReplace.matchedSourceIds.isNotEmpty()) {
+                    channelRepository.deleteSourcesByIds(existingSourceToReplace.matchedSourceIds)
+                }
             }
 
             if (parsed.categories.isNotEmpty()) {
@@ -210,27 +333,38 @@ class SettingsViewModel @Inject constructor(
             channelRepository.saveChannels(parsed.channels)
             channelRepository.saveSources(parsed.sources + matchedSources)
 
-            val sourceTitle = when {
+            val sourceTitle = existingSourceToReplace?.name ?: when {
                 downloadUrl.startsWith("http") -> {
                     val candidate = downloadUrl.substringAfterLast('/').substringBefore('?')
                     if (candidate.isNotBlank() && candidate.contains(".")) candidate else "网络订阅源"
                 }
                 else -> "文本导入源"
             }
+            val effectiveEpgUrl = parsed.epgUrl ?: existingSourceToReplace?.epgUrl.orEmpty()
             val record = CustomPlaylistSource(
-                id = UUID.randomUUID().toString(),
+                id = existingSourceToReplace?.id ?: UUID.randomUUID().toString(),
                 name = sourceTitle,
-                url = if (downloadUrl.startsWith("http")) downloadUrl else "",
+                url = if (downloadUrl.startsWith("http")) downloadUrl else existingSourceToReplace?.url.orEmpty(),
                 channelCount = parsed.channels.size,
                 channelIds = parsed.channels.map { it.id },
                 matchedSourceIds = matchedSources.map { it.id },
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                epgUrl = effectiveEpgUrl
             )
             userPreferencesRepository.saveCustomPlaylistSource(record)
+
+            // 若播放列表头部包含 x-tvg-url / url-tvg，后台异步拉取 XMLTV 节目单入库
+            if (effectiveEpgUrl.isNotBlank() && epgRepository != null) {
+                viewModelScope.launch(dispatchers.io) {
+                    val allNow = channelRepository.getAllChannelsSync()
+                    epgRepository.importXmltvFromUrl(effectiveEpgUrl, allNow)
+                }
+            }
 
             _uiState.update {
                 it.copy(
                     isImporting = false,
+                    refreshingSourceId = null,
                     importSuccessCount = parsed.channels.size,
                     importError = null
                 )
@@ -240,6 +374,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isImporting = false,
+                    refreshingSourceId = null,
                     importError = "解析导入失败: ${e.message}"
                 )
             }
@@ -257,6 +392,26 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, importError = null) }
             importM3uInternal(content)
+        }
+    }
+
+    fun refreshCustomPlaylistSource(source: CustomPlaylistSource) {
+        if (source.url.isBlank() || _uiState.value.refreshingSourceId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(refreshingSourceId = source.id, importError = null) }
+            importM3uInternal(source.url, existingSourceToReplace = source)
+        }
+    }
+
+    fun refreshAllCustomSources() {
+        val networkSources = _uiState.value.customSources.filter { it.url.startsWith("http") }
+        if (networkSources.isEmpty() || _uiState.value.refreshingSourceId != null) return
+        viewModelScope.launch {
+            for (src in networkSources) {
+                _uiState.update { it.copy(refreshingSourceId = src.id) }
+                importM3uInternal(src.url, existingSourceToReplace = src)
+            }
+            _uiState.update { it.copy(refreshingSourceId = null) }
         }
     }
 
@@ -319,12 +474,12 @@ class SettingsViewModel @Inject constructor(
 
         // 2. Special CCTV handling (e.g. CCTV1 matches CCTV1综合)
         if (normName.startsWith("CCTV")) {
-            val numMatch = Regex("""CCTV(\d+\+?)""").find(normName)
+            val numMatch = CCTV_NUM_REGEX.find(normName)
             if (numMatch != null) {
                 val cctvNum = numMatch.groupValues[1]
                 existingChannels.firstOrNull {
                     val existingNorm = normalizeChannelName(it.name)
-                    val exMatch = Regex("""CCTV(\d+\+?)""").find(existingNorm)
+                    val exMatch = CCTV_NUM_REGEX.find(existingNorm)
                     exMatch != null && exMatch.groupValues[1] == cctvNum
                 }?.let { return it }
             }
@@ -337,6 +492,10 @@ class SettingsViewModel @Inject constructor(
         }?.let { return it }
 
         return null
+    }
+
+    companion object {
+        private val CCTV_NUM_REGEX = Regex("""CCTV(\d+\+?)""")
     }
 
     override fun onCleared() {

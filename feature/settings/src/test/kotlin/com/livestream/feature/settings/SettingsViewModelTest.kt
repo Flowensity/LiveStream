@@ -116,7 +116,7 @@ class SettingsViewModelTest {
 
         assertTrue(viewModel.uiState.value.isImportDialogOpen)
         assertEquals("http://192.168.1.10:52026/", viewModel.uiState.value.localServerUrl)
-        coVerify(exactly = 1) { localImportServer.start(any()) }
+        coVerify(atLeast = 1) { localImportServer.start(any()) }
     }
 
     @Test
@@ -152,13 +152,15 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `closeImportDialog stops local server and clears url`() = runTest(testDispatcher) {
+    fun `closeImportDialog keeps local server running for persistent phone remote`() = runTest(testDispatcher) {
+        io.mockk.every { localImportServer.start(any()) } returns "http://192.168.1.10:52026/"
+        viewModel.openImportDialog()
         viewModel.closeImportDialog()
         advanceUntilIdle()
 
         org.junit.Assert.assertFalse(viewModel.uiState.value.isImportDialogOpen)
-        org.junit.Assert.assertNull(viewModel.uiState.value.localServerUrl)
-        coVerify(atLeast = 1) { localImportServer.stop() }
+        assertEquals("http://192.168.1.10:52026/", viewModel.uiState.value.localServerUrl)
+        coVerify(exactly = 0) { localImportServer.stop() }
     }
 
     @Test

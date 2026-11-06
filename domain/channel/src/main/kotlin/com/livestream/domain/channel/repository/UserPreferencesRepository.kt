@@ -27,6 +27,8 @@ interface UserPreferencesRepository {
 
     suspend fun setBootStartupEnabled(enabled: Boolean)
 
+    suspend fun setVideoAspectRatio(ratio: com.livestream.core.model.VideoAspectRatio) {}
+
     val customPlaylistSources: Flow<List<com.livestream.core.model.CustomPlaylistSource>>
 
     suspend fun saveCustomPlaylistSource(source: com.livestream.core.model.CustomPlaylistSource)

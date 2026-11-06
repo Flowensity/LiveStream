@@ -8,19 +8,25 @@ import java.io.InputStream
 import java.io.StringReader
 import java.text.SimpleDateFormat
 import java.util.Locale
+import javax.xml.XMLConstants
 import javax.xml.parsers.SAXParserFactory
 
 object XmltvParser {
 
-    private val DATE_FORMAT_WITH_TZ = ThreadLocal.withInitial {
-        SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
+    private val DATE_FORMAT_WITH_TZ = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
     }
-    private val DATE_FORMAT_WITHOUT_TZ = ThreadLocal.withInitial {
-        SimpleDateFormat("yyyyMMddHHmmss", Locale.US)
+    private val DATE_FORMAT_WITHOUT_TZ = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("yyyyMMddHHmmss", Locale.US)
     }
     private val saxParserFactory: SAXParserFactory by lazy {
         SAXParserFactory.newInstance().apply {
             isNamespaceAware = false
+            runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            runCatching { setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
         }
     }
 

@@ -39,6 +39,12 @@ interface ChannelRepository {
 
     suspend fun saveSources(sources: List<LiveSource>)
 
+    suspend fun updateSourceHealth(
+        sourceId: String,
+        status: com.livestream.core.model.SourceHealthStatus,
+        timestamp: Long = System.currentTimeMillis()
+    ) {}
+
     fun observeCustomChannels(): Flow<List<Channel>>
 
     suspend fun deleteChannelById(channelId: String)

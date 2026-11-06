@@ -21,7 +21,7 @@ class OfficialSourceAdapter @Inject constructor(
     override val providerId: String = "official_source_provider"
 
     override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
-        val streamUrl = channelRepository.getStreamUrl(source.id)
+        val streamUrl = source.url.ifBlank { channelRepository.getStreamUrl(source.id) }
         if (streamUrl.isNullOrBlank()) {
             return SourceResolution.Unavailable("官方公开资源地址未配置")
         }
@@ -39,7 +39,8 @@ class OfficialSourceAdapter @Inject constructor(
     }
 
     override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
-        val streamUrl = channelRepository.getStreamUrl(source.id)
+        val streamUrl = source.url.ifBlank { channelRepository.getStreamUrl(source.id) }
+            ?.takeIf { it.isNotBlank() }
             ?: return AvailabilityResult.Unavailable("缺少官方资源配置")
 
         return when (val probeResult = networkProbe.probeUrl(streamUrl)) {

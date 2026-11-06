@@ -29,16 +29,17 @@ fun LiveSourceEntity.toDomain(): LiveSource {
         healthStatus = healthEnum,
         lastCheckedTimestamp = lastCheckedTimestamp,
         headersProfileId = headersProfileId,
-        drmProfileId = drmProfileId
+        drmProfileId = drmProfileId,
+        url = url
     )
 }
 
-fun LiveSource.toEntity(rawUrl: String = "", userAgent: String? = null, referer: String? = null): LiveSourceEntity {
+fun LiveSource.toEntity(rawUrl: String = this.url, userAgent: String? = null, referer: String? = null): LiveSourceEntity {
     return LiveSourceEntity(
         id = id,
         channelId = channelId,
         name = name,
-        url = rawUrl,
+        url = rawUrl.ifEmpty { this.url },
         protocol = protocol.name,
         adapterProviderId = adapterProviderId,
         priority = priority,

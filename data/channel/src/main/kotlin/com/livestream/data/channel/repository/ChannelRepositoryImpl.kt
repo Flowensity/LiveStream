@@ -135,6 +135,16 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateSourceHealth(
+        sourceId: String,
+        status: com.livestream.core.model.SourceHealthStatus,
+        timestamp: Long
+    ) {
+        withContext(dispatchers.io) {
+            liveSourceDao.updateSourceHealth(sourceId, status.name, timestamp)
+        }
+    }
+
     override fun observeCustomChannels(): Flow<List<Channel>> {
         return channelDao.observeCustomChannels()
             .map { list -> list.map { it.toDomain() } }

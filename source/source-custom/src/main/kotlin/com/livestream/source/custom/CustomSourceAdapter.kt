@@ -20,7 +20,7 @@ class CustomSourceAdapter @Inject constructor(
     override val providerId: String = "custom_user_source"
 
     override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
-        val streamUrl = channelRepository.getStreamUrl(source.id)
+        val streamUrl = source.url.ifBlank { channelRepository.getStreamUrl(source.id) }
         if (streamUrl.isNullOrBlank()) {
             return SourceResolution.Unavailable("未找到对应自定义直播源播放地址")
         }
@@ -34,7 +34,8 @@ class CustomSourceAdapter @Inject constructor(
     }
 
     override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
-        val streamUrl = channelRepository.getStreamUrl(source.id)
+        val streamUrl = source.url.ifBlank { channelRepository.getStreamUrl(source.id) }
+            ?.takeIf { it.isNotBlank() }
             ?: return AvailabilityResult.Unavailable("缺少播放地址")
 
         return when (val probeResult = networkProbe.probeUrl(streamUrl)) {

@@ -49,6 +49,7 @@ import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
+import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.theme.AppBackground
 import com.livestream.core.ui.theme.AppSurface
 import com.livestream.core.ui.theme.AppSurfaceElevated
@@ -79,7 +80,7 @@ fun TabletDualPaneLayout(
     playerUiState: PlayerUiState,
     channelUiState: ChannelUiState,
     settingsUiState: SettingsUiState,
-    onSurfaceAttached: (android.view.SurfaceView) -> Unit,
+    onSurfaceAttached: (android.view.View) -> Unit,
     onSurfaceDetached: () -> Unit,
     onToggleOsd: () -> Unit,
     onRetry: () -> Unit,
@@ -107,6 +108,10 @@ fun TabletDualPaneLayout(
     onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onDeleteSingleCustomChannel: (String) -> Unit = {},
     onClearAllCustomSources: () -> Unit = {},
+    onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
+    onCycleAspectRatio: () -> Unit = {},
+    onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onRefreshAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -277,6 +282,7 @@ fun TabletDualPaneLayout(
                     WebPlaybackContainer(
                         controller = webPlaybackController,
                         url = webUrl,
+                        aspectRatio = settingsUiState.aspectRatio,
                         modifier = Modifier.fillMaxSize(),
                         onContainerClick = onToggleOsd
                     )
@@ -284,6 +290,10 @@ fun TabletDualPaneLayout(
                     LiveVideoSurface(
                         onSurfaceAttached = onSurfaceAttached,
                         onSurfaceDetached = onSurfaceDetached,
+                        isSurfaceViewPreferred = settingsUiState.isSurfaceViewPreferred,
+                        aspectRatio = settingsUiState.aspectRatio,
+                        videoWidth = playerUiState.metrics.videoWidth,
+                        videoHeight = playerUiState.metrics.videoHeight,
                         modifier = Modifier
                             .fillMaxSize()
                             .clickable(
@@ -298,7 +308,9 @@ fun TabletDualPaneLayout(
                     uiState = playerUiState,
                     onRetry = onRetry,
                     onSwitchSource = onSwitchSource,
-                    onOpenEpgSchedule = onToggleEpgSheet
+                    onOpenEpgSchedule = onToggleEpgSheet,
+                    aspectRatio = settingsUiState.aspectRatio,
+                    onCycleAspectRatio = onCycleAspectRatio
                 )
 
                 // 平板全屏时的顶部快捷操作条（退出全屏、节目单、频道抽屉、设置）
@@ -406,15 +418,25 @@ fun TabletDualPaneLayout(
             onCloseSourceManagement = onCloseSourceManagement,
             onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,
             onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
-            onClearAllCustomSources = onClearAllCustomSources
+            onClearAllCustomSources = onClearAllCustomSources,
+            onAspectRatioSelected = onAspectRatioSelected,
+            onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
+            onRefreshAllCustomSources = onRefreshAllCustomSources
         )
 
-        // 5. EPG 节目排期弹窗
+        // 5. 综合播放菜单弹窗（集成信号源切换、画面比例与今日节目单）
         EpgScheduleDialog(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
-            onDismiss = onHideEpgSheet
+            onDismiss = onHideEpgSheet,
+            aspectRatio = settingsUiState.aspectRatio,
+            onAspectRatioSelected = onAspectRatioSelected,
+            activeSourceIndex = playerUiState.activeSourceIndex,
+            totalSources = playerUiState.totalSources,
+            availableSources = playerUiState.availableSources,
+            sourceLatenciesMs = playerUiState.sourceLatenciesMs,
+            onSwitchSource = onSwitchSource
         )
     }
 }

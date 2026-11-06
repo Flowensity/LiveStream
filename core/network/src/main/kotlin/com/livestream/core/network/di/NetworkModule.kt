@@ -35,9 +35,13 @@ abstract class NetworkModule {
                 .followSslRedirects(true)
                 .addInterceptor { chain ->
                     val original = chain.request()
-                    val request = original.newBuilder()
-                        .header("User-Agent", "LiveStream-Android/1.0 (Linux; Android)")
-                        .build()
+                    val request = if (original.header("User-Agent") == null) {
+                        original.newBuilder()
+                            .header("User-Agent", "LiveStream-Android/1.0 (Linux; Android)")
+                            .build()
+                    } else {
+                        original
+                    }
                     chain.proceed(request)
                 }
                 .build()

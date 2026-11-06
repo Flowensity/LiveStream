@@ -58,6 +58,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     // 活跃请求会话序列号，解决快速切台时的异步竞争
     private var activeSessionToken = 0L
     private var activePlayJob: Job? = null
+    private var activeProbeJob: Job? = null
 
     // 时延与性能统计分段打点
     private var switchStartTimeMs = 0L
@@ -68,6 +69,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var availableSources: List<LiveSource> = emptyList()
     private var currentSourceIndex: Int = 0
     private var currentRetryCount: Int = 0
+    private val sourceLatencyCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     // 缓冲卡死看门狗（超时自动换线或自愈）
     internal val watchdog = PlaybackWatchdog(dispatchers) {
@@ -90,7 +92,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         // 启动卡顿看门狗监听
         watchdog.start(statusFlow)
 
-        // 监听并动态同步用户设置的换台/缓冲卡死超时时间
+        // 监听并动态同步用户设置的换台/缓冲卡死超时时间与软硬解偏好
         userPreferencesRepository?.let { repo ->
             orchestratorScope.launch {
                 repo.userPreferences
@@ -98,6 +100,14 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                     .distinctUntilChanged()
                     .collect { timeoutMs ->
                         watchdog.updateStallTimeout(timeoutMs)
+                    }
+            }
+            orchestratorScope.launch {
+                repo.userPreferences
+                    .map { it.isHardwareDecodePreferred }
+                    .distinctUntilChanged()
+                    .collect { hwPreferred ->
+                        engine.setHardwareDecodePreferred(hwPreferred)
                     }
             }
         }
@@ -185,6 +195,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
 
         // 1. 协同取消旧播放与解析任务，杜绝旧任务回调污染新状态
         activePlayJob?.cancel()
+        activeProbeJob?.cancel()
         currentRetryCount = 0
         watchdog.start(statusFlow)
 
@@ -222,14 +233,76 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 return@launch
             }
 
-            availableSources = sources.sortedByDescending { it.priority }
+            availableSources = sortSourcesByHealthAndLatency(sources)
             currentSourceIndex = if (preferredSourceId != null) {
                 availableSources.indexOfFirst { it.id == preferredSourceId }.coerceAtLeast(0)
             } else {
                 0
             }
 
+            if (availableSources.size > 1) {
+                probeCandidateSources(currentToken, channel, availableSources)
+            }
+
             executeSourcePlayback(currentToken)
+        }
+    }
+
+    private fun sortSourcesByHealthAndLatency(sources: List<LiveSource>): List<LiveSource> {
+        return sources.sortedWith(
+            compareByDescending<LiveSource> { src ->
+                when (src.healthStatus) {
+                    com.livestream.core.model.SourceHealthStatus.HEALTHY -> 3
+                    com.livestream.core.model.SourceHealthStatus.UNKNOWN -> 2
+                    com.livestream.core.model.SourceHealthStatus.DEGRADED -> 1
+                    com.livestream.core.model.SourceHealthStatus.UNAVAILABLE -> 0
+                }
+            }.thenByDescending { it.priority }
+             .thenBy { sourceLatencyCache[it.id] ?: Long.MAX_VALUE }
+        )
+    }
+
+    private fun probeCandidateSources(
+        sessionToken: Long,
+        channel: Channel,
+        sources: List<LiveSource>
+    ) {
+        activeProbeJob?.cancel()
+        activeProbeJob = orchestratorScope.launch(dispatchers.io) {
+            for (src in sources) {
+                if (sessionToken != activeSessionToken) return@launch
+                val adapter = sourceAdapterRegistry.getAdapter(src.adapterProviderId) ?: continue
+                runCatching {
+                    when (val result = adapter.checkAvailability(channel, src)) {
+                        is com.livestream.source.api.AvailabilityResult.Available -> {
+                            sourceLatencyCache[src.id] = result.latencyMs
+                            channelRepository.updateSourceHealth(
+                                src.id,
+                                com.livestream.core.model.SourceHealthStatus.HEALTHY
+                            )
+                        }
+                        is com.livestream.source.api.AvailabilityResult.Degraded -> {
+                            sourceLatencyCache[src.id] = result.latencyMs
+                            channelRepository.updateSourceHealth(
+                                src.id,
+                                com.livestream.core.model.SourceHealthStatus.DEGRADED
+                            )
+                        }
+                        is com.livestream.source.api.AvailabilityResult.Unavailable -> {
+                            channelRepository.updateSourceHealth(
+                                src.id,
+                                com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
+                            )
+                        }
+                    }
+                }
+            }
+            if (sessionToken == activeSessionToken) {
+                _orchestratorState.value = _orchestratorState.value.copy(
+                    availableSources = availableSources,
+                    sourceLatenciesMs = sourceLatencyCache.toMap()
+                )
+            }
         }
     }
 
@@ -257,6 +330,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             currentSource = source,
             currentSourceIndex = currentSourceIndex,
             totalSources = availableSources.size,
+            availableSources = availableSources,
+            sourceLatenciesMs = sourceLatencyCache.toMap(),
             errorInfo = null
         )
 
@@ -371,6 +446,17 @@ class DefaultPlaybackOrchestrator @Inject constructor(
 
     private fun handlePlaybackFailure(errorInfo: PlaybackErrorInfo) {
         val currentToken = activeSessionToken
+        val failedSource = availableSources.getOrNull(currentSourceIndex)
+        if (failedSource != null) {
+            orchestratorScope.launch(dispatchers.io) {
+                runCatching {
+                    channelRepository.updateSourceHealth(
+                        failedSource.id,
+                        com.livestream.core.model.SourceHealthStatus.DEGRADED
+                    )
+                }
+            }
+        }
 
         // 尝试源回退策略：切换同频道的备选源
         if (currentSourceIndex + 1 < availableSources.size) {
@@ -441,6 +527,18 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             val channel = _orchestratorState.value.currentChannel
             val source = _orchestratorState.value.currentSource
             if (channel != null && source != null) {
+                sourceLatencyCache[source.id] = totalDuration
+                orchestratorScope.launch(dispatchers.io) {
+                    runCatching {
+                        channelRepository.updateSourceHealth(
+                            source.id,
+                            com.livestream.core.model.SourceHealthStatus.HEALTHY
+                        )
+                    }
+                }
+                _orchestratorState.value = _orchestratorState.value.copy(
+                    sourceLatenciesMs = sourceLatencyCache.toMap()
+                )
                 latencyTracker.recordSwitch(
                     SwitchRecord(
                         channelId = channel.id,
@@ -502,6 +600,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         val nextIndex = currentSourceIndex + 1
         if (nextIndex >= availableSources.size && _orchestratorState.value.status != PlaybackStatus.PLAYING) {
             // 所有备用源均已轮询尝试完毕且未成功起播，判定为网络超时，转入 ERROR 状态以激活网络自愈监听
+            currentRetryCount = MAX_RETRY_COUNT
             handlePlaybackFailure(
                 PlaybackErrorInfo(
                     errorType = PlaybackErrorType.NETWORK_TIMEOUT,
@@ -518,6 +617,17 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         }
     }
 
+    override fun selectSource(sourceIndex: Int) {
+        if (sourceIndex !in availableSources.indices || sourceIndex == currentSourceIndex) return
+        val currentToken = activeSessionToken
+        currentSourceIndex = sourceIndex
+        currentRetryCount = 0
+        activePlayJob?.cancel()
+        activePlayJob = orchestratorScope.launch {
+            executeSourcePlayback(currentToken)
+        }
+    }
+
     override fun retry() {
         val currentToken = activeSessionToken
         currentRetryCount = 0
@@ -528,16 +638,27 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     }
 
     override fun pause() {
-        engine.pause()
+        watchdog.stop()
+        if (_orchestratorState.value.isOfficialWeb) {
+            webPlaybackController.pause()
+        } else {
+            engine.pause()
+        }
     }
 
     override fun resume() {
-        engine.play()
+        if (_orchestratorState.value.isOfficialWeb) {
+            webPlaybackController.resume()
+        } else {
+            engine.play()
+        }
+        watchdog.start(statusFlow)
     }
 
     override fun stop() {
         activeSessionToken++
         activePlayJob?.cancel()
+        activeProbeJob?.cancel()
         switchStartTimeMs = 0L
         watchdog.stop()
         engine.stop()
@@ -552,6 +673,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     override fun release() {
         activeSessionToken++
         activePlayJob?.cancel()
+        activeProbeJob?.cancel()
         switchStartTimeMs = 0L
         watchdog.release()
         engine.release()

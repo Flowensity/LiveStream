@@ -33,7 +33,9 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.CustomPlaylistSource
+import com.livestream.core.model.PlaybackStatus
 import com.livestream.core.model.ThemeMode
+import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.AppBackground
 import com.livestream.core.ui.theme.AppTextPrimary
@@ -63,7 +65,7 @@ fun TvLayout(
     playerUiState: PlayerUiState,
     channelUiState: ChannelUiState,
     settingsUiState: SettingsUiState,
-    onSurfaceAttached: (android.view.SurfaceView) -> Unit,
+    onSurfaceAttached: (android.view.View) -> Unit,
     onSurfaceDetached: () -> Unit,
     onToggleOsd: () -> Unit,
     onShowOsd: () -> Unit,
@@ -97,6 +99,10 @@ fun TvLayout(
     onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onDeleteSingleCustomChannel: (String) -> Unit = {},
     onClearAllCustomSources: () -> Unit = {},
+    onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
+    onCycleAspectRatio: () -> Unit = {},
+    onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onRefreshAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -104,9 +110,26 @@ fun TvLayout(
     var osdFocusIndex by remember { mutableIntStateOf(0) }
     var lastChannelSwitchTime by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(settingsUiState.isSettingsOpen, channelUiState.isDrawerOpen, playerUiState.isEpgSheetVisible) {
-        if (!settingsUiState.isSettingsOpen && !channelUiState.isDrawerOpen && !playerUiState.isEpgSheetVisible) {
-            focusRequester.requestFocus()
+    val isErrorVisible = playerUiState.status == PlaybackStatus.ERROR && playerUiState.error != null
+
+    LaunchedEffect(
+        settingsUiState.isSettingsOpen,
+        settingsUiState.isImportDialogOpen,
+        settingsUiState.isSourceManagementOpen,
+        channelUiState.isDrawerOpen,
+        playerUiState.isEpgSheetVisible,
+        isErrorVisible
+    ) {
+        if (!settingsUiState.isSettingsOpen &&
+            !settingsUiState.isImportDialogOpen &&
+            !settingsUiState.isSourceManagementOpen &&
+            !channelUiState.isDrawerOpen &&
+            !playerUiState.isEpgSheetVisible &&
+            !isErrorVisible
+        ) {
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
     }
 
@@ -125,10 +148,11 @@ fun TvLayout(
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                // 侧边栏展开时：左右方向键切换分类，返回键/退出键关闭侧边栏
+                // 侧边栏展开时：左右方向键切换分类（搜索框输入非空时保留给光标移动），返回键/退出键关闭侧边栏
                 if (channelUiState.isDrawerOpen) {
                     when (keyEvent.key) {
                         Key.DirectionLeft -> {
+                            if (channelUiState.searchQuery.isNotEmpty()) return@onKeyEvent false
                             val categories = channelUiState.categories
                             if (categories.isNotEmpty()) {
                                 val currIdx = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
@@ -138,6 +162,7 @@ fun TvLayout(
                             return@onKeyEvent true
                         }
                         Key.DirectionRight -> {
+                            if (channelUiState.searchQuery.isNotEmpty()) return@onKeyEvent false
                             val categories = channelUiState.categories
                             if (categories.isNotEmpty()) {
                                 val currIdx = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
@@ -155,22 +180,32 @@ fun TvLayout(
                     }
                 }
 
-                // 设置或导入/源管理展开时拦截返回键
+                // 设置或导入/源管理展开时拦截返回键，其余按键返回 false 交由 Compose FocusOwner 在弹窗内移动焦点
                 if (settingsUiState.isSettingsOpen || settingsUiState.isImportDialogOpen || settingsUiState.isSourceManagementOpen) {
-                    if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                        if (settingsUiState.isSourceManagementOpen) {
-                            onCloseSourceManagement()
-                        } else if (settingsUiState.isImportDialogOpen) {
-                            onCloseImportDialog()
-                        } else {
-                            onCloseSettings()
+                    when (keyEvent.key) {
+                        Key.Back, Key.Escape -> {
+                            if (settingsUiState.isSourceManagementOpen) {
+                                onCloseSourceManagement()
+                            } else if (settingsUiState.isImportDialogOpen) {
+                                onCloseImportDialog()
+                            } else {
+                                onCloseSettings()
+                            }
+                            focusRequester.requestFocus()
+                            return@onKeyEvent true
                         }
-                        focusRequester.requestFocus()
-                        return@onKeyEvent true
+                        Key.Menu -> {
+                            if (!settingsUiState.isImportDialogOpen && !settingsUiState.isSourceManagementOpen) {
+                                onCloseSettings()
+                                focusRequester.requestFocus()
+                            }
+                            return@onKeyEvent true
+                        }
+                        else -> return@onKeyEvent false
                     }
-                    return@onKeyEvent false
                 }
 
+                // 节目单展开时拦截返回键，其余方向键交由节目单内部焦点树处理
                 if (playerUiState.isEpgSheetVisible) {
                     if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
                         onHideEpgSheet()
@@ -178,6 +213,20 @@ fun TvLayout(
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
+                }
+
+                // 播放错误卡片展示时：优先允许重试/换线操作及上下切台，避免按 OK 键误打开左侧抽屉
+                if (isErrorVisible) {
+                    when (keyEvent.key) {
+                        Key.DirectionCenter, Key.Enter -> {
+                            onRetry()
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionLeft, Key.DirectionRight -> {
+                            return@onKeyEvent false
+                        }
+                        else -> {}
+                    }
                 }
 
                 // 遥控器上下键切台节流保护：防止长按上/下键时硬件产生密集高频事件 (40ms/次) 导致应用崩溃
@@ -200,27 +249,20 @@ fun TvLayout(
                     lastChannelSwitchTime = now
                 }
 
-                // OSD 悬浮条显示时：左右键在 [线路] 与 [节目单] 并排按钮之间切换选择
+                // OSD 悬浮条显示时：右键或确认键直接打开 [播放菜单]，左键快捷换线
                 if (playerUiState.isOsdVisible) {
                     when (keyEvent.key) {
                         Key.DirectionLeft -> {
-                            if (osdFocusIndex == 1) {
-                                osdFocusIndex = 0
-                            } else {
-                                onSwitchSource()
-                            }
+                            onSwitchSource()
                             return@onKeyEvent true
                         }
                         Key.DirectionRight -> {
-                            osdFocusIndex = 1
+                            osdFocusIndex = 0
+                            onToggleEpgSheet()
                             return@onKeyEvent true
                         }
                         Key.DirectionCenter, Key.Enter -> {
-                            if (osdFocusIndex == 0) {
-                                onSwitchSource()
-                            } else {
-                                onToggleEpgSheet()
-                            }
+                            onToggleEpgSheet()
                             return@onKeyEvent true
                         }
                         Key.DirectionUp, Key.PageUp -> {
@@ -264,7 +306,7 @@ fun TvLayout(
                     }
                     Key.DirectionRight -> {
                         onShowOsd()
-                        osdFocusIndex = 1
+                        osdFocusIndex = 0
                         true
                     }
                     Key.DirectionCenter, Key.Enter -> {
@@ -295,6 +337,7 @@ fun TvLayout(
             WebPlaybackContainer(
                 controller = webPlaybackController,
                 url = webUrl,
+                aspectRatio = settingsUiState.aspectRatio,
                 modifier = Modifier.fillMaxSize(),
                 onContainerClick = {
                     if (channelUiState.isDrawerOpen) {
@@ -310,6 +353,10 @@ fun TvLayout(
             LiveVideoSurface(
                 onSurfaceAttached = onSurfaceAttached,
                 onSurfaceDetached = onSurfaceDetached,
+                isSurfaceViewPreferred = settingsUiState.isSurfaceViewPreferred,
+                aspectRatio = settingsUiState.aspectRatio,
+                videoWidth = playerUiState.metrics.videoWidth,
+                videoHeight = playerUiState.metrics.videoHeight,
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable(
@@ -327,13 +374,16 @@ fun TvLayout(
             )
         }
 
-        // 2. 中层：OSD 状态、指标与错误卡片 (带并排线路与节目单按钮)
+        // 2. 中层：OSD 状态、指标与错误卡片 (带并排线路、画面比例、节目单与手机遥控按钮)
         PlayerOverlay(
             uiState = playerUiState,
             onRetry = onRetry,
             onSwitchSource = onSwitchSource,
             onOpenEpgSchedule = onToggleEpgSheet,
-            osdFocusedIndex = if (playerUiState.isOsdVisible) osdFocusIndex else -1
+            osdFocusedIndex = if (playerUiState.isOsdVisible) osdFocusIndex else -1,
+            aspectRatio = settingsUiState.aspectRatio,
+            onCycleAspectRatio = onCycleAspectRatio,
+            onOpenSettings = onOpenSettings
         )
 
         // 3. 顶层侧边栏：频道分类与列表抽屉
@@ -343,7 +393,8 @@ fun TvLayout(
             onChannelSelected = onChannelSelected,
             onFavoriteToggle = onFavoriteToggle,
             onSearchQueryChanged = onSearchQueryChanged,
-            onCloseDrawer = onCloseDrawer
+            onCloseDrawer = onCloseDrawer,
+            onOpenSettings = onOpenSettings
         )
 
         // 4. 模态浮层：系统与播放设置弹窗
@@ -362,15 +413,25 @@ fun TvLayout(
             onCloseSourceManagement = onCloseSourceManagement,
             onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,
             onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
-            onClearAllCustomSources = onClearAllCustomSources
+            onClearAllCustomSources = onClearAllCustomSources,
+            onAspectRatioSelected = onAspectRatioSelected,
+            onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
+            onRefreshAllCustomSources = onRefreshAllCustomSources
         )
 
-        // 5. 模态浮层：真实 EPG 节目单完整排期弹窗
+        // 5. 模态浮层：综合播放菜单（集成信号源切换、画面比例与今日节目单）
         EpgScheduleDialog(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
-            onDismiss = onHideEpgSheet
+            onDismiss = onHideEpgSheet,
+            aspectRatio = settingsUiState.aspectRatio,
+            onAspectRatioSelected = onAspectRatioSelected,
+            activeSourceIndex = playerUiState.activeSourceIndex,
+            totalSources = playerUiState.totalSources,
+            availableSources = playerUiState.availableSources,
+            sourceLatenciesMs = playerUiState.sourceLatenciesMs,
+            onSwitchSource = onSwitchSource
         )
     }
 }

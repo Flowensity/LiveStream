@@ -20,6 +20,8 @@ import com.livestream.core.ui.theme.AppBackground
 import com.livestream.feature.channel.ChannelViewModel
 import com.livestream.feature.home.HomeViewModel
 import com.livestream.feature.player.PlayerViewModel
+import com.livestream.feature.player.ui.LiveVideoSurface
+import com.livestream.feature.player.ui.WebPlaybackContainer
 import com.livestream.feature.settings.SettingsViewModel
 
 /**
@@ -29,6 +31,7 @@ import com.livestream.feature.settings.SettingsViewModel
  * 2. 手机竖屏半屏列表界面 (PhonePortraitLayout)
  * 3. 手机横屏手势全屏界面 (PhoneLandscapeLayout)
  * 4. 平板大屏双栏分屏界面 (TabletDualPaneLayout)
+ * 5. 画中画悬浮小窗极简播放模式 (isInPipMode)
  */
 @Composable
 fun HomeScreen(
@@ -36,7 +39,8 @@ fun HomeScreen(
     playerViewModel: PlayerViewModel,
     channelViewModel: ChannelViewModel,
     settingsViewModel: SettingsViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isInPipMode: Boolean = false
 ) {
     val playerUiState by playerViewModel.uiState.collectAsState()
     val channelUiState by channelViewModel.uiState.collectAsState()
@@ -52,10 +56,41 @@ fun HomeScreen(
         homeViewModel.initStartupPlayback()
     }
 
+    // 画中画 (PiP) 悬浮小窗模式：仅渲染纯净视频流，隐藏一切抽屉、弹窗与控制浮层
+    if (isInPipMode) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(AppBackground)
+        ) {
+            val webUrl = playerUiState.officialWebUrl
+            if (playerUiState.isOfficialWeb && !webUrl.isNullOrBlank()) {
+                WebPlaybackContainer(
+                    controller = playerViewModel.webPlaybackController,
+                    url = webUrl,
+                    aspectRatio = settingsUiState.aspectRatio,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                LiveVideoSurface(
+                    onSurfaceAttached = { playerViewModel.attachSurface(it) },
+                    onSurfaceDetached = { playerViewModel.detachSurface() },
+                    isSurfaceViewPreferred = settingsUiState.isSurfaceViewPreferred,
+                    aspectRatio = settingsUiState.aspectRatio,
+                    videoWidth = playerUiState.metrics.videoWidth,
+                    videoHeight = playerUiState.metrics.videoHeight,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        return
+    }
+
     // 系统返回键分级消费与二次退出确认弹窗
     BackHandler(enabled = true) {
         when {
             showExitDialog -> showExitDialog = false
+            settingsUiState.isSourceManagementOpen -> settingsViewModel.closeSourceManagement()
             settingsUiState.isImportDialogOpen -> settingsViewModel.closeImportDialog()
             settingsUiState.isSettingsOpen -> settingsViewModel.closeSettings()
             channelUiState.isDrawerOpen -> channelViewModel.closeDrawer()
@@ -73,181 +108,197 @@ fun HomeScreen(
             .background(AppBackground)
     ) {
         when (deviceType) {
-        DeviceType.PHONE_PORTRAIT -> {
-            PhonePortraitLayout(
-                playerUiState = playerUiState,
-                channelUiState = channelUiState,
-                settingsUiState = settingsUiState,
-                onSurfaceAttached = { playerViewModel.attachSurface(it) },
-                onSurfaceDetached = { playerViewModel.detachSurface() },
-                onToggleOsd = { playerViewModel.toggleOsd() },
-                onRetry = { playerViewModel.retry() },
-                onSwitchSource = { playerViewModel.switchNextSource() },
-                onCategorySelected = { channelViewModel.selectCategory(it) },
-                onChannelSelected = {
-                    homeViewModel.playChannel(it)
-                    channelViewModel.closeDrawer()
-                },
-                onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
-                onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
-                onOpenSettings = { settingsViewModel.openSettings() },
-                onCloseSettings = { settingsViewModel.closeSettings() },
-                onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
-                onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
-                onOpenImportDialog = { settingsViewModel.openImportDialog() },
-                onCloseImportDialog = { settingsViewModel.closeImportDialog() },
-                onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
-                onConfirmImport = { settingsViewModel.importM3uContent() },
-                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
-                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
-                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
-                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
-                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
-                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
-                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
-                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
-                webPlaybackController = playerViewModel.webPlaybackController,
-                modifier = modifier
-            )
+            DeviceType.PHONE_PORTRAIT -> {
+                PhonePortraitLayout(
+                    playerUiState = playerUiState,
+                    channelUiState = channelUiState,
+                    settingsUiState = settingsUiState,
+                    onSurfaceAttached = { playerViewModel.attachSurface(it) },
+                    onSurfaceDetached = { playerViewModel.detachSurface() },
+                    onToggleOsd = { playerViewModel.toggleOsd() },
+                    onRetry = { playerViewModel.retry() },
+                    onSwitchSource = { playerViewModel.switchNextSource() },
+                    onCategorySelected = { channelViewModel.selectCategory(it) },
+                    onChannelSelected = {
+                        homeViewModel.playChannel(it)
+                        channelViewModel.closeDrawer()
+                    },
+                    onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
+                    onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
+                    onOpenSettings = { settingsViewModel.openSettings() },
+                    onCloseSettings = { settingsViewModel.closeSettings() },
+                    onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
+                    onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
+                    onOpenImportDialog = { settingsViewModel.openImportDialog() },
+                    onCloseImportDialog = { settingsViewModel.closeImportDialog() },
+                    onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
+                    onConfirmImport = { settingsViewModel.importM3uContent() },
+                    onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                    onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                    onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                    onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                    onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                    onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                    onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                    onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
+                    onAspectRatioSelected = { settingsViewModel.setVideoAspectRatio(it) },
+                    onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
+                    onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
+                    onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    webPlaybackController = playerViewModel.webPlaybackController,
+                    modifier = modifier
+                )
+            }
+            DeviceType.PHONE_LANDSCAPE -> {
+                PhoneLandscapeLayout(
+                    playerUiState = playerUiState,
+                    channelUiState = channelUiState,
+                    settingsUiState = settingsUiState,
+                    onSurfaceAttached = { playerViewModel.attachSurface(it) },
+                    onSurfaceDetached = { playerViewModel.detachSurface() },
+                    onToggleOsd = { playerViewModel.toggleOsd() },
+                    onRetry = { playerViewModel.retry() },
+                    onSwitchSource = { playerViewModel.switchNextSource() },
+                    onOpenDrawer = { channelViewModel.openDrawer() },
+                    onCloseDrawer = { channelViewModel.closeDrawer() },
+                    onCategorySelected = { channelViewModel.selectCategory(it) },
+                    onChannelSelected = {
+                        homeViewModel.playChannel(it)
+                        channelViewModel.closeDrawer()
+                    },
+                    onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
+                    onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
+                    onOpenSettings = { settingsViewModel.openSettings() },
+                    onCloseSettings = { settingsViewModel.closeSettings() },
+                    onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
+                    onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
+                    onOpenImportDialog = { settingsViewModel.openImportDialog() },
+                    onCloseImportDialog = { settingsViewModel.closeImportDialog() },
+                    onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
+                    onConfirmImport = { settingsViewModel.importM3uContent() },
+                    onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                    onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                    onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                    onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                    onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                    onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                    onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                    onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
+                    onAspectRatioSelected = { settingsViewModel.setVideoAspectRatio(it) },
+                    onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
+                    onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
+                    onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    webPlaybackController = playerViewModel.webPlaybackController,
+                    modifier = modifier
+                )
+            }
+            DeviceType.TABLET -> {
+                TabletDualPaneLayout(
+                    playerUiState = playerUiState,
+                    channelUiState = channelUiState,
+                    settingsUiState = settingsUiState,
+                    onSurfaceAttached = { playerViewModel.attachSurface(it) },
+                    onSurfaceDetached = { playerViewModel.detachSurface() },
+                    onToggleOsd = { playerViewModel.toggleOsd() },
+                    onRetry = { playerViewModel.retry() },
+                    onSwitchSource = { playerViewModel.switchNextSource() },
+                    onCategorySelected = { channelViewModel.selectCategory(it) },
+                    onChannelSelected = {
+                        homeViewModel.playChannel(it)
+                        channelViewModel.closeDrawer()
+                    },
+                    onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
+                    onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
+                    onOpenSettings = { settingsViewModel.openSettings() },
+                    onCloseSettings = { settingsViewModel.closeSettings() },
+                    onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
+                    onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
+                    onOpenImportDialog = { settingsViewModel.openImportDialog() },
+                    onCloseImportDialog = { settingsViewModel.closeImportDialog() },
+                    onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
+                    onConfirmImport = { settingsViewModel.importM3uContent() },
+                    onOpenDrawer = { channelViewModel.openDrawer() },
+                    onCloseDrawer = { channelViewModel.closeDrawer() },
+                    onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                    onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                    onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                    onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                    onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                    onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                    onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                    onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
+                    onAspectRatioSelected = { settingsViewModel.setVideoAspectRatio(it) },
+                    onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
+                    onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
+                    onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    webPlaybackController = playerViewModel.webPlaybackController,
+                    modifier = modifier
+                )
+            }
+            DeviceType.TV -> {
+                TvLayout(
+                    playerUiState = playerUiState,
+                    channelUiState = channelUiState,
+                    settingsUiState = settingsUiState,
+                    onSurfaceAttached = { playerViewModel.attachSurface(it) },
+                    onSurfaceDetached = { playerViewModel.detachSurface() },
+                    onToggleOsd = { playerViewModel.toggleOsd() },
+                    onShowOsd = { playerViewModel.showOsd() },
+                    onHideOsd = { playerViewModel.hideOsd() },
+                    onRetry = { playerViewModel.retry() },
+                    onSwitchSource = { playerViewModel.switchNextSource() },
+                    onSwitchNextChannel = {
+                        homeViewModel.switchNextChannel()
+                        playerViewModel.showOsd()
+                    },
+                    onSwitchPreviousChannel = {
+                        homeViewModel.switchPreviousChannel()
+                        playerViewModel.showOsd()
+                    },
+                    onNumberKeyInput = { digit ->
+                        playerViewModel.onNumberKeyInput(digit) { targetChannel ->
+                            homeViewModel.playChannel(targetChannel)
+                        }
+                    },
+                    onOpenDrawer = { channelViewModel.openDrawer() },
+                    onCloseDrawer = { channelViewModel.closeDrawer() },
+                    onCategorySelected = { channelViewModel.selectCategory(it) },
+                    onChannelSelected = {
+                        homeViewModel.playChannel(it)
+                        channelViewModel.closeDrawer()
+                    },
+                    onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
+                    onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
+                    onOpenSettings = { settingsViewModel.openSettings() },
+                    onCloseSettings = { settingsViewModel.closeSettings() },
+                    onToggleSettings = { settingsViewModel.toggleSettings() },
+                    onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
+                    onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
+                    onOpenImportDialog = { settingsViewModel.openImportDialog() },
+                    onCloseImportDialog = { settingsViewModel.closeImportDialog() },
+                    onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
+                    onConfirmImport = { settingsViewModel.importM3uContent() },
+                    onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
+                    onHideEpgSheet = { playerViewModel.hideEpgSheet() },
+                    onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
+                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
+                    onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
+                    onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
+                    onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
+                    onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
+                    onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
+                    onAspectRatioSelected = { settingsViewModel.setVideoAspectRatio(it) },
+                    onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
+                    onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
+                    onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    webPlaybackController = playerViewModel.webPlaybackController,
+                    modifier = modifier
+                )
+            }
         }
-        DeviceType.PHONE_LANDSCAPE -> {
-            PhoneLandscapeLayout(
-                playerUiState = playerUiState,
-                channelUiState = channelUiState,
-                settingsUiState = settingsUiState,
-                onSurfaceAttached = { playerViewModel.attachSurface(it) },
-                onSurfaceDetached = { playerViewModel.detachSurface() },
-                onToggleOsd = { playerViewModel.toggleOsd() },
-                onRetry = { playerViewModel.retry() },
-                onSwitchSource = { playerViewModel.switchNextSource() },
-                onOpenDrawer = { channelViewModel.openDrawer() },
-                onCloseDrawer = { channelViewModel.closeDrawer() },
-                onCategorySelected = { channelViewModel.selectCategory(it) },
-                onChannelSelected = {
-                    homeViewModel.playChannel(it)
-                    channelViewModel.closeDrawer()
-                },
-                onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
-                onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
-                onOpenSettings = { settingsViewModel.openSettings() },
-                onCloseSettings = { settingsViewModel.closeSettings() },
-                onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
-                onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
-                onOpenImportDialog = { settingsViewModel.openImportDialog() },
-                onCloseImportDialog = { settingsViewModel.closeImportDialog() },
-                onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
-                onConfirmImport = { settingsViewModel.importM3uContent() },
-                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
-                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
-                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
-                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
-                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
-                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
-                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
-                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
-                webPlaybackController = playerViewModel.webPlaybackController,
-                modifier = modifier
-            )
-        }
-        DeviceType.TABLET -> {
-            TabletDualPaneLayout(
-                playerUiState = playerUiState,
-                channelUiState = channelUiState,
-                settingsUiState = settingsUiState,
-                onSurfaceAttached = { playerViewModel.attachSurface(it) },
-                onSurfaceDetached = { playerViewModel.detachSurface() },
-                onToggleOsd = { playerViewModel.toggleOsd() },
-                onRetry = { playerViewModel.retry() },
-                onSwitchSource = { playerViewModel.switchNextSource() },
-                onCategorySelected = { channelViewModel.selectCategory(it) },
-                onChannelSelected = {
-                    homeViewModel.playChannel(it)
-                    channelViewModel.closeDrawer()
-                },
-                onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
-                onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
-                onOpenSettings = { settingsViewModel.openSettings() },
-                onCloseSettings = { settingsViewModel.closeSettings() },
-                onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
-                onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
-                onOpenImportDialog = { settingsViewModel.openImportDialog() },
-                onCloseImportDialog = { settingsViewModel.closeImportDialog() },
-                onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
-                onConfirmImport = { settingsViewModel.importM3uContent() },
-                onOpenDrawer = { channelViewModel.openDrawer() },
-                onCloseDrawer = { channelViewModel.closeDrawer() },
-                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
-                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
-                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
-                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
-                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
-                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
-                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
-                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
-                webPlaybackController = playerViewModel.webPlaybackController,
-                modifier = modifier
-            )
-        }
-        DeviceType.TV -> {
-            TvLayout(
-                playerUiState = playerUiState,
-                channelUiState = channelUiState,
-                settingsUiState = settingsUiState,
-                onSurfaceAttached = { playerViewModel.attachSurface(it) },
-                onSurfaceDetached = { playerViewModel.detachSurface() },
-                onToggleOsd = { playerViewModel.toggleOsd() },
-                onShowOsd = { playerViewModel.showOsd() },
-                onHideOsd = { playerViewModel.hideOsd() },
-                onRetry = { playerViewModel.retry() },
-                onSwitchSource = { playerViewModel.switchNextSource() },
-                onSwitchNextChannel = {
-                    homeViewModel.switchNextChannel()
-                    playerViewModel.showOsd()
-                },
-                onSwitchPreviousChannel = {
-                    homeViewModel.switchPreviousChannel()
-                    playerViewModel.showOsd()
-                },
-                onNumberKeyInput = { digit ->
-                    playerViewModel.onNumberKeyInput(digit) { targetChannel ->
-                        homeViewModel.playChannel(targetChannel)
-                    }
-                },
-                onOpenDrawer = { channelViewModel.openDrawer() },
-                onCloseDrawer = { channelViewModel.closeDrawer() },
-                onCategorySelected = { channelViewModel.selectCategory(it) },
-                onChannelSelected = {
-                    homeViewModel.playChannel(it)
-                    channelViewModel.closeDrawer()
-                },
-                onFavoriteToggle = { channelViewModel.toggleFavorite(it) },
-                onSearchQueryChanged = { channelViewModel.onSearchQueryChanged(it) },
-                onOpenSettings = { settingsViewModel.openSettings() },
-                onCloseSettings = { settingsViewModel.closeSettings() },
-                onToggleSettings = { settingsViewModel.toggleSettings() },
-                onToggleHardwareDecode = { settingsViewModel.setHardwareDecodePreferred(it) },
-                onToggleSurfaceView = { settingsViewModel.setSurfaceViewPreferred(it) },
-                onOpenImportDialog = { settingsViewModel.openImportDialog() },
-                onCloseImportDialog = { settingsViewModel.closeImportDialog() },
-                onImportTextChanged = { settingsViewModel.onImportTextChanged(it) },
-                onConfirmImport = { settingsViewModel.importM3uContent() },
-                onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
-                onHideEpgSheet = { playerViewModel.hideEpgSheet() },
-                onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
-                onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
-                onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
-                onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
-                onDeleteSingleCustomChannel = { settingsViewModel.deleteSingleCustomChannel(it) },
-                onClearAllCustomSources = { settingsViewModel.clearAllCustomSources() },
-                webPlaybackController = playerViewModel.webPlaybackController,
-                modifier = modifier
-            )
-        }
-    }
 
         // 退出确认二次弹窗
         ExitConfirmDialog(

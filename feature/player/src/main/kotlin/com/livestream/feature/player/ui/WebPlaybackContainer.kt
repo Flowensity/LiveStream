@@ -12,10 +12,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import com.livestream.core.model.VideoAspectRatio
 import com.livestream.playback.api.web.WebPlaybackController
 
 /**
@@ -31,13 +34,17 @@ fun WebPlaybackContainer(
     url: String,
     modifier: Modifier = Modifier,
     overlayModifier: Modifier = Modifier,
+    aspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL,
     onContainerClick: (() -> Unit)? = null
 ) {
     var containerRef by remember { mutableStateOf<FrameLayout?>(null) }
+    val latestController by rememberUpdatedState(controller)
+    val latestAspectRatio by rememberUpdatedState(aspectRatio)
 
     Box(
         modifier = modifier
             .fillMaxSize()
+            .clipToBounds()
             .background(Color.Black)
     ) {
         AndroidView(
@@ -48,14 +55,23 @@ fun WebPlaybackContainer(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
+                    clipChildren = true
+                    clipToPadding = true
+                    keepScreenOn = true
                     isFocusable = false
                     isFocusableInTouchMode = false
+                    addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                        if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                            latestController?.setAspectRatio(latestAspectRatio)
+                        }
+                    }
                     containerRef = this
                 }
             },
             update = { frameLayout ->
                 containerRef = frameLayout
                 if (controller != null && url.isNotBlank()) {
+                    controller.setAspectRatio(aspectRatio)
                     controller.loadOfficialUrl(url, frameLayout)
                 }
             }

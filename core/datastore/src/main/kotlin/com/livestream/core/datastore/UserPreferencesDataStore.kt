@@ -33,6 +33,7 @@ class UserPreferencesDataStore @Inject constructor(
         val TV_KEY_MAPPING_SCHEME = stringPreferencesKey("tv_key_mapping_scheme")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val BOOT_STARTUP_ENABLED = booleanPreferencesKey("boot_startup_enabled")
+        val VIDEO_ASPECT_RATIO = stringPreferencesKey("video_aspect_ratio")
         val CUSTOM_PLAYLIST_SOURCES = stringPreferencesKey("custom_playlist_sources")
     }
 
@@ -81,6 +82,10 @@ class UserPreferencesDataStore @Inject constructor(
                 else -> com.livestream.core.model.ThemeMode.SYSTEM
             }
             val bootStartup = preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] ?: false
+            val aspectRatioStr = preferences[PreferencesKeys.VIDEO_ASPECT_RATIO]
+            val aspectRatio = com.livestream.core.model.VideoAspectRatio.entries.find {
+                it.name == aspectRatioStr
+            } ?: com.livestream.core.model.VideoAspectRatio.ORIGINAL
 
             UserPreferences(
                 defaultCategoryId = defaultCategory,
@@ -90,7 +95,8 @@ class UserPreferencesDataStore @Inject constructor(
                 channelSwitchTimeoutMs = timeout,
                 tvKeyMappingScheme = mappingScheme,
                 themeMode = themeMode,
-                isBootStartupEnabled = bootStartup
+                isBootStartupEnabled = bootStartup,
+                aspectRatio = aspectRatio
             )
         }
 
@@ -139,6 +145,12 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun setBootStartupEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setVideoAspectRatio(ratio: com.livestream.core.model.VideoAspectRatio) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.VIDEO_ASPECT_RATIO] = ratio.name
         }
     }
 

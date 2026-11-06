@@ -39,4 +39,21 @@ class XmltvParserTest {
         assertEquals("生活圈", p2.title)
         assertEquals(p1.endTimestamp, p2.startTimestamp)
     }
+
+    @Test(expected = org.xml.sax.SAXParseException::class)
+    fun `parse rejects xml with doctype xxe payload`() {
+        val xxeXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <!DOCTYPE tv [
+              <!ENTITY xxe SYSTEM "file:///etc/passwd">
+            ]>
+            <tv>
+              <programme channel="cctv1" start="20261105080000 +0800" stop="20261105090000 +0800">
+                <title>&xxe;</title>
+              </programme>
+            </tv>
+        """.trimIndent()
+
+        XmltvParser.parse(xxeXml)
+    }
 }

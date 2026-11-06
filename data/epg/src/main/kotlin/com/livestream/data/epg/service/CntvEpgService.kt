@@ -22,6 +22,15 @@ class CntvEpgService @Inject constructor(
     private val dispatchers: AppDispatchers
 ) {
 
+    companion object {
+        private val REGEX_CCTV_4K = Regex("""CCTV[-_ ]*4K""", RegexOption.IGNORE_CASE)
+        private val REGEX_CCTV_8K = Regex("""CCTV[-_ ]*8K""", RegexOption.IGNORE_CASE)
+        private val REGEX_CCTV_NUMBERED = Regex("""CCTV[-_ ]*(1[0-7]|[1-9])(?![0-9K])""", RegexOption.IGNORE_CASE)
+        private val REGEX_CCTV_5_PLUS = Regex("""CCTV[-_ ]*5\+|CCTV[-_ ]*5PLUS|体育赛事""", RegexOption.IGNORE_CASE)
+        private val REGEX_CCTV_NUM_EXTRACT = Regex("""(?:CCTV|中央)[-_ ]*(1[0-7]|[1-9])(?![0-9K])""", RegexOption.IGNORE_CASE)
+        private val REGEX_CCTV_ZH_NUM = Regex("""中央([一二三四五六七八九十]+)台?""")
+    }
+
     /**
      * 根据频道名称或原始 ID 解析 CNTV 官方 EPG 频源码
      */
@@ -29,21 +38,21 @@ class CntvEpgService @Inject constructor(
         if (channelName.isBlank()) return null
 
         // 1. 检查独立的 4K / 8K 频道 (如 CCTV-4K, CCTV-8K)
-        val isCctv4k = Regex("""CCTV[-_ ]*4K""", RegexOption.IGNORE_CASE).containsMatchIn(channelName) &&
-            !Regex("""CCTV[-_ ]*(1[0-7]|[1-9])""", RegexOption.IGNORE_CASE).containsMatchIn(channelName)
+        val isCctv4k = REGEX_CCTV_4K.containsMatchIn(channelName) &&
+            !REGEX_CCTV_NUMBERED.containsMatchIn(channelName)
         if (isCctv4k) return "cctv4k"
 
-        val isCctv8k = Regex("""CCTV[-_ ]*8K""", RegexOption.IGNORE_CASE).containsMatchIn(channelName) &&
-            !Regex("""CCTV[-_ ]*(1[0-7]|[1-9])""", RegexOption.IGNORE_CASE).containsMatchIn(channelName)
+        val isCctv8k = REGEX_CCTV_8K.containsMatchIn(channelName) &&
+            !REGEX_CCTV_NUMBERED.containsMatchIn(channelName)
         if (isCctv8k) return "cctv8k"
 
         // 2. 检查 CCTV-5+ 体育赛事
-        if (Regex("""CCTV[-_ ]*5\+|CCTV[-_ ]*5PLUS|体育赛事""", RegexOption.IGNORE_CASE).containsMatchIn(channelName)) {
+        if (REGEX_CCTV_5_PLUS.containsMatchIn(channelName)) {
             return "cctv5plus"
         }
 
         // 3. 检查 CCTV 1-17 号数字频道 (支持 CCTV-1, CCTV1, CCTV-16 4K, CCTV1 高清 等各种格式)
-        val cctvNumMatch = Regex("""(?:CCTV|中央)[-_ ]*(1[0-7]|[1-9])(?!\d)""", RegexOption.IGNORE_CASE).find(channelName)
+        val cctvNumMatch = REGEX_CCTV_NUM_EXTRACT.find(channelName)
         if (cctvNumMatch != null) {
             val num = cctvNumMatch.groupValues[1].toInt()
             return when (num) {
@@ -69,7 +78,7 @@ class CntvEpgService @Inject constructor(
         }
 
         // 4. 检查中央中文数字别名 (如 中央一台, 中央十六台)
-        val zhMatch = Regex("""中央([一二三四五六七八九十]+)台?""").find(channelName)
+        val zhMatch = REGEX_CCTV_ZH_NUM.find(channelName)
         if (zhMatch != null) {
             val zhNum = zhMatch.groupValues[1]
             when (zhNum) {

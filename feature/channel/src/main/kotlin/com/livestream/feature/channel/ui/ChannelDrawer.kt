@@ -28,12 +28,17 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -48,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.OneUiDimensions
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
@@ -65,10 +71,12 @@ fun ChannelDrawer(
     onFavoriteToggle: (Channel) -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onCloseDrawer: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenSettings: (() -> Unit)? = null
 ) {
     val activeItemFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    var isSearchFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isDrawerOpen, uiState.selectedCategory?.id, uiState.channels) {
         if (uiState.isDrawerOpen && uiState.channels.isNotEmpty()) {
@@ -112,18 +120,26 @@ fun ChannelDrawer(
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
                             Key.DirectionLeft -> {
-                                if (categories.isNotEmpty()) {
-                                    val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
-                                    onCategorySelected(categories[prevIdx])
+                                if (isSearchFocused && uiState.searchQuery.isNotEmpty()) {
+                                    false
+                                } else {
+                                    if (categories.isNotEmpty()) {
+                                        val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
+                                        onCategorySelected(categories[prevIdx])
+                                    }
+                                    true
                                 }
-                                true
                             }
                             Key.DirectionRight -> {
-                                if (categories.isNotEmpty()) {
-                                    val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
-                                    onCategorySelected(categories[nextIdx])
+                                if (isSearchFocused && uiState.searchQuery.isNotEmpty()) {
+                                    false
+                                } else {
+                                    if (categories.isNotEmpty()) {
+                                        val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
+                                        onCategorySelected(categories[nextIdx])
+                                    }
+                                    true
                                 }
-                                true
                             }
                             Key.Back, Key.Escape -> {
                                 onCloseDrawer()
@@ -244,7 +260,9 @@ fun ChannelDrawer(
                             ),
                             cursorBrush = SolidColor(OneUiTheme.colors.accent),
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .onFocusChanged { isSearchFocused = it.isFocused },
                             decorationBox = { innerTextField ->
                                 if (uiState.searchQuery.isEmpty()) {
                                     Text(
@@ -363,18 +381,42 @@ fun ChannelDrawer(
                         textAlign = TextAlign.Start,
                         modifier = Modifier.weight(1f)
                     )
-                    Box(
-                        modifier = Modifier
-                            .clip(OneUiShapes.pill)
-                            .background(OneUiTheme.colors.surfacePill)
-                            .clickable { onCloseDrawer() }
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
+                    if (onOpenSettings != null) {
+                        TvFocusableBox(
+                            onClick = {
+                                onCloseDrawer()
+                                onOpenSettings()
+                            },
+                            shape = OneUiShapes.pill,
+                            unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                            focusedBackgroundColor = OneUiTheme.colors.accent,
+                            focusedBorderColor = OneUiTheme.colors.accent,
+                            focusedBorderWidth = 1.5.dp
+                        ) { isFocused ->
+                            Text(
+                                text = "手机遥控 / 设置",
+                                color = if (isFocused) Color.White else OneUiTheme.colors.accent,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    TvFocusableBox(
+                        onClick = onCloseDrawer,
+                        shape = OneUiShapes.pill,
+                        unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                        focusedBackgroundColor = OneUiTheme.colors.accent,
+                        focusedBorderColor = OneUiTheme.colors.accent,
+                        focusedBorderWidth = 1.5.dp
+                    ) { isFocused ->
                         Text(
                             text = "关闭",
-                            color = OneUiTheme.colors.textSecondary,
+                            color = if (isFocused) Color.White else OneUiTheme.colors.textSecondary,
                             fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
                 }

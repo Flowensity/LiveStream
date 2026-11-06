@@ -47,6 +47,10 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         dataStore.setBootStartupEnabled(enabled)
     }
 
+    override suspend fun setVideoAspectRatio(ratio: com.livestream.core.model.VideoAspectRatio) {
+        dataStore.setVideoAspectRatio(ratio)
+    }
+
     override val customPlaylistSources: Flow<List<com.livestream.core.model.CustomPlaylistSource>> =
         dataStore.customPlaylistSources
 

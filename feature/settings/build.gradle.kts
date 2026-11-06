@@ -38,6 +38,7 @@ dependencies {
     implementation(project(":core:datastore"))
     implementation(project(":core:network"))
     implementation(project(":domain:channel"))
+    implementation(project(":playback:playback-api"))
     implementation(project(":source:source-custom"))
 
     implementation(libs.androidx.core.ktx)

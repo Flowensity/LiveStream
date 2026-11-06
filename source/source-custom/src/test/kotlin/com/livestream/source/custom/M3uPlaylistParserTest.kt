@@ -38,12 +38,15 @@ class M3uPlaylistParserTest {
 
         val src1 = parsed.sources[0]
         assertEquals(StreamProtocol.HLS, src1.protocol)
+        assertEquals("https://live.example.com/cctv1.m3u8", src1.url)
 
         val src2 = parsed.sources[1]
         assertEquals(StreamProtocol.DASH, src2.protocol)
+        assertEquals("https://live.example.com/cctv2.mpd", src2.url)
 
         val src3 = parsed.sources[2]
         assertEquals(StreamProtocol.PROGRESSIVE_HTTP, src3.protocol)
+        assertEquals("https://live.example.com/local.mp4", src3.url)
     }
 
     @Test
@@ -62,5 +65,18 @@ class M3uPlaylistParserTest {
 
         assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("https://live.cctv.cn/live.m3u8"))
         assertTrue(M3uPlaylistParser.isSafeAndValidStreamUrl("http://stream.example.com/dash/channel.mpd"))
+    }
+
+    @Test
+    fun `test x-tvg-url header extraction`() {
+        val m3uWithEpg = """
+            #EXTM3U x-tvg-url="https://epg.example.com/xmltv.xml.gz"
+            #EXTINF:-1 tvg-id="cctv1" group-title="央视",CCTV-1 综合
+            https://live.example.com/cctv1.m3u8
+        """.trimIndent()
+
+        val parsed = M3uPlaylistParser.parse(m3uWithEpg)
+        assertEquals("https://epg.example.com/xmltv.xml.gz", parsed.epgUrl)
+        assertEquals(1, parsed.channels.size)
     }
 }

@@ -19,4 +19,9 @@ interface EpgRepository {
     suspend fun deleteExpiredPrograms(beforeTimestamp: Long)
 
     suspend fun refreshEpgForChannel(channelId: String, channelName: String)
+
+    suspend fun importXmltvFromUrl(
+        epgUrl: String,
+        channels: List<com.livestream.core.model.Channel>
+    ): Result<Int> = Result.success(0)
 }

@@ -5,10 +5,12 @@ import com.livestream.core.model.Channel
 import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.TvKeyMappingScheme
+import com.livestream.core.model.VideoAspectRatio
 
 data class SettingsUiState(
     val isHardwareDecodePreferred: Boolean = true,
     val isSurfaceViewPreferred: Boolean = true,
+    val aspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL,
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -18,6 +20,7 @@ data class SettingsUiState(
     val isSourceManagementOpen: Boolean = false,
     val importText: String = "",
     val isImporting: Boolean = false,
+    val refreshingSourceId: String? = null,
     val importSuccessCount: Int? = null,
     val importError: String? = null,
     val localServerUrl: String? = null,

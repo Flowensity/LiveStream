@@ -32,4 +32,9 @@ interface PlaybackEngine {
     fun attachSurface(surfaceView: Any?)
 
     fun detachSurface()
+
+    /**
+     * 动态设置是否优先启用硬件加速解码（false 时优先软件解码器并支持回退）
+     */
+    fun setHardwareDecodePreferred(preferred: Boolean) {}
 }

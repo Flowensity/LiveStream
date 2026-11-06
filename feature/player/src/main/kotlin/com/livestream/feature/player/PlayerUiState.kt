@@ -5,6 +5,7 @@ import com.livestream.core.model.EpgProgram
 import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackStatus
+import com.livestream.core.model.VideoAspectRatio
 import com.livestream.playback.api.model.PlaybackMetrics
 
 data class PlayerUiState(
@@ -15,6 +16,9 @@ data class PlayerUiState(
     val activeSource: LiveSource? = null,
     val activeSourceIndex: Int = 0,
     val totalSources: Int = 1,
+    val availableSources: List<LiveSource> = emptyList(),
+    val sourceLatenciesMs: Map<String, Long> = emptyMap(),
+    val aspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL,
     val metrics: PlaybackMetrics = PlaybackMetrics(),
     val error: PlaybackErrorInfo? = null,
     val isOsdVisible: Boolean = true,

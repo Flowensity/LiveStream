@@ -12,7 +12,8 @@ import java.util.UUID
 data class ParsedPlaylist(
     val categories: List<ChannelCategory>,
     val channels: List<Channel>,
-    val sources: List<LiveSource>
+    val sources: List<LiveSource>,
+    val epgUrl: String? = null
 )
 
 object M3uPlaylistParser {
@@ -21,6 +22,7 @@ object M3uPlaylistParser {
     private val TVG_ID_REGEX = Regex("""tvg-id="([^"]*)"""")
     private val TVG_LOGO_REGEX = Regex("""tvg-logo="([^"]*)"""")
     private val TVG_NAME_REGEX = Regex("""tvg-name="([^"]*)"""")
+    private val EPG_URL_REGEX = Regex("""(?:x-tvg-url|url-tvg)="([^"]+)"""", RegexOption.IGNORE_CASE)
 
     /**
      * 解析用户导入的 M3U 播放列表内容
@@ -31,6 +33,7 @@ object M3uPlaylistParser {
         val channels = mutableListOf<Channel>()
         val sources = mutableListOf<LiveSource>()
         val categoriesMap = mutableMapOf<String, ChannelCategory>()
+        var detectedEpgUrl: String? = null
 
         var currentExtInf: String? = null
         var channelIndex = 1
@@ -39,7 +42,14 @@ object M3uPlaylistParser {
             val trimmed = line.trim()
             if (trimmed.isEmpty()) continue
 
-            if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
+            if (trimmed.startsWith("#EXTM3U", ignoreCase = true) && detectedEpgUrl == null) {
+                val rawUrls = EPG_URL_REGEX.find(trimmed)?.groupValues?.get(1)
+                if (!rawUrls.isNullOrBlank()) {
+                    detectedEpgUrl = rawUrls.split(",")
+                        .map { it.trim() }
+                        .firstOrNull { isSafeAndValidStreamUrl(it) }
+                }
+            } else if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
                 currentExtInf = trimmed
             } else if (!trimmed.startsWith("#") && currentExtInf != null) {
                 val streamUrl = trimmed
@@ -86,7 +96,8 @@ object M3uPlaylistParser {
                         protocol = protocol,
                         adapterProviderId = "custom_user_source",
                         priority = 10,
-                        healthStatus = SourceHealthStatus.UNKNOWN
+                        healthStatus = SourceHealthStatus.UNKNOWN,
+                        url = streamUrl
                     )
 
                     channels.add(channel)
@@ -100,7 +111,8 @@ object M3uPlaylistParser {
         return ParsedPlaylist(
             categories = categoriesMap.values.toList(),
             channels = channels,
-            sources = sources
+            sources = sources,
+            epgUrl = detectedEpgUrl
         )
     }
 

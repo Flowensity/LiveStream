@@ -38,5 +38,6 @@ data class LiveSource(
     val healthStatus: SourceHealthStatus = SourceHealthStatus.UNKNOWN,
     val lastCheckedTimestamp: Long = 0L,
     val headersProfileId: String? = null,
-    val drmProfileId: String? = null
+    val drmProfileId: String? = null,
+    val url: String = ""
 )

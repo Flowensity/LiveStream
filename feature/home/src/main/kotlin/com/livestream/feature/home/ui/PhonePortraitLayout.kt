@@ -53,6 +53,7 @@ import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
+import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
@@ -80,7 +81,7 @@ fun PhonePortraitLayout(
     playerUiState: PlayerUiState,
     channelUiState: ChannelUiState,
     settingsUiState: SettingsUiState,
-    onSurfaceAttached: (android.view.SurfaceView) -> Unit,
+    onSurfaceAttached: (android.view.View) -> Unit,
     onSurfaceDetached: () -> Unit,
     onToggleOsd: () -> Unit,
     onRetry: () -> Unit,
@@ -106,6 +107,10 @@ fun PhonePortraitLayout(
     onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onDeleteSingleCustomChannel: (String) -> Unit = {},
     onClearAllCustomSources: () -> Unit = {},
+    onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
+    onCycleAspectRatio: () -> Unit = {},
+    onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
+    onRefreshAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -143,6 +148,7 @@ fun PhonePortraitLayout(
                     WebPlaybackContainer(
                         controller = webPlaybackController,
                         url = webUrl,
+                        aspectRatio = settingsUiState.aspectRatio,
                         modifier = Modifier.fillMaxSize(),
                         onContainerClick = onToggleOsd
                     )
@@ -150,6 +156,10 @@ fun PhonePortraitLayout(
                     LiveVideoSurface(
                         onSurfaceAttached = onSurfaceAttached,
                         onSurfaceDetached = onSurfaceDetached,
+                        isSurfaceViewPreferred = settingsUiState.isSurfaceViewPreferred,
+                        aspectRatio = settingsUiState.aspectRatio,
+                        videoWidth = playerUiState.metrics.videoWidth,
+                        videoHeight = playerUiState.metrics.videoHeight,
                         modifier = Modifier
                             .fillMaxSize()
                             .clickable(
@@ -164,7 +174,9 @@ fun PhonePortraitLayout(
                     uiState = playerUiState,
                     onRetry = onRetry,
                     onSwitchSource = onSwitchSource,
-                    onOpenEpgSchedule = onToggleEpgSheet
+                    onOpenEpgSchedule = onToggleEpgSheet,
+                    aspectRatio = settingsUiState.aspectRatio,
+                    onCycleAspectRatio = onCycleAspectRatio
                 )
 
                 // 右上角全屏胶囊药丸按钮 (点击画面唤出 OSD 出现，无任何图标)
@@ -259,7 +271,8 @@ fun PhonePortraitLayout(
                             onThemeModeSelected = onThemeModeSelected,
                             onToggleHardwareDecode = onToggleHardwareDecode,
                             onToggleSurfaceView = onToggleSurfaceView,
-                            onToggleBootStartup = onToggleBootStartup
+                            onToggleBootStartup = onToggleBootStartup,
+                            onAspectRatioSelected = onAspectRatioSelected
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -461,15 +474,25 @@ fun PhonePortraitLayout(
             onCloseSourceManagement = onCloseSourceManagement,
             onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,
             onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
-            onClearAllCustomSources = onClearAllCustomSources
+            onClearAllCustomSources = onClearAllCustomSources,
+            onAspectRatioSelected = onAspectRatioSelected,
+            onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
+            onRefreshAllCustomSources = onRefreshAllCustomSources
         )
 
-        // EPG 节目单排期弹窗
+        // 综合播放菜单弹窗（集成信号源切换、画面比例与今日节目单）
         EpgScheduleDialog(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
-            onDismiss = onHideEpgSheet
+            onDismiss = onHideEpgSheet,
+            aspectRatio = settingsUiState.aspectRatio,
+            onAspectRatioSelected = onAspectRatioSelected,
+            activeSourceIndex = playerUiState.activeSourceIndex,
+            totalSources = playerUiState.totalSources,
+            availableSources = playerUiState.availableSources,
+            sourceLatenciesMs = playerUiState.sourceLatenciesMs,
+            onSwitchSource = onSwitchSource
         )
     }
 }
