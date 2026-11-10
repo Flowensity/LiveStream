@@ -380,25 +380,42 @@ class SettingsViewModel internal constructor(
             val matchIndex = ChannelMatchIndex(existingChannels)
             val sourcesByChannelId = parsed.sources.groupBy { it.channelId }
             val matchedSources = mutableListOf<LiveSource>()
+            val unmatchedChannels = mutableListOf<Channel>()
+            val unmatchedSources = mutableListOf<LiveSource>()
+
             for (parsedCh in parsed.channels) {
                 val matched = matchIndex.match(parsedCh.name)
+                val chSources = sourcesByChannelId[parsedCh.id].orEmpty()
                 if (matched != null) {
-                    val chSources = sourcesByChannelId[parsedCh.id].orEmpty()
                     chSources.forEachIndexed { idx, src ->
+                        val lineLabel = if (src.name.contains("(")) {
+                            "网络线路 ${idx + 1} (" + src.name.substringAfter("(")
+                        } else {
+                            "网络线路 ${idx + 1}"
+                        }
+                        val resolutionBonus = (src.priority - 10).coerceAtLeast(0)
                         matchedSources.add(
                             src.copy(
-                                id = "matched_${matched.id}_${UUID.nameUUIDFromBytes("${src.id}_${matched.id}".toByteArray())}",
+                                id = "matched_${matched.id}_${UUID.nameUUIDFromBytes("${src.url}_${matched.id}".toByteArray())}",
                                 channelId = matched.id,
-                                name = "网络线路 ${idx + 1}",
-                                priority = 50
+                                name = lineLabel,
+                                priority = 50 + resolutionBonus
                             )
                         )
                     }
+                } else {
+                    unmatchedChannels.add(parsedCh)
+                    unmatchedSources.addAll(chSources)
                 }
             }
 
-            channelRepository.saveChannels(parsed.channels)
-            channelRepository.saveSources(parsed.sources + matchedSources)
+            if (unmatchedChannels.isNotEmpty()) {
+                channelRepository.saveChannels(unmatchedChannels)
+            }
+            val allSourcesToSave = unmatchedSources + matchedSources
+            if (allSourcesToSave.isNotEmpty()) {
+                channelRepository.saveSources(allSourcesToSave)
+            }
 
             val sourceTitle = existingSourceToReplace?.name ?: when {
                 downloadUrl.startsWith("http") -> {
@@ -413,7 +430,7 @@ class SettingsViewModel internal constructor(
                 name = sourceTitle,
                 url = if (downloadUrl.startsWith("http")) downloadUrl else existingSourceToReplace?.url.orEmpty(),
                 channelCount = parsed.channels.size,
-                channelIds = parsed.channels.map { it.id },
+                channelIds = unmatchedChannels.map { it.id },
                 matchedSourceIds = matchedSources.map { it.id },
                 timestamp = System.currentTimeMillis(),
                 epgUrl = effectiveEpgUrl

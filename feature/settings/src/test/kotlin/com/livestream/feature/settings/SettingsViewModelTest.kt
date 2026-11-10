@@ -138,7 +138,9 @@ class SettingsViewModelTest {
         """.trimIndent()
 
         val capturedSources = mutableListOf<List<com.livestream.core.model.LiveSource>>()
+        val capturedChannels = mutableListOf<List<com.livestream.core.model.Channel>>()
         coEvery { channelRepository.saveSources(capture(capturedSources)) } returns Unit
+        coEvery { channelRepository.saveChannels(capture(capturedChannels)) } returns Unit
 
         viewModel.onImportTextChanged(validM3u)
         viewModel.importM3uContent()
@@ -147,8 +149,57 @@ class SettingsViewModelTest {
         assertEquals(1, viewModel.uiState.value.importSuccessCount)
         assertTrue(capturedSources.isNotEmpty())
         val saved = capturedSources.first()
-        // There should be the parsed source and the matched source attached to cctv_preset_1
-        assertTrue(saved.any { it.channelId == "cctv_preset_1" && it.name == "网络线路 1" })
+        // There should be the matched source attached to cctv_preset_1
+        assertTrue(saved.any { it.channelId == "cctv_preset_1" && it.name.startsWith("网络线路") })
+        // Scheme A: Since all channels matched preset, no duplicate custom channel should be saved
+        assertTrue(capturedChannels.isEmpty() || capturedChannels.all { it.isEmpty() })
+    }
+
+    @Test
+    fun `importM3uContent with mixed channels saves unmatched as custom and matched as sources only`() = runTest(testDispatcher) {
+        val presetChannels = listOf(
+            com.livestream.core.model.Channel(
+                id = "cctv_preset_1",
+                name = "CCTV-1 综合",
+                channelNumber = 1,
+                categoryId = "cctv"
+            )
+        )
+        coEvery { channelRepository.getAllChannelsSync() } returns presetChannels
+
+        val mixedM3u = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="cctv1" group-title="央视",CCTV-1 综合 [4K]
+            http://example.com/live/cctv1_4k.m3u8
+            #EXTINF:-1 group-title="国际频道",HBO HD
+            http://example.com/live/hbo.m3u8
+        """.trimIndent()
+
+        val capturedSources = mutableListOf<List<com.livestream.core.model.LiveSource>>()
+        val capturedChannels = mutableListOf<List<com.livestream.core.model.Channel>>()
+        coEvery { channelRepository.saveSources(capture(capturedSources)) } returns Unit
+        coEvery { channelRepository.saveChannels(capture(capturedChannels)) } returns Unit
+
+        viewModel.onImportTextChanged(mixedM3u)
+        viewModel.importM3uContent()
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.importSuccessCount)
+        assertTrue(capturedChannels.isNotEmpty())
+        val savedChannels = capturedChannels.flatten()
+        // Only HBO should be saved as a new custom channel
+        assertEquals(1, savedChannels.size)
+        assertEquals("HBO", savedChannels[0].name)
+
+        val savedSources = capturedSources.first()
+        // CCTV-1 4K line should be attached to cctv_preset_1 with 4K tag and priority
+        val matchedCctvSource = savedSources.first { it.channelId == "cctv_preset_1" }
+        assertTrue(matchedCctvSource.name.contains("4K"))
+        assertTrue(matchedCctvSource.priority >= 90) // 50 base + 40 4k
+
+        // HBO source should be attached to HBO custom channel
+        val hboSource = savedSources.first { it.channelId == savedChannels[0].id }
+        assertEquals("http://example.com/live/hbo.m3u8", hboSource.url)
     }
 
     @Test
