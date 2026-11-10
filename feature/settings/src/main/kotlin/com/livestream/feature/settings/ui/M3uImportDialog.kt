@@ -177,7 +177,7 @@ internal fun M3uImportDialog(
 
                 // 2. M3U 订阅链接或内容直接输入框
                 Text(
-                    text = "或粘贴链接 / M3U 文本：",
+                    text = if (isTv) "或粘贴链接 / M3U 文本：" else "粘贴订阅链接 / M3U 文本：",
                     color = OneUiTheme.colors.textSecondary,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(bottom = 4.dp)

@@ -178,6 +178,8 @@ class SettingsViewModelTest {
 
         nonTvVm.ensureLocalServerStarted()
         nonTvVm.openImportDialog()
+        nonTvVm.openSettings()
+        nonTvVm.toggleSettings()
         advanceUntilIdle()
 
         org.junit.Assert.assertNull(nonTvVm.uiState.value.localServerUrl)
