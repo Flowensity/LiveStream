@@ -79,4 +79,68 @@ class M3uPlaylistParserTest {
         assertEquals("https://epg.example.com/xmltv.xml.gz", parsed.epgUrl)
         assertEquals(1, parsed.channels.size)
     }
+
+    @Test
+    fun `test zero-regex single-pass attribute scanner extracts all EXTINF fields and supports Reader streaming`() {
+        val line = """#EXTINF:-1 tvg-id="cctv5plus" tvg-name="CCTV5+" tvg-logo="https://img.example.com/5p.png" group-title="央视体育",CCTV-5+ 体育赛事"""
+        val attrs = M3uPlaylistParser.extractExtInfAttributes(line)
+
+        assertEquals("cctv5plus", attrs.tvgId)
+        assertEquals("CCTV5+", attrs.tvgName)
+        assertEquals("https://img.example.com/5p.png", attrs.tvgLogo)
+        assertEquals("央视体育", attrs.groupTitle)
+        assertEquals("CCTV-5+ 体育赛事", attrs.channelName)
+
+        val streamed = M3uPlaylistParser.parse(java.io.StringReader(sampleM3u))
+        assertEquals(3, streamed.channels.size)
+    }
+
+    @Test
+    fun `test duplicate channels in same group are aggregated into single channel with multiple sources and quality tags`() {
+        val m3uWithDuplicates = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="cctv1" tvg-name="CCTV-1" tvg-logo="https://example.com/cctv1.png" group-title="央视频道",CCTV-1 综合 [4K 50fps]
+            https://live.example.com/cctv1_4k.m3u8
+            #EXTINF:-1 tvg-id="cctv1" tvg-name="CCTV-1" group-title="央视频道",CCTV-1 (1080P 电信)
+            https://live.example.com/cctv1_1080p_ct.m3u8
+            #EXTINF:-1 tvg-id="cctv1" tvg-name="CCTV-1" group-title="央视频道",CCTV-1 高清 (移动)
+            https://live.example.com/cctv1_hd_cm.m3u8
+            #EXTINF:-1 tvg-id="cctv2" group-title="央视频道",CCTV-2 财经
+            https://live.example.com/cctv2.m3u8
+        """.trimIndent()
+
+        val parsed = M3uPlaylistParser.parse(m3uWithDuplicates)
+        // 验证聚合后仅有 2 个频道（CCTV-1 与 CCTV-2），而不是 4 个重复条目
+        assertEquals(2, parsed.channels.size)
+
+        val cctv1 = parsed.channels[0]
+        assertEquals("cctv1", cctv1.epgSourceId)
+        val cctv1Sources = parsed.sources.filter { it.channelId == cctv1.id }
+        assertEquals(3, cctv1Sources.size)
+
+        // 验证 4K 线路权重最高，1080P 次之，720P/高清居后
+        val src4k = cctv1Sources.first { it.url.contains("4k") }
+        val src1080p = cctv1Sources.first { it.url.contains("1080p") }
+        val srcHd = cctv1Sources.first { it.url.contains("hd") }
+
+        assertTrue("4K priority (${src4k.priority}) should be > 1080P (${src1080p.priority})", src4k.priority > src1080p.priority)
+        assertTrue("1080P priority (${src1080p.priority}) should be >= HD (${srcHd.priority})", src1080p.priority >= srcHd.priority)
+        assertTrue("4K source name should contain tag: ${src4k.name}", src4k.name.contains("4K"))
+    }
+
+    @Test
+    fun `test duplicate stream URLs for same channel are deduplicated`() {
+        val m3uWithDuplicateUrls = """
+            #EXTM3U
+            #EXTINF:-1 tvg-name="湖南卫视" group-title="卫视",湖南卫视
+            https://live.example.com/hunan.m3u8
+            #EXTINF:-1 tvg-name="湖南卫视" group-title="卫视",湖南卫视 [高清]
+            https://live.example.com/hunan.m3u8
+        """.trimIndent()
+
+        val parsed = M3uPlaylistParser.parse(m3uWithDuplicateUrls)
+        assertEquals(1, parsed.channels.size)
+        assertEquals(1, parsed.sources.size)
+        assertEquals("https://live.example.com/hunan.m3u8", parsed.sources[0].url)
+    }
 }
