@@ -63,7 +63,6 @@ fun SettingsDialog(
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
     onThemeModeSelected: (ThemeMode) -> Unit = {},
-    onToggleBootStartup: (Boolean) -> Unit = {},
     onOpenSourceManagement: () -> Unit = {},
     onCloseSourceManagement: () -> Unit = {},
     onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
@@ -144,7 +143,6 @@ fun SettingsDialog(
                 onThemeModeSelected = onThemeModeSelected,
                 onToggleHardwareDecode = onToggleHardwareDecode,
                 onToggleSurfaceView = onToggleSurfaceView,
-                onToggleBootStartup = onToggleBootStartup,
                 onAspectRatioSelected = onAspectRatioSelected,
                 onEnlargeQrCode = { isQrEnlarged = true }
             )
@@ -197,7 +195,6 @@ private fun SettingsDrawerPanel(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onToggleHardwareDecode: (Boolean) -> Unit,
     onToggleSurfaceView: (Boolean) -> Unit,
-    onToggleBootStartup: (Boolean) -> Unit,
     onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
     onEnlargeQrCode: () -> Unit = {}
 ) {
@@ -272,7 +269,6 @@ private fun SettingsDrawerPanel(
                     onThemeModeSelected = onThemeModeSelected,
                     onToggleHardwareDecode = onToggleHardwareDecode,
                     onToggleSurfaceView = onToggleSurfaceView,
-                    onToggleBootStartup = onToggleBootStartup,
                     firstFocusRequester = firstFocusRequester,
                     onAspectRatioSelected = onAspectRatioSelected,
                     onEnlargeQrCode = onEnlargeQrCode

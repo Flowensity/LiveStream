@@ -47,7 +47,6 @@ fun SettingsContent(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onToggleHardwareDecode: (Boolean) -> Unit,
     onToggleSurfaceView: (Boolean) -> Unit,
-    onToggleBootStartup: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     firstFocusRequester: FocusRequester? = null,
     onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
@@ -324,17 +323,6 @@ fun SettingsContent(
                 subtitle = "专用硬件视频图层，关闭则使用 TextureView 防穿透",
                 checked = uiState.isSurfaceViewPreferred,
                 onCheckedChange = onToggleSurfaceView
-            )
-        }
-
-        // 系统设置卡片（开机自启动）
-        SettingsSectionTitle("系统设置")
-        OneUiGroupCard {
-            SettingToggleRow(
-                title = "开机自启动",
-                subtitle = "设备开机后自动拉起直播并播放",
-                checked = uiState.isBootStartupEnabled,
-                onCheckedChange = onToggleBootStartup
             )
         }
     }

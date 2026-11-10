@@ -49,6 +49,5 @@ data class UserPreferences(
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val isBootStartupEnabled: Boolean = false,
     val aspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL
 )

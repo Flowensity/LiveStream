@@ -101,7 +101,6 @@ fun PhonePortraitLayout(
     onToggleEpgSheet: () -> Unit = {},
     onHideEpgSheet: () -> Unit = {},
     onThemeModeSelected: (ThemeMode) -> Unit = {},
-    onToggleBootStartup: (Boolean) -> Unit = {},
     onOpenSourceManagement: () -> Unit = {},
     onCloseSourceManagement: () -> Unit = {},
     onDeleteCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
@@ -271,7 +270,6 @@ fun PhonePortraitLayout(
                             onThemeModeSelected = onThemeModeSelected,
                             onToggleHardwareDecode = onToggleHardwareDecode,
                             onToggleSurfaceView = onToggleSurfaceView,
-                            onToggleBootStartup = onToggleBootStartup,
                             onAspectRatioSelected = onAspectRatioSelected
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -469,7 +467,6 @@ fun PhonePortraitLayout(
             onImportTextChanged = onImportTextChanged,
             onConfirmImport = onConfirmImport,
             onThemeModeSelected = onThemeModeSelected,
-            onToggleBootStartup = onToggleBootStartup,
             onOpenSourceManagement = onOpenSourceManagement,
             onCloseSourceManagement = onCloseSourceManagement,
             onDeleteCustomPlaylistSource = onDeleteCustomPlaylistSource,

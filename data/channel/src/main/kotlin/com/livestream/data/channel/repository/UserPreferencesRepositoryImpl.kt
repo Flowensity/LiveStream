@@ -43,10 +43,6 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         dataStore.setThemeMode(mode)
     }
 
-    override suspend fun setBootStartupEnabled(enabled: Boolean) {
-        dataStore.setBootStartupEnabled(enabled)
-    }
-
     override suspend fun setVideoAspectRatio(ratio: com.livestream.core.model.VideoAspectRatio) {
         dataStore.setVideoAspectRatio(ratio)
     }

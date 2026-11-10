@@ -32,7 +32,6 @@ class UserPreferencesDataStore @Inject constructor(
         val SWITCH_CHANNEL_TIMEOUT_MS = longPreferencesKey("switch_channel_timeout_ms")
         val TV_KEY_MAPPING_SCHEME = stringPreferencesKey("tv_key_mapping_scheme")
         val THEME_MODE = stringPreferencesKey("theme_mode")
-        val BOOT_STARTUP_ENABLED = booleanPreferencesKey("boot_startup_enabled")
         val VIDEO_ASPECT_RATIO = stringPreferencesKey("video_aspect_ratio")
         val CUSTOM_PLAYLIST_SOURCES = stringPreferencesKey("custom_playlist_sources")
     }
@@ -81,7 +80,6 @@ class UserPreferencesDataStore @Inject constructor(
                 com.livestream.core.model.ThemeMode.LIGHT.name -> com.livestream.core.model.ThemeMode.LIGHT
                 else -> com.livestream.core.model.ThemeMode.SYSTEM
             }
-            val bootStartup = preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] ?: false
             val aspectRatioStr = preferences[PreferencesKeys.VIDEO_ASPECT_RATIO]
             val aspectRatio = com.livestream.core.model.VideoAspectRatio.entries.find {
                 it.name == aspectRatioStr
@@ -95,7 +93,6 @@ class UserPreferencesDataStore @Inject constructor(
                 channelSwitchTimeoutMs = timeout,
                 tvKeyMappingScheme = mappingScheme,
                 themeMode = themeMode,
-                isBootStartupEnabled = bootStartup,
                 aspectRatio = aspectRatio
             )
         }
@@ -139,12 +136,6 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun setThemeMode(mode: com.livestream.core.model.ThemeMode) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_MODE] = mode.name
-        }
-    }
-
-    suspend fun setBootStartupEnabled(enabled: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BOOT_STARTUP_ENABLED] = enabled
         }
     }
 

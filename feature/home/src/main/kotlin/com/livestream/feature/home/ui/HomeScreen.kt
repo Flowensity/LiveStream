@@ -7,13 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.livestream.core.ui.device.DeviceType
 import com.livestream.core.ui.device.rememberDeviceType
 import com.livestream.core.ui.theme.AppBackground
@@ -42,9 +42,9 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     isInPipMode: Boolean = false
 ) {
-    val playerUiState by playerViewModel.uiState.collectAsState()
-    val channelUiState by channelViewModel.uiState.collectAsState()
-    val settingsUiState by settingsViewModel.uiState.collectAsState()
+    val playerUiState by playerViewModel.uiState.collectAsStateWithLifecycle()
+    val channelUiState by channelViewModel.uiState.collectAsStateWithLifecycle()
+    val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
     val deviceType = rememberDeviceType()
     val activity = LocalContext.current as? Activity
@@ -136,7 +136,6 @@ fun HomeScreen(
                     onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                     onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                     onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                     onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
                     onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
                     onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
@@ -180,7 +179,6 @@ fun HomeScreen(
                     onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                     onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                     onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                     onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
                     onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
                     onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
@@ -224,7 +222,6 @@ fun HomeScreen(
                     onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                     onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                     onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                     onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
                     onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
                     onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },
@@ -284,7 +281,6 @@ fun HomeScreen(
                     onToggleEpgSheet = { playerViewModel.toggleEpgSheet() },
                     onHideEpgSheet = { playerViewModel.hideEpgSheet() },
                     onThemeModeSelected = { settingsViewModel.setThemeMode(it) },
-                    onToggleBootStartup = { settingsViewModel.setBootStartupEnabled(it) },
                     onOpenSourceManagement = { settingsViewModel.openSourceManagement() },
                     onCloseSourceManagement = { settingsViewModel.closeSourceManagement() },
                     onDeleteCustomPlaylistSource = { settingsViewModel.deleteCustomPlaylistSource(it) },

@@ -76,8 +76,7 @@ class SettingsViewModel @Inject constructor(
                         aspectRatio = prefs.aspectRatio,
                         channelSwitchTimeoutMs = prefs.channelSwitchTimeoutMs,
                         tvKeyMappingScheme = prefs.tvKeyMappingScheme,
-                        themeMode = prefs.themeMode,
-                        isBootStartupEnabled = prefs.isBootStartupEnabled
+                        themeMode = prefs.themeMode
                     )
                 }
             }
@@ -176,12 +175,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setBootStartupEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            userPreferencesRepository.setBootStartupEnabled(enabled)
-        }
-    }
-
     fun openImportDialog() {
         ensureLocalServerStarted()
         _uiState.update {
@@ -276,23 +269,25 @@ class SettingsViewModel @Inject constructor(
             if (downloadUrl.contains("github.com/") && downloadUrl.contains("/blob/")) {
                 downloadUrl = downloadUrl.replace("github.com/", "raw.githubusercontent.com/").replace("/blob/", "/")
             }
-            val content = if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
+            val parsed = if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
                 val req = Request.Builder().url(downloadUrl).build()
                 okHttpClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
                         return@withContext Result.failure(Exception("下载 M3U 订阅失败: HTTP ${resp.code}"))
                     }
-                    resp.body?.string() ?: ""
+                    val body = resp.body
+                        ?: return@withContext Result.failure(Exception("导入内容不能为空"))
+                    body.charStream().use { reader ->
+                        M3uPlaylistParser.parse(reader)
+                    }
                 }
             } else {
-                trimmed
+                if (trimmed.isBlank()) {
+                    return@withContext Result.failure(Exception("导入内容不能为空"))
+                }
+                M3uPlaylistParser.parse(trimmed)
             }
 
-            if (content.isBlank()) {
-                return@withContext Result.failure(Exception("导入内容不能为空"))
-            }
-
-            val parsed = M3uPlaylistParser.parse(content)
             if (parsed.channels.isEmpty()) {
                 return@withContext Result.failure(Exception("未能从播放列表中解析出合法频道或所有源均被安全策略拦截"))
             }
@@ -312,11 +307,13 @@ class SettingsViewModel @Inject constructor(
             }
 
             val existingChannels = channelRepository.getAllChannelsSync()
+            val matchIndex = ChannelMatchIndex(existingChannels)
+            val sourcesByChannelId = parsed.sources.groupBy { it.channelId }
             val matchedSources = mutableListOf<LiveSource>()
             for (parsedCh in parsed.channels) {
-                val matched = matchPresetChannel(parsedCh.name, existingChannels)
+                val matched = matchIndex.match(parsedCh.name)
                 if (matched != null) {
-                    val chSources = parsed.sources.filter { it.channelId == parsedCh.id }
+                    val chSources = sourcesByChannelId[parsedCh.id].orEmpty()
                     chSources.forEachIndexed { idx, src ->
                         matchedSources.add(
                             src.copy(
@@ -449,53 +446,63 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun normalizeChannelName(raw: String): String {
-        return raw.uppercase(Locale.ROOT)
-            .replace(" ", "")
-            .replace("-", "")
-            .replace("_", "")
-            .replace("HD", "")
-            .replace("FHD", "")
-            .replace("4K", "")
-            .replace("8K", "")
-            .replace("超高清", "")
-            .replace("高清", "")
-            .replace("标清", "")
-            .replace("频道", "")
-            .trim()
-    }
+    /**
+     * 预计算哈希索引，将频道名称匹配从 O(N × M) 降至 O(1) 哈希查找
+     */
+    class ChannelMatchIndex(existingChannels: List<Channel>) {
+        private val exactMap = LinkedHashMap<String, Channel>(existingChannels.size)
+        private val cctvNumMap = LinkedHashMap<String, Channel>()
+        private val normalizedEntries = ArrayList<Pair<String, Channel>>(existingChannels.size)
 
-    private fun matchPresetChannel(name: String, existingChannels: List<Channel>): Channel? {
-        val normName = normalizeChannelName(name)
-        if (normName.isEmpty()) return null
-
-        // 1. Exact match on normalized
-        existingChannels.firstOrNull { normalizeChannelName(it.name) == normName }?.let { return it }
-
-        // 2. Special CCTV handling (e.g. CCTV1 matches CCTV1综合)
-        if (normName.startsWith("CCTV")) {
-            val numMatch = CCTV_NUM_REGEX.find(normName)
-            if (numMatch != null) {
-                val cctvNum = numMatch.groupValues[1]
-                existingChannels.firstOrNull {
-                    val existingNorm = normalizeChannelName(it.name)
-                    val exMatch = CCTV_NUM_REGEX.find(existingNorm)
-                    exMatch != null && exMatch.groupValues[1] == cctvNum
-                }?.let { return it }
+        init {
+            for (ch in existingChannels) {
+                val norm = normalizeChannelName(ch.name)
+                if (norm.isEmpty()) continue
+                exactMap.putIfAbsent(norm, ch)
+                normalizedEntries.add(norm to ch)
+                if (norm.startsWith("CCTV")) {
+                    val numMatch = CCTV_NUM_REGEX.find(norm)
+                    if (numMatch != null) {
+                        cctvNumMap.putIfAbsent(numMatch.groupValues[1], ch)
+                    }
+                }
             }
         }
 
-        // 3. Prefix / contains match (e.g. "湖南卫视" vs "湖南卫视-标清")
-        existingChannels.firstOrNull {
-            val exNorm = normalizeChannelName(it.name)
-            exNorm.isNotEmpty() && (normName.startsWith(exNorm) || exNorm.startsWith(normName))
-        }?.let { return it }
+        fun match(name: String): Channel? {
+            val normName = normalizeChannelName(name)
+            if (normName.isEmpty()) return null
 
-        return null
+            // 1. Exact match on normalized (O(1))
+            exactMap[normName]?.let { return it }
+
+            // 2. Special CCTV handling (O(1), e.g. CCTV1 matches CCTV1综合)
+            if (normName.startsWith("CCTV")) {
+                val numMatch = CCTV_NUM_REGEX.find(normName)
+                if (numMatch != null) {
+                    cctvNumMap[numMatch.groupValues[1]]?.let { return it }
+                }
+            }
+
+            // 3. Prefix match on pre-normalized entries (no repeated string replacement/regex)
+            for ((exNorm, channel) in normalizedEntries) {
+                if (normName.startsWith(exNorm) || exNorm.startsWith(normName)) {
+                    return channel
+                }
+            }
+
+            return null
+        }
     }
 
     companion object {
         private val CCTV_NUM_REGEX = Regex("""CCTV(\d+\+?)""")
+        private val NOISE_TOKEN_REGEX = Regex("""(?:FHD|HD|4K|8K|超高清|高清|标清|频道|[\s\-_])+""")
+
+        internal fun normalizeChannelName(raw: String): String {
+            if (raw.isBlank()) return ""
+            return NOISE_TOKEN_REGEX.replace(raw.uppercase(Locale.ROOT), "").trim()
+        }
     }
 
     override fun onCleared() {
