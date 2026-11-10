@@ -66,9 +66,8 @@ import java.util.Locale
  * 3. 今日完整 EPG 节目单排期与正在播出定位
  *
  * 手机横屏模式优化：
- * 采用左右双栏布局，左侧承载信号源与画面比例控制卡片，右侧独占纵向全高展示今日节目单，
- * 彻底解决横屏下高度局促导致节目单被压缩无法浏览的问题。针对极窄横屏（如分屏多任务）
- * 提供平滑降级保护。
+ * 采用左右严格对称的双栏布局，左侧统一为「播放控制」卡片，右侧统一为「今日节目单」卡片，
+ * 双方拥有高度一致的顶部标题栏与满高统一卡片容器，彻底消除左右高度不一致与单侧突兀偏高的问题。
  */
 @Composable
 fun EpgScheduleDialog(
@@ -94,7 +93,7 @@ fun EpgScheduleDialog(
         deviceType == DeviceType.PHONE_LANDSCAPE ||
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     )
-    // 宽屏横屏下启用双栏；若处于分屏多任务等极窄横屏 (sw < 520dp)，平滑回退单列避免右栏受压
+    // 宽屏横屏下启用对称双栏；若处于分屏多任务等极窄横屏 (sw < 520dp)，平滑回退单列
     val canUseDualColumn = isLandscape && (configuration.screenWidthDp >= 520)
 
     val now = System.currentTimeMillis()
@@ -169,7 +168,7 @@ fun EpgScheduleDialog(
                     .padding(vertical = 12.dp, horizontal = 10.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // 1. 顶部标题栏：播放菜单 + 频道名 + 关闭胶囊
+                    // 1. 顶部主标题栏：播放菜单 + 频道名 + 关闭胶囊
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -217,50 +216,205 @@ fun EpgScheduleDialog(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     if (canUseDualColumn) {
-                        // 横屏双栏排版：左栏控制（信号源+画面比例），右栏节目单
+                        // 横屏双栏对称排版：两栏拥有严格对齐的顶部小标头与高度完全一致的卡片容器
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // 1. 左栏：播放控制
                             Column(
                                 modifier = Modifier
                                     .width(190.dp)
                                     .fillMaxHeight()
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                SourceSwitchCard(
-                                    currentSourceNum = currentSourceNum,
-                                    safeTotalSources = safeTotalSources,
-                                    activeSource = activeSource,
-                                    activeLatency = activeLatency,
-                                    onSwitchSource = onSwitchSource,
-                                    cardShape = cardShape,
-                                    focusRequester = if (isTv) firstFocusRequester else null,
-                                    isLandscape = true
+                                Text(
+                                    text = "播放控制",
+                                    color = OneUiTheme.colors.textSecondary,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
                                 )
 
-                                AspectRatioCard(
-                                    aspectRatio = aspectRatio,
-                                    onAspectRatioSelected = onAspectRatioSelected,
-                                    cardShape = cardShape,
-                                    isTwoByTwoGrid = true
-                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
+                                        .background(OneUiTheme.colors.cardBackground, cardShape)
+                                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // 信号源切换区块
+                                    SourceSwitchSection(
+                                        currentSourceNum = currentSourceNum,
+                                        safeTotalSources = safeTotalSources,
+                                        activeSource = activeSource,
+                                        activeLatency = activeLatency,
+                                        onSwitchSource = onSwitchSource,
+                                        focusRequester = if (isTv) firstFocusRequester else null
+                                    )
+
+                                    // 纤细分割线
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .background(OneUiTheme.colors.borderSubtle.copy(alpha = 0.5f))
+                                    )
+
+                                    // 画面比例区块
+                                    AspectRatioSection(
+                                        aspectRatio = aspectRatio,
+                                        onAspectRatioSelected = onAspectRatioSelected
+                                    )
+                                }
                             }
 
-                            EpgProgramList(
-                                programs = programs,
-                                listState = listState,
-                                now = now,
-                                todayStr = todayStr,
-                                timeFormat = timeFormat,
-                                cardShape = cardShape,
+                            // 2. 右栏：今日节目单
+                            Column(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
-                            )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "今日节目单 ($todayStr)",
+                                        color = OneUiTheme.colors.textSecondary,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (programs.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "共 ${programs.size} 档",
+                                            color = OneUiTheme.colors.textMuted,
+                                            fontSize = 10.5.sp,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
+                                        .background(OneUiTheme.colors.cardBackground, cardShape)
+                                ) {
+                                    if (programs.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "正在获取最新节目排期...",
+                                                color = OneUiTheme.colors.textSecondary,
+                                                fontSize = 12.5.sp
+                                            )
+                                        }
+                                    } else {
+                                        LazyColumn(
+                                            state = listState,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentPadding = PaddingValues(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                                        ) {
+                                            itemsIndexed(programs, key = { _, it -> it.id }) { _, prog ->
+                                                val isCurrent = prog.startTimestamp <= now && prog.endTimestamp > now
+                                                val timeRange = "${timeFormat.format(Date(prog.startTimestamp))} - ${timeFormat.format(Date(prog.endTimestamp))}"
+                                                val itemShape = RoundedCornerShape(10.dp)
+
+                                                val itemBg = if (isCurrent) {
+                                                    OneUiTheme.colors.accentSoft
+                                                } else {
+                                                    OneUiTheme.colors.cardSecondary
+                                                }
+
+                                                TvFocusableBox(
+                                                    onClick = {},
+                                                    shape = itemShape,
+                                                    scaleOnFocus = 1.0f,
+                                                    unfocusedBackgroundColor = itemBg,
+                                                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                                    focusedBorderWidth = 1.5.dp,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .border(
+                                                            if (isCurrent) BorderStroke(1.5.dp, OneUiTheme.colors.accent)
+                                                            else BorderStroke(1.dp, OneUiTheme.colors.borderSubtle.copy(alpha = 0.5f)),
+                                                            itemShape
+                                                        )
+                                                ) { isFocused ->
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        ) {
+                                                            if (isCurrent) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(RoundedCornerShape(6.dp))
+                                                                        .background(OneUiTheme.colors.accent)
+                                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "正在播出",
+                                                                        color = Color.White,
+                                                                        fontSize = 9.5.sp,
+                                                                        fontWeight = FontWeight.Bold
+                                                                    )
+                                                                }
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                            }
+                                                            Text(
+                                                                text = prog.title,
+                                                                color = if (isCurrent || isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                                                fontSize = 12.5.sp,
+                                                                fontWeight = if (isCurrent || isFocused) FontWeight.Bold else FontWeight.Medium,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                modifier = Modifier.weight(1f, fill = false)
+                                                            )
+                                                        }
+
+                                                        Text(
+                                                            text = timeRange,
+                                                            color = if (isCurrent || isFocused) OneUiTheme.colors.accent.copy(alpha = 0.85f) else OneUiTheme.colors.textSecondary,
+                                                            fontSize = 10.5.sp,
+                                                            modifier = Modifier.padding(top = 2.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     } else {
                         // 竖屏与 TV 端经典垂直单列堆叠
@@ -271,8 +425,7 @@ fun EpgScheduleDialog(
                             activeLatency = activeLatency,
                             onSwitchSource = onSwitchSource,
                             cardShape = cardShape,
-                            focusRequester = if (isTv) firstFocusRequester else null,
-                            isLandscape = false
+                            focusRequester = if (isTv) firstFocusRequester else null
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -280,8 +433,7 @@ fun EpgScheduleDialog(
                         AspectRatioCard(
                             aspectRatio = aspectRatio,
                             onAspectRatioSelected = onAspectRatioSelected,
-                            cardShape = cardShape,
-                            isTwoByTwoGrid = false
+                            cardShape = cardShape
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -304,17 +456,17 @@ fun EpgScheduleDialog(
     }
 }
 
+/**
+ * 横屏双栏内嵌：信号源切换子区块
+ */
 @Composable
-private fun SourceSwitchCard(
+private fun SourceSwitchSection(
     currentSourceNum: Int,
     safeTotalSources: Int,
     activeSource: LiveSource?,
     activeLatency: Long?,
     onSwitchSource: () -> Unit,
-    cardShape: RoundedCornerShape,
-    focusRequester: FocusRequester?,
-    isLandscape: Boolean,
-    modifier: Modifier = Modifier
+    focusRequester: FocusRequester?
 ) {
     val sourceSubtitle = buildString {
         append(activeSource?.name ?: "默认主线路")
@@ -323,116 +475,72 @@ private fun SourceSwitchCard(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
-            .background(OneUiTheme.colors.cardBackground, cardShape)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-    ) {
-        if (isLandscape) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = "信号源切换 ($currentSourceNum/$safeTotalSources)",
+                text = "信号源切换",
                 color = OneUiTheme.colors.textPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = sourceSubtitle,
+                text = "$currentSourceNum/$safeTotalSources",
                 color = OneUiTheme.colors.accent,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 1.dp)
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            TvFocusableBox(
-                onClick = onSwitchSource,
-                shape = OneUiShapes.pill,
-                unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
-                focusedBackgroundColor = OneUiTheme.colors.accent,
-                focusedBorderColor = OneUiTheme.colors.accent,
-                focusedBorderWidth = 1.5.dp,
+        }
+        Text(
+            text = sourceSubtitle,
+            color = OneUiTheme.colors.accent,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 1.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        TvFocusableBox(
+            onClick = onSwitchSource,
+            shape = OneUiShapes.pill,
+            unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
+            focusedBackgroundColor = OneUiTheme.colors.accent,
+            focusedBorderColor = OneUiTheme.colors.accent,
+            focusedBorderWidth = 1.5.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        ) { isFocused ->
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            ) { isFocused ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (safeTotalSources > 1) "切换下一线路" else "重新连接线路",
-                        color = if (isFocused) Color.White else OneUiTheme.colors.accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text(
-                        text = "信号源切换 ($currentSourceNum/$safeTotalSources)",
-                        color = OneUiTheme.colors.textPrimary,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = sourceSubtitle,
-                        color = OneUiTheme.colors.accent,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 1.dp)
-                    )
-                }
-
-                TvFocusableBox(
-                    onClick = onSwitchSource,
-                    shape = OneUiShapes.pill,
-                    unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
-                    focusedBackgroundColor = OneUiTheme.colors.accent,
-                    focusedBorderColor = OneUiTheme.colors.accent,
-                    focusedBorderWidth = 1.5.dp,
-                    modifier = Modifier.then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                ) { isFocused ->
-                    Text(
-                        text = if (safeTotalSources > 1) "切换下一线路" else "重新连接线路",
-                        color = if (isFocused) Color.White else OneUiTheme.colors.accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
+                Text(
+                    text = if (safeTotalSources > 1) "切换下一线路" else "重新连接线路",
+                    color = if (isFocused) Color.White else OneUiTheme.colors.accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
+/**
+ * 横屏双栏内嵌：画面比例切换子区块
+ */
 @Composable
-private fun AspectRatioCard(
+private fun AspectRatioSection(
     aspectRatio: VideoAspectRatio,
-    onAspectRatioSelected: (VideoAspectRatio) -> Unit,
-    cardShape: RoundedCornerShape,
-    isTwoByTwoGrid: Boolean,
-    modifier: Modifier = Modifier
+    onAspectRatioSelected: (VideoAspectRatio) -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
-            .background(OneUiTheme.colors.cardBackground, cardShape)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -452,46 +560,154 @@ private fun AspectRatioCard(
             )
         }
 
-        if (isTwoByTwoGrid) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                VideoAspectRatio.entries.chunked(2).forEach { rowEntries ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        rowEntries.forEach { ratio ->
-                            AspectRatioButton(
-                                ratio = ratio,
-                                isSelected = aspectRatio == ratio,
-                                onSelect = { onAspectRatioSelected(ratio) },
-                                modifier = Modifier.weight(1f),
-                                shortLabel = false
-                            )
-                        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            VideoAspectRatio.entries.chunked(2).forEach { rowEntries ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    rowEntries.forEach { ratio ->
+                        AspectRatioButton(
+                            ratio = ratio,
+                            isSelected = aspectRatio == ratio,
+                            onSelect = { onAspectRatioSelected(ratio) },
+                            modifier = Modifier.weight(1f),
+                            shortLabel = false
+                        )
                     }
                 }
             }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                VideoAspectRatio.entries.forEach { ratio ->
-                    AspectRatioButton(
-                        ratio = ratio,
-                        isSelected = aspectRatio == ratio,
-                        onSelect = { onAspectRatioSelected(ratio) },
-                        modifier = Modifier.weight(1f),
-                        shortLabel = true
-                    )
-                }
+        }
+    }
+}
+
+/**
+ * 竖屏与 TV 独立卡片：信号源与线路切换卡片
+ */
+@Composable
+private fun SourceSwitchCard(
+    currentSourceNum: Int,
+    safeTotalSources: Int,
+    activeSource: LiveSource?,
+    activeLatency: Long?,
+    onSwitchSource: () -> Unit,
+    cardShape: RoundedCornerShape,
+    focusRequester: FocusRequester?,
+    modifier: Modifier = Modifier
+) {
+    val sourceSubtitle = buildString {
+        append(activeSource?.name ?: "默认主线路")
+        if (activeLatency != null && activeLatency > 0L) {
+            append(" · 延迟 ${activeLatency}ms")
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
+            .background(OneUiTheme.colors.cardBackground, cardShape)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                Text(
+                    text = "信号源切换 ($currentSourceNum/$safeTotalSources)",
+                    color = OneUiTheme.colors.textPrimary,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = sourceSubtitle,
+                    color = OneUiTheme.colors.accent,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 1.dp)
+                )
+            }
+
+            TvFocusableBox(
+                onClick = onSwitchSource,
+                shape = OneUiShapes.pill,
+                unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                focusedBackgroundColor = OneUiTheme.colors.accent,
+                focusedBorderColor = OneUiTheme.colors.accent,
+                focusedBorderWidth = 1.5.dp,
+                modifier = Modifier.then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            ) { isFocused ->
+                Text(
+                    text = if (safeTotalSources > 1) "切换下一线路" else "重新连接线路",
+                    color = if (isFocused) Color.White else OneUiTheme.colors.accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 竖屏与 TV 独立卡片：画面比例卡片
+ */
+@Composable
+private fun AspectRatioCard(
+    aspectRatio: VideoAspectRatio,
+    onAspectRatioSelected: (VideoAspectRatio) -> Unit,
+    cardShape: RoundedCornerShape,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
+            .background(OneUiTheme.colors.cardBackground, cardShape)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "画面比例",
+                color = OneUiTheme.colors.textPrimary,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = aspectRatio.label,
+                color = OneUiTheme.colors.accent,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            VideoAspectRatio.entries.forEach { ratio ->
+                AspectRatioButton(
+                    ratio = ratio,
+                    isSelected = aspectRatio == ratio,
+                    onSelect = { onAspectRatioSelected(ratio) },
+                    modifier = Modifier.weight(1f),
+                    shortLabel = true
+                )
             }
         }
     }
@@ -517,7 +733,7 @@ private fun AspectRatioButton(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 7.dp),
+                .padding(vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -532,6 +748,9 @@ private fun AspectRatioButton(
     }
 }
 
+/**
+ * 竖屏与 TV 列表：今日节目单列表
+ */
 @Composable
 private fun EpgProgramList(
     programs: List<EpgProgram>,
@@ -578,7 +797,7 @@ private fun EpgProgramList(
                     .fillMaxWidth()
                     .weight(1f)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
-                .background(OneUiTheme.colors.cardBackground, cardShape),
+                    .background(OneUiTheme.colors.cardBackground, cardShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
