@@ -8,3 +8,19 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
 }
+
+subprojects {
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            val stabilityFile = rootProject.file("compose_stability.conf")
+            if (stabilityFile.exists()) {
+                freeCompilerArgs = freeCompilerArgs + listOf(
+                    "-P",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:experimentalStrongSkipping=true",
+                    "-P",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=${stabilityFile.absolutePath}"
+                )
+            }
+        }
+    }
+}

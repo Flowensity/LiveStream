@@ -9,7 +9,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed interface ProbeResult {
-    data class Success(val latencyMs: Long, val statusCode: Int) : ProbeResult
+    data class Success(
+        val latencyMs: Long,
+        val statusCode: Int,
+        val videoWidth: Int? = null,
+        val videoHeight: Int? = null
+    ) : ProbeResult
     data class Failure(val reason: String, val throwable: Throwable? = null) : ProbeResult
 }
 
@@ -17,6 +22,10 @@ sealed interface ProbeResult {
 class NetworkProbe @Inject constructor(
     private val okHttpClient: OkHttpClient
 ) {
+    companion object {
+        private val HLS_RESOLUTION_REGEX = Regex("""RESOLUTION=(\d+)x(\d+)""", RegexOption.IGNORE_CASE)
+    }
+
     suspend fun probeUrl(url: String): ProbeResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val headRequest = Request.Builder()
@@ -30,12 +39,14 @@ class NetworkProbe @Inject constructor(
             val latency = System.currentTimeMillis() - start
             val code = headResponse.code
             val isSuccess = headResponse.isSuccessful || headResponse.isRedirect
+            headResponse.close()
 
             if (isSuccess) {
-                headResponse.close()
-                return@withContext ProbeResult.Success(latencyMs = latency, statusCode = code)
+                return@withContext ProbeResult.Success(
+                    latencyMs = latency,
+                    statusCode = code
+                )
             }
-            headResponse.close()
 
             // 针对禁用 HEAD 请求（返回 405 Method Not Allowed 或 403 Forbidden）的流媒体服务器，使用轻量 Range GET 兜底探测
             if (code == 405 || code == 403 || code == 400) {
@@ -50,7 +61,16 @@ class NetworkProbe @Inject constructor(
                     val getLatency = System.currentTimeMillis() - getStart
                     val getCode = getResponse.code
                     if (getResponse.isSuccessful || getResponse.isRedirect || getCode == 206) {
-                        return@withContext ProbeResult.Success(latencyMs = getLatency, statusCode = getCode)
+                        val bodyText = getResponse.body?.string().orEmpty()
+                        val resMatch = HLS_RESOLUTION_REGEX.find(bodyText)
+                        val realW = resMatch?.groupValues?.get(1)?.toIntOrNull()
+                        val realH = resMatch?.groupValues?.get(2)?.toIntOrNull()
+                        return@withContext ProbeResult.Success(
+                            latencyMs = getLatency,
+                            statusCode = getCode,
+                            videoWidth = realW,
+                            videoHeight = realH
+                        )
                     } else {
                         return@withContext ProbeResult.Failure("HTTP状态码异常: $getCode")
                     }

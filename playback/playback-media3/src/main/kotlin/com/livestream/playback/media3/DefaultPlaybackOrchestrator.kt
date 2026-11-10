@@ -76,6 +76,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var currentSourceIndex: Int = 0
     private var currentRetryCount: Int = 0
     private val sourceLatencyCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val sourceRealResolutionCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Int>>()
     private val prewarmedSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<LiveSource>>()
 
     // 缓冲卡死看门狗（超时自动换线或自愈）
@@ -92,23 +93,23 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         const val MAX_CONCURRENT_PROBES = 3
         const val PREWARM_STABILIZE_DELAY_MS = 1200L
 
-        internal fun inferResolutionWeight(source: LiveSource): Int {
-            val combined = "${source.name} ${source.url}".lowercase(java.util.Locale.ROOT)
-            return when {
-                combined.contains("8k") || combined.contains("4320p") -> 40
-                combined.contains("4k") || combined.contains("2160p") || combined.contains("超高清") || combined.contains("超清") -> 40
-                combined.contains("1080p") || combined.contains("1080i") || combined.contains("fhd") || combined.contains("全高清") -> 30
-                combined.contains("720p") || combined.contains("hd") || combined.contains("高清") -> 20
-                combined.contains("576p") || combined.contains("480p") || combined.contains("sd") || combined.contains("标清") -> 10
+        internal fun calculateQualityScore(
+            source: LiveSource,
+            latencyMs: Long?,
+            realResolution: Pair<Int, Int>?
+        ): Int {
+            // 真实物理分辨率评分：严禁轻信字符串命名，依据探针技术协议或解码器真实物理像素
+            val resBonus = when {
+                realResolution == null -> 0
+                realResolution.first >= 3840 || realResolution.second >= 2160 -> 400
+                realResolution.first >= 1920 || realResolution.second >= 1080 -> 300
+                realResolution.first >= 1280 || realResolution.second >= 720 -> 200
+                realResolution.first > 0 || realResolution.second > 0 -> 100
                 else -> 0
             }
-        }
+            val baseScore = 200 + resBonus + source.priority
 
-        internal fun calculateQualityScore(source: LiveSource, latencyMs: Long?): Int {
-            val inferredRes = inferResolutionWeight(source)
-            val resScore = if (inferredRes > 0) inferredRes * 10 else ((source.priority - 50).coerceAtLeast(0)) * 10
-            val baseScore = 200 + resScore + source.priority
-
+            // 测速时延惩罚：极速加载优先，过大延迟（>1500ms）降权避免卡顿
             val latencyPenalty = when {
                 latencyMs == null -> 0
                 latencyMs <= 500L -> 0
@@ -209,7 +210,21 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         // 监听实时性能指标
         orchestratorScope.launch {
             engine.playbackMetrics.collect { metrics ->
+                val currentSrc = _orchestratorState.value.currentSource
+                if (currentSrc != null && metrics.videoWidth > 0 && metrics.videoHeight > 0) {
+                    val prev = sourceRealResolutionCache[currentSrc.id]
+                    if (prev == null || prev.first != metrics.videoWidth || prev.second != metrics.videoHeight) {
+                        sourceRealResolutionCache[currentSrc.id] = metrics.videoWidth to metrics.videoHeight
+                        availableSources = sortSourcesByHealthAndLatency(availableSources)
+                        val activeIdx = availableSources.indexOfFirst { it.id == currentSrc.id }
+                        if (activeIdx >= 0) currentSourceIndex = activeIdx
+                    }
+                }
+
                 _orchestratorState.value = _orchestratorState.value.copy(
+                    availableSources = availableSources,
+                    currentSourceIndex = currentSourceIndex,
+                    sourceResolutions = sourceRealResolutionCache.toMap(),
                     metrics = _orchestratorState.value.metrics.copy(
                         bitrateBps = metrics.bitrateBps,
                         videoWidth = metrics.videoWidth,
@@ -312,9 +327,10 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                     com.livestream.core.model.SourceHealthStatus.UNAVAILABLE -> 0
                 }
             }.thenByDescending { src ->
-                // 综合清晰度（分辨率加权）与测速加载速度（网络时延）动态优选
+                // 综合真实物理分辨率（杜绝假画质文本虚标）与测速加载速度（网络时延）动态优选
                 val latency = sourceLatencyCache[src.id]
-                calculateQualityScore(src, latency)
+                val realRes = sourceRealResolutionCache[src.id]
+                calculateQualityScore(src, latency, realRes)
             }.thenBy { src ->
                 sourceLatencyCache[src.id] ?: Long.MAX_VALUE
             }.thenByDescending { src ->
@@ -346,6 +362,11 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                                 when (val result = adapter.checkAvailability(channel, src)) {
                                     is com.livestream.source.api.AvailabilityResult.Available -> {
                                         sourceLatencyCache[src.id] = result.latencyMs
+                                        val vw = result.videoWidth
+                                        val vh = result.videoHeight
+                                        if (vw != null && vh != null && vw > 0 && vh > 0) {
+                                            sourceRealResolutionCache[src.id] = vw to vh
+                                        }
                                         healthUpdates[src.id] = com.livestream.core.model.SourceHealthStatus.HEALTHY
                                         channelRepository.updateSourceHealth(
                                             src.id,
@@ -354,6 +375,11 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                                     }
                                     is com.livestream.source.api.AvailabilityResult.Degraded -> {
                                         sourceLatencyCache[src.id] = result.latencyMs
+                                        val vw = result.videoWidth
+                                        val vh = result.videoHeight
+                                        if (vw != null && vh != null && vw > 0 && vh > 0) {
+                                            sourceRealResolutionCache[src.id] = vw to vh
+                                        }
                                         healthUpdates[src.id] = com.livestream.core.model.SourceHealthStatus.DEGRADED
                                         channelRepository.updateSourceHealth(
                                             src.id,
@@ -388,7 +414,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 _orchestratorState.value = _orchestratorState.value.copy(
                     availableSources = availableSources,
                     currentSourceIndex = currentSourceIndex,
-                    sourceLatenciesMs = sourceLatencyCache.toMap()
+                    sourceLatenciesMs = sourceLatencyCache.toMap(),
+                    sourceResolutions = sourceRealResolutionCache.toMap()
                 )
             }
         }

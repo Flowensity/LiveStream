@@ -14,52 +14,43 @@
 
 ## 详细设计
 
-### 1. M3U 解析层同名聚合与线路标签提取 (`M3uPlaylistParser.kt`)
+### 1. M3U 解析层同名聚合与网络标签提取 (`M3uPlaylistParser.kt`)
 - **同名聚合维度**：
   - 提取 `#EXTINF` 原始属性：`tvg-id`、`tvg-name`、`tvg-logo`、`group-title`、`channelName` 与播放链接 `url`。
-  - 规范化频道名称清洗（去除 `[4K]`, `[1080P]`, `(电信)`, `_超清`, `高清`, `标清`, `频道` 等噪音词），提取基础频道名（例如从 `CCTV-1 综合 [4K 50fps]` 提炼出 `CCTV-1`）。
-  - 分辨率与线路标签检测：
-    - **4K / 8K / 2160P / 超高清**：分辨率权重 +40，线路标签标为 `4K`。
-    - **1080P / FHD / 全高清**：分辨率权重 +30，线路标签标为 `1080P`。
-    - **720P / HD / 高清**：分辨率权重 +20，线路标签标为 `720P`。
-    - **480P / 576P / SD / 标清**：分辨率权重 +10，线路标签标为 `标清`。
-    - 网络/运营商标签：检测 `电信`、`联通`、`移动`、`IPv6`、`专线`、`备用` 等。
+  - 规范化频道名称清洗（去除 `[4K]`, `[1080P]`, `(电信)`, `_超清`, `高清`, `标清`, `频道` 等噪音词），提取基础频道名（例如从 `CCTV-1 综合 [4K 50fps]` 提炼出 `CCTV-1 综合`）。
+  - **杜绝基于文本标题命名判定画质**：
+    - 第三方源常存在“假 4K”、“假 1080P”的标题虚标欺骗，解析层严禁直接根据标题字符串赋予分辨率权重或虚假标签；
+    - 解析层仅提取网络运营商与协议客观标签（检测 `电信`、`联通`、`移动`、`IPv6`、`专线`、`备用` 等）；
+    - 线路统一初始权重（基础值 10，匹配内置频道为 50），不因假标题产生虚高优先级。
   - **聚合规则**：
     - 维护聚合索引 `groupTitle + "_" + normalizedChannelName`（或非空 `tvg-id`）。
     - 同一聚合分组只生成 **1 个 `Channel`**，其所有有效播放 URL 生成各自的 `LiveSource`。
     - URL 去重：若同一个频道包含完全相同的 URL，忽略重复项。
-    - 线路命名规则：`线路 1 (4K 电信)`、`线路 2 (1080P)`、`线路 3` 等。
-    - 初始优先级：基础值 10 + 分辨率权重（0 ~ 40）。
+    - 线路命名规则：`线路 1 (电信)`、`线路 2 (IPv6)`、`线路 3` 等。
 
-### 2. 方案 A 融入系统内置频道 (`SettingsViewModel.kt`)
-- **匹配与分流**：
-  - 调用 `ChannelMatchIndex` 对解析出的 `parsed.channels` 进行精准/模糊比对。
-  - **已匹配内置频道的项**：
-    - 不加入 `channelsToSave`（彻底阻止生成多余的自定义频道）。
-    - 其挂载的线路转换为针对内置频道的 `matchedSources`，`channelId` 指向对应内置频道的 ID，优先级赋予更高基础分（50 + 分辨率权重）。
-    - 记录到 `CustomPlaylistSource.matchedSourceIds`，以便未来更新或删除订阅时精准级联清理。
-  - **未匹配内置频道的项**：
-    - 加入 `channelsToSave`，进入自定义频道库。
-    - 其挂载的线路加入 `sourcesToSave`。
-    - 记录到 `CustomPlaylistSource.channelIds`。
-- **存储与元数据同步**：
-  - `channelRepository.saveChannels(channelsToSave)`：仅保存真正的新频道。
-  - `channelRepository.saveSources(sourcesToSave + matchedSources)`：全量保存优化后的线路。
-  - `CustomPlaylistSource.channelCount` 记录实际新增频道数与补充线路数。
+### 2. 真实物理分辨率的获取与测速机制
+- **流媒体探测层 (`NetworkProbe` / `CustomSourceAdapter`)**：
+  - 针对 HLS 流媒体（`.m3u8`），探测时检查 Master Playlist 中的 `#EXT-X-STREAM-INF:RESOLUTION=(\d+)x(\d+)`，从技术协议层提取服务端实际编码物理分辨率（如 1920x1080、3840x2160）；
+- **解码播放层 (`Media3PlaybackEngine` / `DefaultPlaybackOrchestrator`)**：
+  - 在 ExoPlayer 开始解码渲染后，通过 `onVideoSizeChanged` 监听精准获取硬件解码器输出的真实视频像素尺寸（`videoWidth` 与 `videoHeight`）；
+  - `DefaultPlaybackOrchestrator` 将真实物理分辨率记录在 `sourceRealResolutionCache` 中。
 
-### 3. 播放优选高分辨率与高加载速度线路 (`DefaultPlaybackOrchestrator.kt`)
+### 3. 播放优选高真实分辨率与高加载速度线路 (`DefaultPlaybackOrchestrator.kt`)
 - **多维度排序算法 (`sortSourcesByHealthAndLatency`)**：
   - 排序维度层次如下：
     1. **健康状态**：`HEALTHY` / `UNKNOWN` (2) > `DEGRADED` (1) > `UNAVAILABLE` (0)。
     2. **播放协议**：原生音视频流协议（HLS / DASH / HTTP，1）> 网页容器（`OFFICIAL_WEB`，0）。
-    3. **画质与速度综合梯队**：
-       - 若测速已完成（`sourceLatencyCache` 包含测速时延）：
-         - 优秀 4K / 8K（延迟 < 1500ms）：梯队分最高。
-         - 优质 1080P（延迟 < 1000ms）：梯队分次高。
-         - 高延迟 4K（延迟 >= 1500ms）与优质 720P。
-         - 延迟测速较低者在同画质梯队内部绝对优先。
-       - 若尚未完成测速（切台初次加载）：
-         - 直接按 `priority`（包含分辨率权重 4K > 1080P > 720P > SD）降序排列，确保首播默认命中最高清晰度线路。
+    3. **真实画质与速度综合打分**：
+       - 基于获取到的真实物理尺寸：
+         - 真实 4K / 8K（宽 >= 3840 或 高 >= 2160）：基础加权 +400；
+         - 真实 1080P（宽 >= 1920 或 高 >= 1080）：基础加权 +300；
+         - 真实 720P（宽 >= 1280 或 高 >= 720）：基础加权 +200；
+         - 真实 标清/未达标（宽 > 0 或 高 > 0）：基础加权 +100；
+         - 尚未探测到真实尺寸：基础加权 0，同未测速源保持平等基线。
+       - 结合测速时延（`sourceLatencyCache`）：
+         - 低延迟（<500ms）不降权；
+         - 高延迟（>1500ms）适当扣分，避免卡顿；
+         - **彻底击碎假分辨率欺骗**：标题声称“4K”但真实解码为 576P 的线路，其实际评分为 100 分，将被真实 1080P（300 分）绝对超越！
     4. **测速时延**：`sourceLatencyCache[it.id]` 升序排列（毫秒延迟越低越优先）。
     5. **优先级兜底**：`it.priority` 降序。
 - **后台测速联动**：

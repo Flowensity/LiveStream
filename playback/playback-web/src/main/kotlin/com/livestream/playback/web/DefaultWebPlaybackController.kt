@@ -11,6 +11,7 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -27,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.ByteArrayInputStream
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,28 +51,84 @@ class DefaultWebPlaybackController @Inject constructor(
     private var parentContainer: ViewGroup? = null
     private var currentAspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL
     private var loadTimeoutJob: Job? = null
+    private var pageFinishedFallbackJob: Job? = null
     private var lastStyleInjectTimeMs: Long = 0L
     private val defaultPosterBitmap: Bitmap by lazy {
         Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     }
 
     companion object {
-        private const val PAGE_LOAD_TIMEOUT_MS = 15000L
-        private const val STYLE_INJECT_THROTTLE_MS = 400L
+        private const val PAGE_LOAD_TIMEOUT_MS = 12000L
+        private const val STYLE_INJECT_THROTTLE_MS = 80L
+        private val BLOCKED_HOST_KEYWORDS = arrayOf(
+            "hm.baidu.com",
+            "beacon.qq.com",
+            "trace.qq.com",
+            "btrace.qq.com",
+            "report.url.cn",
+            "google-analytics.com",
+            "googletagmanager.com",
+            "sensorsdata"
+        )
+        private val BLOCKED_EXTENSIONS = arrayOf(
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".bmp",
+            ".woff", ".woff2", ".ttf", ".otf", ".eot"
+        )
+        private val ALLOWED_STREAM_EXTENSIONS = arrayOf(
+            ".m3u8", ".ts", ".flv", ".mp4", ".mpd", ".m4s", ".aac"
+        )
+    }
+
+    internal fun shouldBlockWebResource(url: String): Boolean {
+        if (url.isBlank()) return false
+        val lower = url.lowercase(Locale.ROOT)
+        val pathPart = lower.substringBefore('?').substringBefore('#')
+        for (streamExt in ALLOWED_STREAM_EXTENSIONS) {
+            if (pathPart.endsWith(streamExt)) return false
+        }
+        for (hostKeyword in BLOCKED_HOST_KEYWORDS) {
+            if (lower.contains(hostKeyword)) return true
+        }
+        for (ext in BLOCKED_EXTENSIONS) {
+            if (pathPart.endsWith(ext)) return true
+        }
+        if (lower.contains("imagemogr2/format/")) return true
+        return false
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun loadOfficialUrl(url: String, container: Any?) {
         val viewGroup = container as? ViewGroup ?: return
-        if (targetUrl == url && webView != null) {
+        val existingWv = webView
+        if (existingWv != null && canReusePooledInstance()) {
             if (parentContainer != viewGroup) {
-                (webView?.parent as? ViewGroup)?.removeView(webView)
-                viewGroup.addView(webView)
+                (existingWv.parent as? ViewGroup)?.removeView(existingWv)
+                viewGroup.addView(existingWv)
                 parentContainer = viewGroup
             }
-            webView?.alpha = 1f
+            if (targetUrl == url) {
+                existingWv.animate().cancel()
+                existingWv.alpha = 1f
+                applyAspectRatioToWebView()
+                injectPlayerStyling(existingWv)
+                return
+            }
+            // 实例池化热复用：不同官方网页切换时直接复用已初始化的 Chromium WebView 实例，省去冷启动开销
+            loadTimeoutJob?.cancel()
+            pageFinishedFallbackJob?.cancel()
+            existingWv.stopLoading()
+            // 先暂停并清空旧 video 元素，防止旧画面残留或误触发新频道的 onVideoReady
+            existingWv.evaluateJavascript(
+                "(function(){try{var v=document.getElementsByTagName('video');for(var i=0;i<v.length;i++){v[i].pause();v[i].removeAttribute('src');v[i].load();}}catch(e){}})();",
+                null
+            )
+            targetUrl = url
+            existingWv.animate().cancel()
+            existingWv.alpha = 0f
+            _webState.value = WebPlaybackState.Loading(0)
             applyAspectRatioToWebView()
-            injectPlayerStyling(webView)
+            startLoadTimeout(existingWv)
+            existingWv.loadUrl(url)
             return
         }
 
@@ -101,6 +160,10 @@ class DefaultWebPlaybackController @Inject constructor(
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                // 禁用网页内无关网络图片加载（全屏仅展示 <video>），大幅释放带宽给视频流与核心 JS
+                blockNetworkImage = true
+                loadsImagesAutomatically = false
                 allowFileAccess = false
                 allowContentAccess = false
                 mediaPlaybackRequiresUserGesture = false
@@ -119,9 +182,8 @@ class DefaultWebPlaybackController @Inject constructor(
                     @JavascriptInterface
                     fun onVideoReady() {
                         post {
-                            if (alpha < 1f) {
-                                animate().alpha(1f).setDuration(250).start()
-                            }
+                            animate().cancel()
+                            alpha = 1f
                             _webState.value = WebPlaybackState.Playing
                         }
                     }
@@ -132,10 +194,10 @@ class DefaultWebPlaybackController @Inject constructor(
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                     super.onProgressChanged(view, newProgress)
-                    if (newProgress in 1..99) {
+                    if (newProgress in 1..99 && _webState.value !is WebPlaybackState.Playing) {
                         _webState.value = WebPlaybackState.Loading(newProgress)
                     }
-                    if (newProgress >= 10) {
+                    if (newProgress >= 5) {
                         val now = System.currentTimeMillis()
                         if (now - lastStyleInjectTimeMs >= STYLE_INJECT_THROTTLE_MS) {
                             lastStyleInjectTimeMs = now
@@ -150,9 +212,31 @@ class DefaultWebPlaybackController @Inject constructor(
             }
 
             webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    request: WebResourceRequest?
+                ): WebResourceResponse? {
+                    if (request != null && !request.isForMainFrame) {
+                        val reqUrl = request.url?.toString().orEmpty()
+                        if (shouldBlockWebResource(reqUrl)) {
+                            return WebResourceResponse(
+                                "text/plain",
+                                "UTF-8",
+                                ByteArrayInputStream(ByteArray(0))
+                            )
+                        }
+                    }
+                    return super.shouldInterceptRequest(view, request)
+                }
+
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
                     _webState.value = WebPlaybackState.Loading(0)
+                    injectPlayerStyling(view)
+                }
+
+                override fun onPageCommitVisible(view: WebView?, url: String?) {
+                    super.onPageCommitVisible(view, url)
                     injectPlayerStyling(view)
                 }
 
@@ -164,13 +248,13 @@ class DefaultWebPlaybackController @Inject constructor(
                     }
                     injectPlayerStyling(view)
 
-                    // 安全回退：1.5秒后若桥接回调未触发则平滑淡入呈现并标记 Ready，防止黑屏断层
-                    controllerScope.launch {
-                        delay(1500)
+                    // 极速回退：250ms 后若桥接回调未触发则立即呈现并标记 Ready，消除 1.5s+250ms 的人为等待
+                    pageFinishedFallbackJob?.cancel()
+                    pageFinishedFallbackJob = controllerScope.launch {
+                        delay(250)
                         post {
-                            if (alpha < 1f) {
-                                animate().alpha(1f).setDuration(250).start()
-                            }
+                            animate().cancel()
+                            alpha = 1f
                             if (_webState.value is WebPlaybackState.Loading) {
                                 _webState.value = WebPlaybackState.Ready
                             }
@@ -214,7 +298,12 @@ class DefaultWebPlaybackController @Inject constructor(
         _activeWebViewCount.value = 1
         applyAspectRatioToWebView()
 
-        // 超时保护定时器
+        startLoadTimeout(wv)
+        wv.loadUrl(url)
+    }
+
+    private fun startLoadTimeout(wv: WebView) {
+        loadTimeoutJob?.cancel()
         loadTimeoutJob = controllerScope.launch {
             delay(PAGE_LOAD_TIMEOUT_MS)
             if (_webState.value is WebPlaybackState.Loading) {
@@ -225,8 +314,18 @@ class DefaultWebPlaybackController @Inject constructor(
                 )
             }
         }
+    }
 
-        wv.loadUrl(url)
+    internal fun canReusePooledInstance(): Boolean {
+        return _activeWebViewCount.value > 0 &&
+            _webState.value !is WebPlaybackState.Destroyed &&
+            _webState.value !is WebPlaybackState.RendererCrashed
+    }
+
+    internal fun markPooledInstanceReadyForTest(url: String) {
+        targetUrl = url
+        _activeWebViewCount.value = 1
+        _webState.value = WebPlaybackState.Ready
     }
 
     override fun setAspectRatio(aspectRatio: VideoAspectRatio) {
@@ -372,22 +471,22 @@ class DefaultWebPlaybackController @Inject constructor(
                             v.style.setProperty('padding', '0px', 'important');
                             if (!v.__ls_bound) {
                                 v.__ls_bound = true;
-                                v.addEventListener('playing', function() {
+                                var notifyReady = function() {
                                     if (window.LiveStreamBridge && window.LiveStreamBridge.onVideoReady) {
                                         window.LiveStreamBridge.onVideoReady();
                                     }
-                                });
-                                v.addEventListener('loadeddata', function() {
-                                    if (window.LiveStreamBridge && window.LiveStreamBridge.onVideoReady) {
-                                        window.LiveStreamBridge.onVideoReady();
-                                    }
-                                });
+                                };
+                                v.addEventListener('loadedmetadata', notifyReady);
+                                v.addEventListener('loadeddata', notifyReady);
+                                v.addEventListener('canplay', notifyReady);
+                                v.addEventListener('playing', notifyReady);
+                                v.addEventListener('timeupdate', notifyReady, { once: true });
                             }
                             if (v.paused) {
                                 v.muted = false;
                                 v.play().catch(function(){});
                             }
-                            if (v.videoWidth > 0 || v.readyState >= 2 || v.currentTime > 0) {
+                            if (v.videoWidth > 0 || v.readyState >= 1 || v.currentTime > 0) {
                                 isReady = true;
                             }
                         }
@@ -417,19 +516,18 @@ class DefaultWebPlaybackController @Inject constructor(
 
                     window.dispatchEvent(new Event('resize'));
 
-                    if (window.__livestream_style_timer) {
-                        clearInterval(window.__livestream_style_timer);
+                    window.__livestream_style_count = 0;
+                    if (!window.__livestream_style_timer) {
+                        window.__livestream_style_timer = setInterval(function() {
+                            applyVideoFix();
+                            window.dispatchEvent(new Event('resize'));
+                            window.__livestream_style_count = (window.__livestream_style_count || 0) + 1;
+                            if (window.__livestream_style_count >= 50) {
+                                clearInterval(window.__livestream_style_timer);
+                                window.__livestream_style_timer = null;
+                            }
+                        }, 60);
                     }
-                    var count = 0;
-                    window.__livestream_style_timer = setInterval(function() {
-                        applyVideoFix();
-                        window.dispatchEvent(new Event('resize'));
-                        count++;
-                        if (count >= 20) {
-                            clearInterval(window.__livestream_style_timer);
-                            window.__livestream_style_timer = null;
-                        }
-                    }, 250);
                 } catch(e) {}
             })();
         """.trimIndent()
@@ -477,6 +575,8 @@ class DefaultWebPlaybackController @Inject constructor(
     override fun stopAndDestroy() {
         loadTimeoutJob?.cancel()
         loadTimeoutJob = null
+        pageFinishedFallbackJob?.cancel()
+        pageFinishedFallbackJob = null
 
         webView?.let { wv ->
             wv.stopLoading()

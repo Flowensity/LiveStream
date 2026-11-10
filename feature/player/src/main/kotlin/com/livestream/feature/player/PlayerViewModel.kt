@@ -11,6 +11,7 @@ import com.livestream.domain.channel.usecase.GetNextProgramUseCase
 import com.livestream.domain.channel.usecase.GetProgramsForChannelUseCase
 import com.livestream.domain.channel.usecase.RefreshEpgUseCase
 import com.livestream.playback.api.PlaybackOrchestrator
+import com.livestream.playback.api.model.PlaybackMetrics
 import com.livestream.playback.api.web.WebPlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -40,6 +41,10 @@ class PlayerViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    // 独立的高频播放监控指标流，避免码率/缓冲/延迟波动触发播放器主 UI 重组
+    private val _playbackMetrics = MutableStateFlow(PlaybackMetrics())
+    val playbackMetrics: StateFlow<PlaybackMetrics> = _playbackMetrics.asStateFlow()
 
     private var osdDismissJob: Job? = null
     private var numberKeyJob: Job? = null
@@ -105,7 +110,20 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
+                _playbackMetrics.value = state.metrics
+                val prevStatus = _uiState.value.status
+
                 _uiState.update { current ->
+                    val layoutMetrics = if (
+                        current.metrics.videoWidth != state.metrics.videoWidth ||
+                        current.metrics.videoHeight != state.metrics.videoHeight ||
+                        current.metrics.isHardwareAccelerated != state.metrics.isHardwareAccelerated ||
+                        current.metrics.decoderName != state.metrics.decoderName
+                    ) {
+                        state.metrics
+                    } else {
+                        current.metrics
+                    }
                     current.copy(
                         status = state.status,
                         isBuffering = isBuffering,
@@ -116,15 +134,15 @@ class PlayerViewModel @Inject constructor(
                         totalSources = state.totalSources,
                         availableSources = state.availableSources,
                         sourceLatenciesMs = state.sourceLatenciesMs,
-                        metrics = state.metrics,
+                        metrics = layoutMetrics,
                         error = state.errorInfo,
                         isOfficialWeb = state.isOfficialWeb,
                         officialWebUrl = state.officialWebUrl
                     )
                 }
 
-                // If playback enters READY or PLAYING, ensure OSD dismiss schedule is active
-                if (state.status == PlaybackStatus.PLAYING && _uiState.value.isOsdVisible) {
+                // 仅在首次进入 PLAYING 状态时重置 OSD 自动隐藏倒计时，防止高频指标发射打断定时器
+                if (prevStatus != PlaybackStatus.PLAYING && state.status == PlaybackStatus.PLAYING && _uiState.value.isOsdVisible) {
                     scheduleOsdDismiss(4000L)
                 }
             }

@@ -62,9 +62,16 @@ class EpgRepositoryImpl @Inject constructor(
             .flowOn(dispatchers.io)
     }
 
+    companion object {
+        const val EPG_BATCH_SIZE = 500
+    }
+
     override suspend fun savePrograms(programs: List<EpgProgram>) {
+        if (programs.isEmpty()) return
         withContext(dispatchers.io) {
-            epgDao.insertPrograms(programs.map { it.toEntity() })
+            for (chunk in programs.chunked(EPG_BATCH_SIZE)) {
+                epgDao.insertPrograms(chunk.map { it.toEntity() })
+            }
         }
     }
 
@@ -91,23 +98,6 @@ class EpgRepositoryImpl @Inject constructor(
         channels: List<Channel>
     ): Result<Int> = withContext(dispatchers.io) {
         try {
-            val client = okHttpClient ?: OkHttpClient()
-            val request = Request.Builder().url(epgUrl).build()
-            val rawPrograms = client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("下载 XMLTV 节目单失败: HTTP ${response.code}"))
-                }
-                val body = response.body ?: return@withContext Result.success(0)
-                val isGzip = epgUrl.lowercase(Locale.ROOT).endsWith(".gz") ||
-                    response.header("Content-Encoding")?.contains("gzip", ignoreCase = true) == true
-                val stream = if (isGzip) GZIPInputStream(body.byteStream()) else body.byteStream()
-                stream.use { XmltvParser.parse(it) }
-            }
-
-            if (rawPrograms.isEmpty()) {
-                return@withContext Result.success(0)
-            }
-
             // 建立 XMLTV channel 标识与本地 Channel.id 的双向索引映射（支持 tvg-id、频道 ID 与标准化名称匹配）
             val channelLookup = mutableMapOf<String, MutableList<String>>()
             for (ch in channels) {
@@ -122,28 +112,54 @@ class EpgRepositoryImpl @Inject constructor(
                 registerKey(ch.name)
             }
 
-            val mappedEntities = mutableListOf<com.livestream.core.database.entity.EpgProgramEntity>()
-            for (prog in rawPrograms) {
-                val normKey = prog.channelId.trim().uppercase(Locale.ROOT).replace(" ", "").replace("-", "")
-                val matchedChannelIds = channelLookup[normKey]
-                if (!matchedChannelIds.isNullOrEmpty()) {
-                    for (localChId in matchedChannelIds) {
-                        mappedEntities.add(
-                            prog.copy(
-                                id = "${localChId}_${prog.startTimestamp}",
-                                channelId = localChId
-                            ).toEntity()
-                        )
+            val client = okHttpClient ?: OkHttpClient()
+            val request = Request.Builder().url(epgUrl).build()
+            var totalImportedCount = 0
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("下载 XMLTV 节目单失败: HTTP ${response.code}"))
+                }
+                val body = response.body ?: return@withContext Result.success(0)
+                val isGzip = epgUrl.lowercase(Locale.ROOT).endsWith(".gz") ||
+                    response.header("Content-Encoding")?.contains("gzip", ignoreCase = true) == true
+                val stream = if (isGzip) GZIPInputStream(body.byteStream()) else body.byteStream()
+
+                val pendingBatches = mutableListOf<List<com.livestream.core.database.entity.EpgProgramEntity>>()
+                stream.use { input ->
+                    XmltvParser.parseStreaming(input, batchSize = EPG_BATCH_SIZE) { batchPrograms ->
+                        val mappedEntities = ArrayList<com.livestream.core.database.entity.EpgProgramEntity>(batchPrograms.size)
+                        for (prog in batchPrograms) {
+                            val normKey = prog.channelId.trim().uppercase(Locale.ROOT).replace(" ", "").replace("-", "")
+                            val matchedChannelIds = channelLookup[normKey]
+                            if (!matchedChannelIds.isNullOrEmpty()) {
+                                for (localChId in matchedChannelIds) {
+                                    mappedEntities.add(
+                                        prog.copy(
+                                            id = "${localChId}_${prog.startTimestamp}",
+                                            channelId = localChId
+                                        ).toEntity()
+                                    )
+                                }
+                            } else {
+                                mappedEntities.add(prog.toEntity())
+                            }
+                        }
+                        if (mappedEntities.isNotEmpty()) {
+                            pendingBatches.add(mappedEntities)
+                        }
                     }
-                } else {
-                    mappedEntities.add(prog.toEntity())
+                }
+
+                for (batch in pendingBatches) {
+                    for (subChunk in batch.chunked(EPG_BATCH_SIZE)) {
+                        epgDao.insertPrograms(subChunk)
+                        totalImportedCount += subChunk.size
+                    }
                 }
             }
 
-            if (mappedEntities.isNotEmpty()) {
-                epgDao.insertPrograms(mappedEntities)
-            }
-            Result.success(mappedEntities.size)
+            Result.success(totalImportedCount)
         } catch (e: Exception) {
             Result.failure(e)
         }

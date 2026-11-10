@@ -165,4 +165,34 @@ class PlayerViewModelTest {
         assertTrue(viewModel.uiState.value.isOfficialWeb)
         assertEquals("https://tv.cctv.com/live", viewModel.uiState.value.officialWebUrl)
     }
+
+    @Test
+    fun `high frequency buffer metrics update playbackMetrics without triggering redundant uiState emissions`() = runTest(testDispatcher) {
+        val baseMetrics = com.livestream.playback.api.model.PlaybackMetrics(
+            videoWidth = 1920,
+            videoHeight = 1080,
+            bufferedDurationMs = 1000L,
+            liveLatencyMs = 2000L
+        )
+        orchestratorStateFlow.value = OrchestratorState(
+            status = PlaybackStatus.PLAYING,
+            metrics = baseMetrics
+        )
+        testScheduler.runCurrent()
+
+        val stateSnapshotBefore = viewModel.uiState.value
+        assertEquals(1920, stateSnapshotBefore.metrics.videoWidth)
+
+        // Only high-frequency buffer/latency telemetry changes; video dimensions remain 1920x1080
+        orchestratorStateFlow.value = OrchestratorState(
+            status = PlaybackStatus.PLAYING,
+            metrics = baseMetrics.copy(bufferedDurationMs = 2500L, liveLatencyMs = 1800L, bitrateBps = 8_000_000L)
+        )
+        testScheduler.runCurrent()
+
+        assertEquals(2500L, viewModel.playbackMetrics.value.bufferedDurationMs)
+        assertEquals(8_000_000L, viewModel.playbackMetrics.value.bitrateBps)
+        // uiState reference must remain identical (no redundant UI recomposition)
+        org.junit.Assert.assertSame(stateSnapshotBefore, viewModel.uiState.value)
+    }
 }

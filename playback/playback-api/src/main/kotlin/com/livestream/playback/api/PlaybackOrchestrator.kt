@@ -28,6 +28,7 @@ data class OrchestratorState(
     val totalSources: Int = 1,
     val availableSources: List<LiveSource> = emptyList(),
     val sourceLatenciesMs: Map<String, Long> = emptyMap(),
+    val sourceResolutions: Map<String, Pair<Int, Int>> = emptyMap(),
     val errorInfo: PlaybackErrorInfo? = null,
     val metrics: PlaybackMetrics = PlaybackMetrics(),
     val isOfficialWeb: Boolean = false,

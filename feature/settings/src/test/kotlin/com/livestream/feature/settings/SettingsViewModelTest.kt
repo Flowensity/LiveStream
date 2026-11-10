@@ -192,10 +192,9 @@ class SettingsViewModelTest {
         assertEquals("HBO", savedChannels[0].name)
 
         val savedSources = capturedSources.first()
-        // CCTV-1 4K line should be attached to cctv_preset_1 with 4K tag and priority
+        // CCTV-1 line should be attached to cctv_preset_1 with clean base priority 50
         val matchedCctvSource = savedSources.first { it.channelId == "cctv_preset_1" }
-        assertTrue(matchedCctvSource.name.contains("4K"))
-        assertTrue(matchedCctvSource.priority >= 90) // 50 base + 40 4k
+        assertEquals(50, matchedCctvSource.priority)
 
         // HBO source should be attached to HBO custom channel
         val hboSource = savedSources.first { it.channelId == savedChannels[0].id }

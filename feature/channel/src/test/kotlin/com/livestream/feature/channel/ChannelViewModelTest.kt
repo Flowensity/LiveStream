@@ -120,4 +120,27 @@ class ChannelViewModelTest {
 
         coVerify(exactly = 1) { toggleFavoriteUseCase(testChannel.id, true) }
     }
+
+    @Test
+    fun `rapid search query changes are debounced to avoid redundant database queries`() = runTest(testDispatcher) {
+        every { searchChannelsUseCase(any()) } returns flowOf(listOf(testChannel))
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("c")
+        testScheduler.advanceTimeBy(50)
+        viewModel.onSearchQueryChanged("cc")
+        testScheduler.advanceTimeBy(50)
+        viewModel.onSearchQueryChanged("cctv")
+
+        // Before 200ms debounce window elapses, search use case should not be invoked yet
+        verify(exactly = 0) { searchChannelsUseCase(any()) }
+
+        testScheduler.advanceTimeBy(200)
+        testScheduler.runCurrent()
+
+        // Only the final query "cctv" should trigger a database search
+        verify(exactly = 0) { searchChannelsUseCase("c") }
+        verify(exactly = 0) { searchChannelsUseCase("cc") }
+        verify(exactly = 1) { searchChannelsUseCase("cctv") }
+    }
 }

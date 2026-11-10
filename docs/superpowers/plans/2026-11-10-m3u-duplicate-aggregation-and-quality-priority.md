@@ -45,9 +45,10 @@
   - Run: `JAVA_HOME=/home/flowensity/android-toolchain/jdk-17.0.21+9 ./gradlew :source:source-custom:testDebugUnitTest --tests com.livestream.source.custom.M3uPlaylistParserTest`
   - Expected: FAIL
 
-- [ ] **Step 3: Implement channel aggregation & tag extraction in `M3uPlaylistParser.kt`**
-  - 提取分辨率权重（4K: +40, 1080P: +30, 720P: +20, SD: +10）与运营商标签。
-  - 清洗频道名称。
+- [x] **Step 3: Implement channel aggregation & tag extraction in `M3uPlaylistParser.kt`**
+  - 清洗频道名称中的画质噪音（如 `[4K]`、`[1080P]` 等），避免标题冗余。
+  - **杜绝基于文本命名给出虚假分辨率**：文本命名常含夸大与假清晰度，解析层不赋予虚假分辨率加权，仅提取运营商与传输标签（电信、联通、移动、IPv6 等）。
+  - 真正分辨率由后续真实探测（HLS Manifest `RESOLUTION` 属性）与硬件解码（ExoPlayer `onVideoSizeChanged`）实时获取。
   - 维护同组内同名聚合映射字典，同名复用同一个 `Channel`，线路作为 `LiveSource` 挂载，URL 去重。
 
 - [ ] **Step 4: Run test to verify it passes**

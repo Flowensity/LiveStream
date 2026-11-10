@@ -31,6 +31,10 @@ class ChannelRepositoryImpl @Inject constructor(
     private var hasSeeded = false
     private val seedMutex = kotlinx.coroutines.sync.Mutex()
 
+    companion object {
+        const val DB_BATCH_CHUNK_SIZE = 500
+    }
+
     override fun observeAllVisibleChannels(): Flow<List<Channel>> {
         return channelDao.observeAllVisibleChannels()
             .onStart { checkAndSeedDefaultChannels() }
@@ -111,27 +115,35 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     override suspend fun saveChannels(channels: List<Channel>) {
+        if (channels.isEmpty()) return
         withContext(dispatchers.io) {
-            val referencedCategoryIds = channels.map { it.categoryId }.distinct()
-            for (catId in referencedCategoryIds) {
-                if (categoryDao.getCategoryById(catId) == null) {
-                    categoryDao.insertCategory(
-                        com.livestream.core.database.entity.CategoryEntity(
-                            id = catId,
-                            name = "自定义源",
-                            group = com.livestream.core.model.ChannelCategoryGroup.CUSTOM.name,
-                            orderIndex = 999
-                        )
+            val referencedCategoryEntities = channels.asSequence()
+                .map { it.categoryId }
+                .distinct()
+                .map { catId ->
+                    com.livestream.core.database.entity.CategoryEntity(
+                        id = catId,
+                        name = "自定义源",
+                        group = com.livestream.core.model.ChannelCategoryGroup.CUSTOM.name,
+                        orderIndex = 999
                     )
                 }
+                .toList()
+            if (referencedCategoryEntities.isNotEmpty()) {
+                categoryDao.insertCategoriesIgnore(referencedCategoryEntities)
             }
-            channelDao.insertChannels(channels.map { it.toEntity() })
+            for (chunk in channels.chunked(DB_BATCH_CHUNK_SIZE)) {
+                channelDao.insertChannels(chunk.map { it.toEntity() })
+            }
         }
     }
 
     override suspend fun saveSources(sources: List<LiveSource>) {
+        if (sources.isEmpty()) return
         withContext(dispatchers.io) {
-            liveSourceDao.insertSources(sources.map { it.toEntity() })
+            for (chunk in sources.chunked(DB_BATCH_CHUNK_SIZE)) {
+                liveSourceDao.insertSources(chunk.map { it.toEntity() })
+            }
         }
     }
 
@@ -159,16 +171,21 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteChannelsByIds(channelIds: List<String>) {
+        if (channelIds.isEmpty()) return
         withContext(dispatchers.io) {
-            channelDao.deleteChannelsByIds(channelIds)
-            liveSourceDao.deleteSourcesByChannelIds(channelIds)
+            for (chunk in channelIds.chunked(DB_BATCH_CHUNK_SIZE)) {
+                channelDao.deleteChannelsByIds(chunk)
+                liveSourceDao.deleteSourcesByChannelIds(chunk)
+            }
         }
     }
 
     override suspend fun deleteSourcesByIds(sourceIds: List<String>) {
         if (sourceIds.isEmpty()) return
         withContext(dispatchers.io) {
-            liveSourceDao.deleteSourcesByIds(sourceIds)
+            for (chunk in sourceIds.chunked(DB_BATCH_CHUNK_SIZE)) {
+                liveSourceDao.deleteSourcesByIds(chunk)
+            }
         }
     }
 
@@ -191,6 +208,15 @@ class ChannelRepositoryImpl @Inject constructor(
 
                 // Preserve user-favorite and user-hidden settings for existing channels
                 val existingChannels = channelDao.getAllChannelsSync().associateBy { it.id }
+                val defaultChannelIds = PresetChannelDataProvider.allDefaultChannels.mapTo(HashSet()) { it.id }
+                val obsoletePresetIds = existingChannels.keys.filter { id ->
+                    (id.startsWith("cctv_") || id.startsWith("weishi_")) && id !in defaultChannelIds
+                }
+                if (obsoletePresetIds.isNotEmpty()) {
+                    channelDao.deleteChannelsByIds(obsoletePresetIds)
+                    liveSourceDao.deleteSourcesByChannelIds(obsoletePresetIds)
+                }
+
                 val channelsToUpsert = PresetChannelDataProvider.allDefaultChannels.map { defaultChannel ->
                     val existing = existingChannels[defaultChannel.id]
                     if (existing != null) {

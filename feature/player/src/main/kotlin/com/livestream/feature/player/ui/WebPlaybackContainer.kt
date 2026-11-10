@@ -95,7 +95,7 @@ fun WebPlaybackContainer(
                 .then(overlayModifier)
         )
 
-        DisposableEffect(controller, url) {
+        DisposableEffect(controller) {
             onDispose {
                 controller?.detachContainer(containerRef)
             }

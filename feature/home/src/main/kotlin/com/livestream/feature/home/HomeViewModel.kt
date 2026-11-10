@@ -131,8 +131,8 @@ class HomeViewModel @Inject constructor(
             // 1. 立即更新播放器调度层的预览频道（触发 OSD 状态实时展示）
             playbackOrchestrator.previewChannel(channel)
 
-            // 2. 长按或连续切台防抖：延迟 250ms 后若无新按键才真正拉流与保存偏好
-            delay(250L)
+            // 2. 长按或连续切台极速防抖：压缩至 120ms，兼顾长按连击防抖与单次切台毫秒级响应
+            delay(120L)
 
             // 3. 真正发起切台拉流
             playbackOrchestrator.playChannel(channel)

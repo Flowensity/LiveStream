@@ -516,23 +516,34 @@ class PlaybackOrchestratorTest {
     }
 
     @Test
-    fun `test playChannel prioritizes higher resolution source when health is equal`() = runTest(testDispatcher) {
-        val src4k = sampleSource1.copy(
-            id = "src_4k",
-            name = "线路 1 (4K)",
-            priority = 90
-        )
-        val src720p = sampleSource1.copy(
-            id = "src_720p",
-            name = "线路 2 (720P)",
-            priority = 70
-        )
-        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(src720p, src4k)
+    fun `test fake resolution in title is defeated by real probe resolution`() = runTest(testDispatcher) {
+        val testRegistry = DefaultSourceAdapterRegistry().apply {
+            register(object : SourceAdapter {
+                override val providerId: String = "cctv"
+                override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
+                    return SourceResolution.NativeMedia("https://live.example.com/${source.id}.m3u8", "HLS")
+                }
+                override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
+                    return if (source.id == "src_fake_4k") {
+                        // 文本声称 4K，但探测流媒体协议真实物理尺寸仅为 720x576 标清
+                        AvailabilityResult.Available(latencyMs = 80L, videoWidth = 720, videoHeight = 576)
+                    } else {
+                        // 真实 1080P 全高清流
+                        AvailabilityResult.Available(latencyMs = 80L, videoWidth = 1920, videoHeight = 1080)
+                    }
+                }
+            })
+        }
+
+        // 两个源初始优先级一致（不被假文本加权）
+        val fake4k = sampleSource1.copy(id = "src_fake_4k", name = "线路 1 (4K 虚标)", priority = 10)
+        val real1080p = sampleSource1.copy(id = "src_real_1080p", name = "线路 2", priority = 10)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(fake4k, real1080p)
 
         val orchestrator = DefaultPlaybackOrchestrator(
             engine,
             channelRepository,
-            sourceAdapterRegistry,
+            testRegistry,
             webPlaybackController,
             networkMonitor,
             latencyTracker,
@@ -541,24 +552,17 @@ class PlaybackOrchestratorTest {
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
-        assertEquals("src_4k", orchestrator.orchestratorState.value.currentSource?.id)
+        // 真实探测后，真实 1080P 源必须超越虚标 4K 的标清源
+        val reordered = orchestrator.orchestratorState.value.availableSources
+        assertEquals("src_real_1080p", reordered.first().id)
+        assertEquals(1920 to 1080, orchestrator.orchestratorState.value.sourceResolutions["src_real_1080p"])
+        assertEquals(720 to 576, orchestrator.orchestratorState.value.sourceResolutions["src_fake_4k"])
     }
 
     @Test
-    fun `test playChannel prioritizes healthy lower resolution source over degraded high resolution source`() = runTest(testDispatcher) {
-        val degraded4k = sampleSource1.copy(
-            id = "src_4k_degraded",
-            name = "线路 1 (4K)",
-            priority = 90,
-            healthStatus = SourceHealthStatus.DEGRADED
-        )
-        val healthy1080p = sampleSource1.copy(
-            id = "src_1080p_healthy",
-            name = "线路 2 (1080P)",
-            priority = 80,
-            healthStatus = SourceHealthStatus.HEALTHY
-        )
-        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(degraded4k, healthy1080p)
+    fun `test hardware decoder onVideoSizeChanged records real resolution and updates state`() = runTest(testDispatcher) {
+        val s1 = sampleSource1.copy(id = "src_live_1", priority = 10)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(s1)
 
         val orchestrator = DefaultPlaybackOrchestrator(
             engine,
@@ -572,7 +576,11 @@ class PlaybackOrchestratorTest {
         orchestrator.playChannel(sampleChannel1)
         advanceUntilIdle()
 
-        assertEquals("src_1080p_healthy", orchestrator.orchestratorState.value.currentSource?.id)
+        // 模拟 ExoPlayer 硬件解码器解码出首帧画面尺寸 1920x1080
+        playbackMetricsFlow.value = PlaybackMetrics(videoWidth = 1920, videoHeight = 1080)
+        advanceUntilIdle()
+
+        assertEquals(1920 to 1080, orchestrator.orchestratorState.value.sourceResolutions["src_live_1"])
     }
 
     @Test
@@ -585,24 +593,18 @@ class PlaybackOrchestratorTest {
                 }
                 override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
                     return if (source.id == "src_sluggish_4k") {
-                        AvailabilityResult.Available(2500L) // 4K 延迟极高 2500ms
+                        // 真实 4K 但延迟极高 2500ms
+                        AvailabilityResult.Available(latencyMs = 2500L, videoWidth = 3840, videoHeight = 2160)
                     } else {
-                        AvailabilityResult.Available(80L)   // 1080P 延迟仅 80ms 极速
+                        // 真实 1080P 且延迟仅 80ms
+                        AvailabilityResult.Available(latencyMs = 80L, videoWidth = 1920, videoHeight = 1080)
                     }
                 }
             })
         }
 
-        val sluggish4k = sampleSource1.copy(
-            id = "src_sluggish_4k",
-            name = "线路 1 (4K)",
-            priority = 90
-        )
-        val fast1080p = sampleSource1.copy(
-            id = "src_fast_1080p",
-            name = "线路 2 (1080P)",
-            priority = 80
-        )
+        val sluggish4k = sampleSource1.copy(id = "src_sluggish_4k", name = "线路 1", priority = 10)
+        val fast1080p = sampleSource1.copy(id = "src_fast_1080p", name = "线路 2", priority = 10)
         coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sluggish4k, fast1080p)
 
         val orchestrator = DefaultPlaybackOrchestrator(

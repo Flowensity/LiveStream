@@ -393,13 +393,12 @@ class SettingsViewModel internal constructor(
                         } else {
                             "网络线路 ${idx + 1}"
                         }
-                        val resolutionBonus = (src.priority - 10).coerceAtLeast(0)
                         matchedSources.add(
                             src.copy(
                                 id = "matched_${matched.id}_${UUID.nameUUIDFromBytes("${src.url}_${matched.id}".toByteArray())}",
                                 channelId = matched.id,
                                 name = lineLabel,
-                                priority = 50 + resolutionBonus
+                                priority = 50
                             )
                         )
                     }

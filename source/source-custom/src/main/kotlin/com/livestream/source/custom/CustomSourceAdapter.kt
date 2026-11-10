@@ -41,9 +41,18 @@ class CustomSourceAdapter @Inject constructor(
         return when (val probeResult = networkProbe.probeUrl(streamUrl)) {
             is ProbeResult.Success -> {
                 if (probeResult.latencyMs > 3000) {
-                    AvailabilityResult.Degraded(probeResult.latencyMs, "网络响应延迟较高 (${probeResult.latencyMs}ms)")
+                    AvailabilityResult.Degraded(
+                        latencyMs = probeResult.latencyMs,
+                        reason = "网络响应延迟较高 (${probeResult.latencyMs}ms)",
+                        videoWidth = probeResult.videoWidth,
+                        videoHeight = probeResult.videoHeight
+                    )
                 } else {
-                    AvailabilityResult.Available(probeResult.latencyMs)
+                    AvailabilityResult.Available(
+                        latencyMs = probeResult.latencyMs,
+                        videoWidth = probeResult.videoWidth,
+                        videoHeight = probeResult.videoHeight
+                    )
                 }
             }
             is ProbeResult.Failure -> {

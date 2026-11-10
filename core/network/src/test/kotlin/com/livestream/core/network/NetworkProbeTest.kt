@@ -72,6 +72,48 @@ class NetworkProbeTest {
     }
 
     @Test
+    fun `probeUrl extracts real HLS resolution from Range GET body when present`() = runTest {
+        val okHttpClient = mockk<OkHttpClient>()
+        val headCall = mockk<Call>()
+        val headResponse = Response.Builder()
+            .request(Request.Builder().url("https://example.com/master.m3u8").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(405)
+            .message("Method Not Allowed")
+            .body("".toResponseBody())
+            .build()
+
+        val hlsBody = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=8000000,RESOLUTION=1920x1080
+            chunklist_1080p.m3u8
+        """.trimIndent()
+
+        val getCall = mockk<Call>()
+        val getResponse = Response.Builder()
+            .request(Request.Builder().url("https://example.com/master.m3u8").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(206)
+            .message("Partial Content")
+            .body(hlsBody.toResponseBody())
+            .build()
+
+        every { okHttpClient.newCall(match { it.method == "HEAD" }) } returns headCall
+        every { headCall.execute() } returns headResponse
+
+        every { okHttpClient.newCall(match { it.method == "GET" && it.header("Range") == "bytes=0-1024" }) } returns getCall
+        every { getCall.execute() } returns getResponse
+
+        val probe = NetworkProbe(okHttpClient)
+        val result = probe.probeUrl("https://example.com/master.m3u8")
+
+        assertTrue(result is ProbeResult.Success)
+        val success = result as ProbeResult.Success
+        assertEquals(1920, success.videoWidth)
+        assertEquals(1080, success.videoHeight)
+    }
+
+    @Test
     fun `probeUrl returns failure when both HEAD and Range GET fail`() = runTest {
         val okHttpClient = mockk<OkHttpClient>()
         val headCall = mockk<Call>()
@@ -103,5 +145,28 @@ class NetworkProbeTest {
 
         assertTrue(result is ProbeResult.Failure)
         assertTrue((result as ProbeResult.Failure).reason.contains("500"))
+    }
+
+    @Test
+    fun `Ipv4FirstDns prioritizes IPv4 addresses ahead of IPv6 and caches lookups`() {
+        var lookupCount = 0
+        val ipv6 = java.net.InetAddress.getByAddress("example.com", ByteArray(16) { 1 })
+        val ipv4 = java.net.InetAddress.getByAddress("example.com", byteArrayOf(93, 184.toByte(), 216.toByte(), 34))
+        val fakeDelegate = object : okhttp3.Dns {
+            override fun lookup(hostname: String): List<java.net.InetAddress> {
+                lookupCount++
+                return listOf(ipv6, ipv4)
+            }
+        }
+
+        val dns = Ipv4FirstDns(delegate = fakeDelegate, cacheTtlMs = 60_000L)
+        val firstResult = dns.lookup("example.com")
+        val secondResult = dns.lookup("example.com")
+
+        assertEquals(2, firstResult.size)
+        assertTrue(firstResult[0] is java.net.Inet4Address)
+        assertTrue(firstResult[1] is java.net.Inet6Address)
+        assertEquals(firstResult.size, secondResult.size)
+        assertEquals(1, lookupCount)
     }
 }

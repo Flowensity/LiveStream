@@ -56,4 +56,41 @@ class XmltvParserTest {
 
         XmltvParser.parse(xxeXml)
     }
+
+    @Test
+    fun `parseStreaming emits programs in bounded chunks`() {
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <tv>
+              <programme channel="cctv1" start="20261105080000 +0800" stop="20261105090000 +0800">
+                <title>节目1</title>
+              </programme>
+              <programme channel="cctv1" start="20261105090000 +0800" stop="20261105100000 +0800">
+                <title>节目2</title>
+              </programme>
+              <programme channel="cctv1" start="20261105100000 +0800" stop="20261105110000 +0800">
+                <title>节目3</title>
+              </programme>
+            </tv>
+        """.trimIndent()
+
+        val batches = mutableListOf<List<com.livestream.core.model.EpgProgram>>()
+        XmltvParser.parseStreaming(xml.byteInputStream(), batchSize = 2) { batch ->
+            batches.add(batch)
+        }
+
+        assertEquals(2, batches.size)
+        assertEquals(2, batches[0].size)
+        assertEquals(1, batches[1].size)
+        assertEquals("节目1", batches[0][0].title)
+        assertEquals("节目3", batches[1][0].title)
+    }
+
+    @Test
+    fun `fast arithmetic timestamp parser matches standard XMLTV timestamps with and without timezone`() {
+        val tsWithTz = XmltvParser.parseTimestampFast("20261105080000 +0800")
+        val tsUtc = XmltvParser.parseTimestampFast("20261105000000 +0000")
+        assertEquals(tsUtc, tsWithTz)
+        assertTrue(tsWithTz > 0L)
+    }
 }

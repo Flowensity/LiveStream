@@ -11,12 +11,14 @@ import com.livestream.domain.channel.usecase.ToggleFavoriteUseCase
 import com.livestream.playback.api.PlaybackOrchestrator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -24,7 +26,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class ChannelViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
@@ -70,9 +72,12 @@ class ChannelViewModel @Inject constructor(
             }
         }
 
-        // 观察频道列表与搜索过滤
+        // 观察频道列表与搜索过滤（对非空搜索词应用 200ms 防抖，清空搜索时立即响应）
         viewModelScope.launch {
-            combine(_selectedCategory, _searchQuery) { cat, query ->
+            val debouncedQuery = _searchQuery.debounce { query ->
+                if (query.isBlank()) 0L else 200L
+            }
+            combine(_selectedCategory, debouncedQuery) { cat, query ->
                 Pair(cat, query)
             }.flatMapLatest { (category, query) ->
                 if (query.isNotBlank()) {

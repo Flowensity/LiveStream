@@ -2,6 +2,7 @@ package com.livestream.core.network.di
 
 import com.livestream.core.common.network.NetworkMonitor
 import com.livestream.core.network.ConnectivityNetworkMonitor
+import com.livestream.core.network.Ipv4FirstDns
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -27,10 +28,11 @@ abstract class NetworkModule {
         @Singleton
         fun provideOkHttpClient(): OkHttpClient {
             return OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-                .callTimeout(10, TimeUnit.SECONDS)
-                .connectionPool(ConnectionPool(10, 2, TimeUnit.MINUTES))
+                .dns(Ipv4FirstDns())
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(4, TimeUnit.SECONDS)
+                .callTimeout(8, TimeUnit.SECONDS)
+                .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .addInterceptor { chain ->

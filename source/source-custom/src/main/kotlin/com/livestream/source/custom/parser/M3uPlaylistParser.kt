@@ -28,17 +28,6 @@ data class ExtInfAttributes(
     val channelName: String?
 )
 
-data class QualityTagInfo(
-    val resolutionWeight: Int,
-    val resolutionTag: String?,
-    val ispTag: String?
-) {
-    fun formatLineTag(): String? {
-        val parts = listOfNotNull(resolutionTag, ispTag)
-        return if (parts.isNotEmpty()) parts.joinToString(" ") else null
-    }
-}
-
 object M3uPlaylistParser {
 
     private val EPG_URL_REGEX = Regex("""(?:x-tvg-url|url-tvg)="([^"]+)"""", RegexOption.IGNORE_CASE)
@@ -116,8 +105,8 @@ object M3uPlaylistParser {
                             )
                         }
 
-                        // 提取画质与网络运营商标签
-                        val qualityTag = extractQualityTags(rawChannelName, streamUrl)
+                        // 仅提取客观网络运营商/协议标签，严禁轻信文本声称的假分辨率
+                        val networkTag = extractNetworkTag(rawChannelName, streamUrl)
                         val cleanedChannelName = cleanChannelTitle(rawChannelName)
 
                         // 计算组内聚合 Key
@@ -163,9 +152,9 @@ object M3uPlaylistParser {
                             val lineIndex = (channelSourceIndexMap[channel.id] ?: 0) + 1
                             channelSourceIndexMap[channel.id] = lineIndex
 
-                            val tagStr = qualityTag.formatLineTag()
-                            val lineName = if (tagStr != null) "线路 $lineIndex ($tagStr)" else "线路 $lineIndex"
-                            val priority = 10 + qualityTag.resolutionWeight
+                            val lineName = if (networkTag != null) "线路 $lineIndex ($networkTag)" else "线路 $lineIndex"
+                            // 统一保持客观基准优先级 10，真实画质由底层播放探针与解码器硬件确认
+                            val priority = 10
 
                             val protocol = inferProtocol(streamUrl)
                             val source = LiveSource(
@@ -272,22 +261,13 @@ object M3uPlaylistParser {
     }
 
     /**
-     * 提取分辨率与运营商/网络标签
+     * 仅提取网络运营商与协议客观标签（不以假画质文本作为依据）
      */
-    fun extractQualityTags(rawName: String, url: String): QualityTagInfo {
+    fun extractNetworkTag(rawName: String, url: String): String? {
         val combined = "$rawName $url"
         val lower = combined.lowercase(Locale.ROOT)
 
-        val (resWeight, resTag) = when {
-            lower.contains("8k") || lower.contains("4320p") -> 40 to "8K"
-            lower.contains("4k") || lower.contains("2160p") || lower.contains("超高清") || lower.contains("超清") -> 40 to "4K"
-            lower.contains("1080p") || lower.contains("1080i") || lower.contains("fhd") || lower.contains("全高清") -> 30 to "1080P"
-            lower.contains("720p") || lower.contains("hd") || lower.contains("高清") -> 20 to "720P"
-            lower.contains("576p") || lower.contains("480p") || lower.contains("sd") || lower.contains("标清") -> 10 to "标清"
-            else -> 0 to null
-        }
-
-        val ispTag = when {
+        return when {
             combined.contains("电信") -> "电信"
             combined.contains("联通") -> "联通"
             combined.contains("移动") -> "移动"
@@ -297,12 +277,6 @@ object M3uPlaylistParser {
             combined.contains("备用") -> "备用"
             else -> null
         }
-
-        return QualityTagInfo(
-            resolutionWeight = resWeight,
-            resolutionTag = resTag,
-            ispTag = ispTag
-        )
     }
 
     /**

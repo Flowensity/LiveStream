@@ -115,17 +115,20 @@ class M3uPlaylistParserTest {
 
         val cctv1 = parsed.channels[0]
         assertEquals("cctv1", cctv1.epgSourceId)
+        assertEquals("CCTV-1 综合", cctv1.name)
         val cctv1Sources = parsed.sources.filter { it.channelId == cctv1.id }
         assertEquals(3, cctv1Sources.size)
 
-        // 验证 4K 线路权重最高，1080P 次之，720P/高清居后
+        // 验证文本命名不应赋予虚假分辨率加权，所有线路保持客观基准 priority=10，仅保留真实网络标签
         val src4k = cctv1Sources.first { it.url.contains("4k") }
         val src1080p = cctv1Sources.first { it.url.contains("1080p") }
         val srcHd = cctv1Sources.first { it.url.contains("hd") }
 
-        assertTrue("4K priority (${src4k.priority}) should be > 1080P (${src1080p.priority})", src4k.priority > src1080p.priority)
-        assertTrue("1080P priority (${src1080p.priority}) should be >= HD (${srcHd.priority})", src1080p.priority >= srcHd.priority)
-        assertTrue("4K source name should contain tag: ${src4k.name}", src4k.name.contains("4K"))
+        assertEquals(10, src4k.priority)
+        assertEquals(10, src1080p.priority)
+        assertEquals(10, srcHd.priority)
+        assertTrue(src1080p.name.contains("电信"))
+        assertTrue(srcHd.name.contains("移动"))
     }
 
     @Test

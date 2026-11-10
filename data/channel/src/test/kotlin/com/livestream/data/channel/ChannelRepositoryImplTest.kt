@@ -7,6 +7,7 @@ import com.livestream.core.database.dao.ChannelDao
 import com.livestream.core.database.dao.LiveSourceDao
 import com.livestream.core.database.entity.ChannelEntity
 import com.livestream.core.database.entity.LiveSourceEntity
+import com.livestream.data.channel.preset.PresetChannelDataProvider
 import com.livestream.data.channel.repository.ChannelRepositoryImpl
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChannelRepositoryImplTest {
@@ -137,5 +139,94 @@ class ChannelRepositoryImplTest {
                 cctv1 != null && cctv1.isFavorite && satellite != null
             })
         }
+    }
+
+    @Test
+    fun `test saveChannels batch inserts missing categories without N+1 queries and chunks large channel lists`() = runTest(testDispatcher) {
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        val largeChannels = (1..1200).map { idx ->
+            com.livestream.core.model.Channel(
+                id = "ch_$idx",
+                name = "频道 $idx",
+                channelNumber = idx,
+                categoryId = "cat_${idx % 5}"
+            )
+        }
+
+        repo.saveChannels(largeChannels)
+
+        // Should never perform N+1 getCategoryById queries
+        coVerify(exactly = 0) { categoryDao.getCategoryById(any()) }
+        coVerify(exactly = 1) { categoryDao.insertCategoriesIgnore(match { it.size == 5 }) }
+        // 1200 channels chunked by 500 -> 3 batch inserts
+        coVerify(exactly = 3) { channelDao.insertChannels(any()) }
+    }
+
+    @Test
+    fun `test deleteChannelsByIds chunks large ID lists to avoid SQLite 999 variable limit`() = runTest(testDispatcher) {
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        val ids = (1..1200).map { "ch_$it" }
+
+        repo.deleteChannelsByIds(ids)
+
+        coVerify(exactly = 3) { channelDao.deleteChannelsByIds(match { it.size <= 500 }) }
+        coVerify(exactly = 3) { liveSourceDao.deleteSourcesByChannelIds(match { it.size <= 500 }) }
+    }
+
+    @Test
+    fun `preset channels and sources exclude VIP CCTV channels`() {
+        val removedVipIds = setOf(
+            "cctv_600099637", // CCTV世界地理频道
+            "cctv_600099660", // CCTV风云音乐频道
+            "cctv_600099649", // CCTV兵器科技频道
+            "cctv_600099636", // CCTV风云足球频道
+            "cctv_600099659", // CCTV高尔夫·网球频道
+            "cctv_600099650", // CCTV女性时尚频道
+            "cctv_600099653", // CCTV央视文化精品频道
+            "cctv_600099652", // CCTV央视台球频道
+            "cctv_600099656", // CCTV电视指南频道
+            "cctv_600099651"  // CCTV卫生健康频道
+        )
+        val removedVipNames = setOf(
+            "CCTV世界地理频道",
+            "CCTV风云音乐频道",
+            "CCTV兵器科技频道",
+            "CCTV风云足球频道",
+            "CCTV高尔夫·网球频道",
+            "CCTV女性时尚频道",
+            "CCTV央视文化精品频道",
+            "CCTV央视台球频道",
+            "CCTV电视指南频道",
+            "CCTV卫生健康频道"
+        )
+
+        val allChannels = PresetChannelDataProvider.allDefaultChannels
+        val allSources = PresetChannelDataProvider.allDefaultSourceEntities
+
+        assertTrue(allChannels.none { it.id in removedVipIds || it.name in removedVipNames })
+        assertTrue(allSources.none { it.channelId in removedVipIds })
+    }
+
+    @Test
+    fun `checkAndSeedDefaultChannels deletes obsolete preset channels from database`() = runTest(testDispatcher) {
+        val obsoleteVipChannel = ChannelEntity(
+            id = "cctv_600099637",
+            name = "CCTV世界地理频道",
+            channelNumber = 31,
+            categoryId = "cctv"
+        )
+        val customUserChannel = ChannelEntity(
+            id = "user_ch_1",
+            name = "自建频道",
+            channelNumber = 100,
+            categoryId = "custom"
+        )
+        coEvery { channelDao.getAllChannelsSync() } returns listOf(obsoleteVipChannel, customUserChannel)
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        repo.checkAndSeedDefaultChannels()
+
+        coVerify(exactly = 1) { channelDao.deleteChannelsByIds(listOf("cctv_600099637")) }
+        coVerify(exactly = 1) { liveSourceDao.deleteSourcesByChannelIds(listOf("cctv_600099637")) }
     }
 }
