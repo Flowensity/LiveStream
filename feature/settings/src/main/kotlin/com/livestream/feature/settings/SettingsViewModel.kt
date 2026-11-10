@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.Context
+import com.livestream.core.ui.device.DeviceDetector
+import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.Locale
@@ -34,7 +37,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
+class SettingsViewModel internal constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val channelRepository: ChannelRepository,
     private val categoryRepository: CategoryRepository,
@@ -42,8 +45,53 @@ class SettingsViewModel @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val dispatchers: AppDispatchers,
     private val epgRepository: EpgRepository?,
-    private val playbackOrchestrator: PlaybackOrchestrator?
+    private val playbackOrchestrator: PlaybackOrchestrator?,
+    val isTvDevice: Boolean
 ) : ViewModel() {
+
+    @Inject
+    constructor(
+        userPreferencesRepository: UserPreferencesRepository,
+        channelRepository: ChannelRepository,
+        categoryRepository: CategoryRepository,
+        localImportServer: LocalImportServer,
+        okHttpClient: OkHttpClient,
+        dispatchers: AppDispatchers,
+        epgRepository: EpgRepository?,
+        playbackOrchestrator: PlaybackOrchestrator?,
+        @ApplicationContext context: Context
+    ) : this(
+        userPreferencesRepository = userPreferencesRepository,
+        channelRepository = channelRepository,
+        categoryRepository = categoryRepository,
+        localImportServer = localImportServer,
+        okHttpClient = okHttpClient,
+        dispatchers = dispatchers,
+        epgRepository = epgRepository,
+        playbackOrchestrator = playbackOrchestrator,
+        isTvDevice = DeviceDetector.isTv(context)
+    )
+
+    constructor(
+        userPreferencesRepository: UserPreferencesRepository,
+        channelRepository: ChannelRepository,
+        categoryRepository: CategoryRepository,
+        localImportServer: LocalImportServer,
+        okHttpClient: OkHttpClient,
+        dispatchers: AppDispatchers,
+        epgRepository: EpgRepository?,
+        playbackOrchestrator: PlaybackOrchestrator?
+    ) : this(
+        userPreferencesRepository = userPreferencesRepository,
+        channelRepository = channelRepository,
+        categoryRepository = categoryRepository,
+        localImportServer = localImportServer,
+        okHttpClient = okHttpClient,
+        dispatchers = dispatchers,
+        epgRepository = epgRepository,
+        playbackOrchestrator = playbackOrchestrator,
+        isTvDevice = true
+    )
 
     constructor(
         userPreferencesRepository: UserPreferencesRepository,
@@ -60,7 +108,28 @@ class SettingsViewModel @Inject constructor(
         okHttpClient = okHttpClient,
         dispatchers = dispatchers,
         epgRepository = null,
-        playbackOrchestrator = null
+        playbackOrchestrator = null,
+        isTvDevice = true
+    )
+
+    constructor(
+        userPreferencesRepository: UserPreferencesRepository,
+        channelRepository: ChannelRepository,
+        categoryRepository: CategoryRepository,
+        localImportServer: LocalImportServer,
+        okHttpClient: OkHttpClient,
+        dispatchers: AppDispatchers,
+        isTv: Boolean
+    ) : this(
+        userPreferencesRepository = userPreferencesRepository,
+        channelRepository = channelRepository,
+        categoryRepository = categoryRepository,
+        localImportServer = localImportServer,
+        okHttpClient = okHttpClient,
+        dispatchers = dispatchers,
+        epgRepository = null,
+        playbackOrchestrator = null,
+        isTvDevice = isTv
     )
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -98,6 +167,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun ensureLocalServerStarted() {
+        if (!isTvDevice) return
         localImportServer.registerActions(createWebConsoleActions())
         val serverUrl = localImportServer.start { rawInput ->
             importM3uInternal(rawInput)

@@ -164,6 +164,28 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `when isTvDevice is false, local server is not started on init or openImportDialog`() = runTest(testDispatcher) {
+        val nonTvServer = mockk<LocalImportServer>(relaxed = true)
+        val nonTvVm = SettingsViewModel(
+            userPreferencesRepository = userPreferencesRepository,
+            channelRepository = channelRepository,
+            categoryRepository = categoryRepository,
+            localImportServer = nonTvServer,
+            okHttpClient = okHttpClient,
+            dispatchers = dispatchers,
+            isTv = false
+        )
+
+        nonTvVm.ensureLocalServerStarted()
+        nonTvVm.openImportDialog()
+        advanceUntilIdle()
+
+        org.junit.Assert.assertNull(nonTvVm.uiState.value.localServerUrl)
+        org.junit.Assert.assertNull(nonTvVm.uiState.value.qrBitmap)
+        coVerify(exactly = 0) { nonTvServer.start(any()) }
+    }
+
+    @Test
     fun `openSourceManagement and closeSourceManagement update state`() = runTest(testDispatcher) {
         viewModel.openSourceManagement()
         assertTrue(viewModel.uiState.value.isSourceManagementOpen)
@@ -205,5 +227,20 @@ class SettingsViewModelTest {
         coVerify(exactly = 1) { channelRepository.deleteChannelsByIds(listOf("ch_1", "ch_2")) }
         coVerify(exactly = 1) { channelRepository.deleteSourcesByIds(listOf("matched_src_1", "matched_src_2")) }
         coVerify(exactly = 1) { userPreferencesRepository.removeCustomPlaylistSource("test_src_1") }
+    }
+
+    @Test
+    fun `ChannelMatchIndex matches exact, CCTV numbered, and prefix channels in O(1) lookup`() {
+        val presetChannels = listOf(
+            com.livestream.core.model.Channel(id = "cctv1", name = "CCTV-1 综合", channelNumber = 1, categoryId = "cctv"),
+            com.livestream.core.model.Channel(id = "cctv5p", name = "CCTV-5+ 体育赛事", channelNumber = 6, categoryId = "cctv"),
+            com.livestream.core.model.Channel(id = "hunan", name = "湖南卫视", channelNumber = 21, categoryId = "satellite")
+        )
+        val index = SettingsViewModel.ChannelMatchIndex(presetChannels)
+
+        assertEquals("cctv1", index.match("CCTV1")?.id)
+        assertEquals("cctv1", index.match("CCTV-1 高清")?.id)
+        assertEquals("cctv5p", index.match("CCTV5+ FHD")?.id)
+        assertEquals("hunan", index.match("湖南卫视-超高清 4K")?.id)
     }
 }

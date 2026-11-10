@@ -59,7 +59,8 @@ internal fun M3uImportDialog(
     onImportTextChanged: (String) -> Unit,
     onConfirmImport: () -> Unit,
     onEnlargeQrCode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTv: Boolean = false
 ) {
     Box(
         modifier = modifier
@@ -108,8 +109,8 @@ internal fun M3uImportDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 1. Android TV 局域网扫码推送区域（带放大按钮）
-                if (uiState.qrBitmap != null && uiState.localServerUrl != null) {
+                // 1. Android TV 局域网扫码推送区域（带放大按钮，仅在 Android TV 模式下展示）
+                if (isTv && uiState.qrBitmap != null && uiState.localServerUrl != null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

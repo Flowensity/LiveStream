@@ -270,7 +270,8 @@ fun PhonePortraitLayout(
                             onThemeModeSelected = onThemeModeSelected,
                             onToggleHardwareDecode = onToggleHardwareDecode,
                             onToggleSurfaceView = onToggleSurfaceView,
-                            onAspectRatioSelected = onAspectRatioSelected
+                            onAspectRatioSelected = onAspectRatioSelected,
+                            isTv = false
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }

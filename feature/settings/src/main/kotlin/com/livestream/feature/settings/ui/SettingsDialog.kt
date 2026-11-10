@@ -144,7 +144,8 @@ fun SettingsDialog(
                 onToggleHardwareDecode = onToggleHardwareDecode,
                 onToggleSurfaceView = onToggleSurfaceView,
                 onAspectRatioSelected = onAspectRatioSelected,
-                onEnlargeQrCode = { isQrEnlarged = true }
+                onEnlargeQrCode = { isQrEnlarged = true },
+                isTv = isTv
             )
         }
 
@@ -156,12 +157,13 @@ fun SettingsDialog(
                 onCloseImportDialog = onCloseImportDialog,
                 onImportTextChanged = onImportTextChanged,
                 onConfirmImport = onConfirmImport,
-                onEnlargeQrCode = { isQrEnlarged = true }
+                onEnlargeQrCode = { isQrEnlarged = true },
+                isTv = isTv
             )
         }
 
-        // 3. 二维码全屏居中超大放大弹窗 (支持电视遥控器一键关闭)
-        if (isQrEnlarged && uiState.qrBitmap != null) {
+        // 3. 二维码全屏居中超大放大弹窗 (仅 TV 端支持，电视遥控器一键关闭)
+        if (isTv && isQrEnlarged && uiState.qrBitmap != null) {
             QrCodeEnlargedOverlay(
                 qrBitmap = uiState.qrBitmap,
                 localServerUrl = uiState.localServerUrl,
@@ -196,7 +198,8 @@ private fun SettingsDrawerPanel(
     onToggleHardwareDecode: (Boolean) -> Unit,
     onToggleSurfaceView: (Boolean) -> Unit,
     onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
-    onEnlargeQrCode: () -> Unit = {}
+    onEnlargeQrCode: () -> Unit = {},
+    isTv: Boolean = false
 ) {
     val drawerShape = RoundedCornerShape(20.dp)
     val scrollState = rememberScrollState()
@@ -271,7 +274,8 @@ private fun SettingsDrawerPanel(
                     onToggleSurfaceView = onToggleSurfaceView,
                     firstFocusRequester = firstFocusRequester,
                     onAspectRatioSelected = onAspectRatioSelected,
-                    onEnlargeQrCode = onEnlargeQrCode
+                    onEnlargeQrCode = onEnlargeQrCode,
+                    isTv = isTv
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }

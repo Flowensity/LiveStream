@@ -50,7 +50,8 @@ fun SettingsContent(
     modifier: Modifier = Modifier,
     firstFocusRequester: FocusRequester? = null,
     onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
-    onEnlargeQrCode: () -> Unit = onOpenImportDialog
+    onEnlargeQrCode: () -> Unit = onOpenImportDialog,
+    isTv: Boolean = false
 ) {
     Column(
         modifier = modifier,
@@ -62,91 +63,94 @@ fun SettingsContent(
             Modifier
         }
 
-        // 1. 置顶独立入口：手机扫码遥控与选台（后台常驻，关闭二维码后依然可控）
-        SettingsSectionTitle("手机扫码遥控")
-        OneUiGroupCard {
-            TvFocusableBox(
-                onClick = {
-                    if (uiState.qrBitmap != null) {
-                        onEnlargeQrCode()
-                    } else {
-                        onOpenImportDialog()
-                    }
-                },
-                shape = OneUiShapes.cardMedium,
-                unfocusedBackgroundColor = Color.Transparent,
-                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
-                focusedBorderColor = OneUiTheme.colors.accent,
-                focusedBorderWidth = 1.5.dp,
-                modifier = firstItemModifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 56.dp)
-            ) { isFocused ->
-                Row(
-                    modifier = Modifier
+        // 1. 置顶独立入口：手机扫码遥控与选台（仅 Android TV 电视端展示，手机/平板完全移除）
+        if (isTv) {
+            SettingsSectionTitle("手机扫码遥控")
+            OneUiGroupCard {
+                TvFocusableBox(
+                    onClick = {
+                        if (uiState.qrBitmap != null) {
+                            onEnlargeQrCode()
+                        } else {
+                            onOpenImportDialog()
+                        }
+                    },
+                    shape = OneUiShapes.cardMedium,
+                    unfocusedBackgroundColor = Color.Transparent,
+                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                    focusedBorderColor = OneUiTheme.colors.accent,
+                    focusedBorderWidth = 1.5.dp,
+                    modifier = firstItemModifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (uiState.qrBitmap != null) {
-                        Image(
-                            bitmap = uiState.qrBitmap.asImageBitmap(),
-                            contentDescription = "手机扫码遥控二维码",
+                        .defaultMinSize(minHeight = 56.dp)
+                ) { isFocused ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (uiState.qrBitmap != null) {
+                            Image(
+                                bitmap = uiState.qrBitmap.asImageBitmap(),
+                                contentDescription = "手机扫码遥控二维码",
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White)
+                                    .padding(2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+                        Column(
                             modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.White)
-                                .padding(2.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
-                    ) {
-                        Text(
-                            text = "手机扫码遥控与选台",
-                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = uiState.localServerUrl ?: "局域网扫码 · 关掉弹窗仍可随时遥控",
-                            color = OneUiTheme.colors.accent,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 1.dp)
-                        )
-                        Text(
-                            text = "支持手机换台、搜台点播、换线与推送源",
-                            color = OneUiTheme.colors.textSecondary,
-                            fontSize = 9.5.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(OneUiShapes.pill)
-                            .background(OneUiTheme.colors.accent)
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "扫码遥控",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = "手机扫码遥控与选台",
+                                color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = uiState.localServerUrl ?: "局域网扫码 · 关掉弹窗仍可随时遥控",
+                                color = OneUiTheme.colors.accent,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 1.dp)
+                            )
+                            Text(
+                                text = "支持手机换台、搜台点播、换线与推送源",
+                                color = OneUiTheme.colors.textSecondary,
+                                fontSize = 9.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(OneUiShapes.pill)
+                                .background(OneUiTheme.colors.accent)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "扫码遥控",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
 
         // 2. 频道源管理卡片
+        val importItemModifier = if (!isTv) firstItemModifier else Modifier
         SettingsSectionTitle("频道源管理")
         OneUiGroupCard {
             TvFocusableBox(
@@ -156,7 +160,7 @@ fun SettingsContent(
                 focusedBackgroundColor = OneUiTheme.colors.accentSoft,
                 focusedBorderColor = OneUiTheme.colors.accent,
                 focusedBorderWidth = 1.5.dp,
-                modifier = Modifier
+                modifier = importItemModifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 48.dp)
             ) { isFocused ->
@@ -179,7 +183,7 @@ fun SettingsContent(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "局域网扫码推送 / 网络链接",
+                            text = if (isTv) "局域网扫码推送 / 网络链接" else "网络订阅链接 / 文本导入",
                             color = OneUiTheme.colors.textSecondary,
                             fontSize = 10.sp,
                             lineHeight = 13.sp,
