@@ -26,18 +26,23 @@ import com.livestream.playback.api.PlaybackEngine
 import com.livestream.playback.api.model.EngineState
 import com.livestream.playback.api.model.PlaybackMediaItem
 import com.livestream.playback.api.model.PlaybackMetrics
+import com.livestream.playback.media3.datasource.SharedOkHttpDataSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @OptIn(UnstableApi::class)
 @Singleton
 class Media3PlaybackEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val okHttpClient: OkHttpClient?
 ) : PlaybackEngine {
+
+    constructor(context: Context) : this(context, null)
 
     private val _engineState = MutableStateFlow<EngineState>(EngineState.Idle)
     override val engineState: StateFlow<EngineState> = _engineState.asStateFlow()
@@ -83,22 +88,26 @@ class Media3PlaybackEngine @Inject constructor(
             isHardwareAccelerated = hardwareDecodePreferred
         )
 
-        // 2. 结合低延迟直播特点的精细化缓冲控制（首帧极速起播优化）
+        // 2. 结合低延迟直播特点的精细化缓冲控制（首帧极速起播优化：100ms 收到首个关键帧立即出图）
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 1500,
                 /* maxBufferMs = */ 5000,
-                /* bufferForPlaybackMs = */ 250, // 调优：由 500ms 降至 250ms，显著提升安卓 TV 首帧呈现出图速度
-                /* bufferForPlaybackAfterRebufferMs = */ 1000
+                /* bufferForPlaybackMs = */ 100,
+                /* bufferForPlaybackAfterRebufferMs = */ 500
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        // 3. 定制 HTTP 数据源工厂（缩短握手超时至 3000ms，加速死源剔除并防止 IPv6 握手阻塞）
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setConnectTimeoutMs(3000) // 调优：由 8000ms 降至 3000ms
-            .setReadTimeoutMs(4000)    // 调优：由 8000ms 降至 4000ms
-            .setAllowCrossProtocolRedirects(true)
+        // 3. 优先使用全局共享 OkHttpClient 连接池与 IPv4 优先 DNS 缓存（直接复用探针阶段已握手的连接）
+        val httpDataSourceFactory = if (okHttpClient != null) {
+            SharedOkHttpDataSource.Factory(okHttpClient)
+        } else {
+            DefaultHttpDataSource.Factory()
+                .setConnectTimeoutMs(3000)
+                .setReadTimeoutMs(4000)
+                .setAllowCrossProtocolRedirects(true)
+        }
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
@@ -137,9 +146,7 @@ class Media3PlaybackEngine @Inject constructor(
         }
 
         val liveConfig = MediaItem.LiveConfiguration.Builder()
-            .setTargetOffsetMs(3000)
-            .setMinOffsetMs(1000)
-            .setMaxOffsetMs(8000)
+            .setMaxOffsetMs(10000)
             .build()
 
         val mediaItemBuilder = MediaItem.Builder()
@@ -154,10 +161,8 @@ class Media3PlaybackEngine @Inject constructor(
         val builtItem = mediaItemBuilder.build()
 
         try {
-            // 实例复用：直接 setMediaItem 而非销毁播放器重新创建
-            player.stop()
-            player.clearMediaItems()
-            player.setMediaItem(builtItem)
+            // 解码器热复用：直接 setMediaItem 切换媒体源，不调用 stop()/clearMediaItems() 销毁已初始化的硬件 MediaCodec
+            player.setMediaItem(builtItem, /* resetPosition = */ true)
             player.playWhenReady = playWhenReady
             player.prepare()
         } catch (e: Throwable) {

@@ -8,6 +8,7 @@ import com.livestream.core.model.LiveSource
 import com.livestream.core.model.PlaybackErrorInfo
 import com.livestream.core.model.PlaybackErrorType
 import com.livestream.core.model.PlaybackStatus
+import com.livestream.core.model.SourceHealthStatus
 import com.livestream.core.model.SourceResolution
 import com.livestream.core.model.StreamProtocol
 import com.livestream.domain.channel.repository.ChannelRepository
@@ -350,5 +351,274 @@ class PlaybackOrchestratorTest {
         prefsFlow.value = com.livestream.core.model.UserPreferences(channelSwitchTimeoutMs = 3000L)
         advanceUntilIdle()
         assertEquals(3000L, orchestrator.watchdogStallTimeoutMs)
+    }
+
+    @Test
+    fun `test probeCandidateSources probes multiple candidate sources concurrently`() = runTest(testDispatcher) {
+        val slowRegistry = DefaultSourceAdapterRegistry().apply {
+            register(object : SourceAdapter {
+                override val providerId: String = "slow_cctv"
+                override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
+                    return SourceResolution.NativeMedia("https://live.example.com/${source.id}.m3u8", "HLS")
+                }
+                override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
+                    kotlinx.coroutines.delay(500L)
+                    return AvailabilityResult.Available(120L)
+                }
+            })
+        }
+
+        val s1 = sampleSource1.copy(id = "c1", adapterProviderId = "slow_cctv", priority = 30)
+        val s2 = sampleSource1.copy(id = "c2", adapterProviderId = "slow_cctv", priority = 20)
+        val s3 = sampleSource1.copy(id = "c3", adapterProviderId = "slow_cctv", priority = 10)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(s1, s2, s3)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            slowRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        // Advance only 600ms (sequential would require 1500ms for 3 x 500ms probes)
+        advanceTimeBy(600L)
+        testScheduler.runCurrent()
+
+        val latencies = orchestrator.orchestratorState.value.sourceLatenciesMs
+        assertEquals(3, latencies.size)
+        assertEquals(120L, latencies["c1"])
+        assertEquals(120L, latencies["c2"])
+        assertEquals(120L, latencies["c3"])
+    }
+
+    @Test
+    fun `test stable playback automatically prewarms adjacent channels`() = runTest(testDispatcher) {
+        val ch2Source = sampleSource1.copy(id = "src_ch2_primary", channelId = "cctv2", priority = 20)
+        coEvery { channelRepository.observeAllVisibleChannels() } returns kotlinx.coroutines.flow.flowOf(
+            listOf(sampleChannel1, sampleChannel2)
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv2") } returns listOf(ch2Source)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        // Transition to PLAYING to trigger adjacent channel pre-warming after stabilization delay
+        engineStateFlow.value = EngineState.Playing
+        advanceTimeBy(2000L)
+        advanceUntilIdle()
+
+        // Verify adjacent channel cctv2's sources were pre-fetched and its primary source was probed
+        coVerify(atLeast = 1) { channelRepository.getSourcesForChannelSync("cctv2") }
+        assertTrue(orchestrator.isChannelPrewarmed("cctv2"))
+    }
+
+    @Test
+    fun `test playChannel uses prewarmedSourcesCache without redundant DB query`() = runTest(testDispatcher) {
+        val ch2Source = sampleSource1.copy(id = "src_ch2_primary", channelId = "cctv2", priority = 20)
+        coEvery { channelRepository.observeAllVisibleChannels() } returns kotlinx.coroutines.flow.flowOf(
+            listOf(sampleChannel1, sampleChannel2)
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv2") } returns listOf(ch2Source)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        engineStateFlow.value = EngineState.Playing
+        advanceTimeBy(2000L)
+        advanceUntilIdle()
+        assertTrue(orchestrator.isChannelPrewarmed("cctv2"))
+
+        // 切换到已预热的 cctv2，验证直接命中缓存且不再触发第 2 次 getSourcesForChannelSync("cctv2")
+        orchestrator.playChannel(sampleChannel2)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { channelRepository.getSourcesForChannelSync("cctv2") }
+        assertEquals("src_ch2_primary", orchestrator.orchestratorState.value.currentSource?.id)
+    }
+
+    @Test
+    fun `test playChannel prioritizes healthy native HLS source over OFFICIAL_WEB source`() = runTest(testDispatcher) {
+        val webSource = sampleSource1.copy(
+            id = "src_web",
+            protocol = StreamProtocol.OFFICIAL_WEB,
+            priority = 100
+        )
+        val nativeHlsSource = sampleSource1.copy(
+            id = "src_native_hls",
+            protocol = StreamProtocol.HLS,
+            priority = 50
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(webSource, nativeHlsSource)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        // 即使网页源 priority=100 高于原生 HLS 的 priority=50，仍应优先选择原生硬解 HLS 源以实现毫秒级秒开
+        assertEquals("src_native_hls", orchestrator.orchestratorState.value.currentSource?.id)
+    }
+
+    @Test
+    fun `test playChannel preserves isOfficialWeb container state during SWITCHING before new source resolves`() = runTest(testDispatcher) {
+        val webSource1 = sampleSource1.copy(id = "src_web", channelId = "cctv1", protocol = StreamProtocol.OFFICIAL_WEB)
+        val webSource2 = sampleSource1.copy(id = "src_web", channelId = "cctv2", protocol = StreamProtocol.OFFICIAL_WEB)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(webSource1)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv2") } returns listOf(webSource2)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+        assertTrue(orchestrator.orchestratorState.value.isOfficialWeb)
+
+        // 发起切台到 cctv2（尚未执行协程体解析）
+        orchestrator.playChannel(sampleChannel2)
+        assertEquals(PlaybackStatus.SWITCHING, orchestrator.orchestratorState.value.status)
+        // 必须保持 isOfficialWeb = true，防止 Compose 拆装 WebPlaybackContainer
+        assertTrue(orchestrator.orchestratorState.value.isOfficialWeb)
+    }
+
+    @Test
+    fun `test playChannel prioritizes higher resolution source when health is equal`() = runTest(testDispatcher) {
+        val src4k = sampleSource1.copy(
+            id = "src_4k",
+            name = "线路 1 (4K)",
+            priority = 90
+        )
+        val src720p = sampleSource1.copy(
+            id = "src_720p",
+            name = "线路 2 (720P)",
+            priority = 70
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(src720p, src4k)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        assertEquals("src_4k", orchestrator.orchestratorState.value.currentSource?.id)
+    }
+
+    @Test
+    fun `test playChannel prioritizes healthy lower resolution source over degraded high resolution source`() = runTest(testDispatcher) {
+        val degraded4k = sampleSource1.copy(
+            id = "src_4k_degraded",
+            name = "线路 1 (4K)",
+            priority = 90,
+            healthStatus = SourceHealthStatus.DEGRADED
+        )
+        val healthy1080p = sampleSource1.copy(
+            id = "src_1080p_healthy",
+            name = "线路 2 (1080P)",
+            priority = 80,
+            healthStatus = SourceHealthStatus.HEALTHY
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(degraded4k, healthy1080p)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        assertEquals("src_1080p_healthy", orchestrator.orchestratorState.value.currentSource?.id)
+    }
+
+    @Test
+    fun `test probeCandidateSources re-ranks fast lower resolution source ahead of sluggish high resolution source`() = runTest(testDispatcher) {
+        val testRegistry = DefaultSourceAdapterRegistry().apply {
+            register(object : SourceAdapter {
+                override val providerId: String = "cctv"
+                override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
+                    return SourceResolution.NativeMedia("https://live.example.com/${source.id}.m3u8", "HLS")
+                }
+                override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
+                    return if (source.id == "src_sluggish_4k") {
+                        AvailabilityResult.Available(2500L) // 4K 延迟极高 2500ms
+                    } else {
+                        AvailabilityResult.Available(80L)   // 1080P 延迟仅 80ms 极速
+                    }
+                }
+            })
+        }
+
+        val sluggish4k = sampleSource1.copy(
+            id = "src_sluggish_4k",
+            name = "线路 1 (4K)",
+            priority = 90
+        )
+        val fast1080p = sampleSource1.copy(
+            id = "src_fast_1080p",
+            name = "线路 2 (1080P)",
+            priority = 80
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sluggish4k, fast1080p)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            testRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        // 测速后，80ms 的极速 1080P 线路应当排在 2500ms 严重卡顿的 4K 之前
+        val reordered = orchestrator.orchestratorState.value.availableSources
+        assertEquals("src_fast_1080p", reordered.first().id)
     }
 }

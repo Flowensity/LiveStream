@@ -25,6 +25,9 @@ import com.livestream.source.api.SourceAdapterRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +38,8 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -59,6 +64,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var activeSessionToken = 0L
     private var activePlayJob: Job? = null
     private var activeProbeJob: Job? = null
+    private var activePrewarmJob: Job? = null
 
     // 时延与性能统计分段打点
     private var switchStartTimeMs = 0L
@@ -70,6 +76,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var currentSourceIndex: Int = 0
     private var currentRetryCount: Int = 0
     private val sourceLatencyCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val prewarmedSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<LiveSource>>()
 
     // 缓冲卡死看门狗（超时自动换线或自愈）
     internal val watchdog = PlaybackWatchdog(dispatchers) {
@@ -82,6 +89,35 @@ class DefaultPlaybackOrchestrator @Inject constructor(
 
     companion object {
         const val MAX_RETRY_COUNT = 3
+        const val MAX_CONCURRENT_PROBES = 3
+        const val PREWARM_STABILIZE_DELAY_MS = 1200L
+
+        internal fun inferResolutionWeight(source: LiveSource): Int {
+            val combined = "${source.name} ${source.url}".lowercase(java.util.Locale.ROOT)
+            return when {
+                combined.contains("8k") || combined.contains("4320p") -> 40
+                combined.contains("4k") || combined.contains("2160p") || combined.contains("超高清") || combined.contains("超清") -> 40
+                combined.contains("1080p") || combined.contains("1080i") || combined.contains("fhd") || combined.contains("全高清") -> 30
+                combined.contains("720p") || combined.contains("hd") || combined.contains("高清") -> 20
+                combined.contains("576p") || combined.contains("480p") || combined.contains("sd") || combined.contains("标清") -> 10
+                else -> 0
+            }
+        }
+
+        internal fun calculateQualityScore(source: LiveSource, latencyMs: Long?): Int {
+            val inferredRes = inferResolutionWeight(source)
+            val resScore = if (inferredRes > 0) inferredRes * 10 else ((source.priority - 50).coerceAtLeast(0)) * 10
+            val baseScore = 200 + resScore + source.priority
+
+            val latencyPenalty = when {
+                latencyMs == null -> 0
+                latencyMs <= 500L -> 0
+                latencyMs <= 1500L -> 40
+                latencyMs <= 3000L -> 160
+                else -> 400
+            }
+            return baseScore - latencyPenalty
+        }
     }
 
     private val statusFlow = _orchestratorState
@@ -196,6 +232,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         // 1. 协同取消旧播放与解析任务，杜绝旧任务回调污染新状态
         activePlayJob?.cancel()
         activeProbeJob?.cancel()
+        activePrewarmJob?.cancel()
         currentRetryCount = 0
         watchdog.start(statusFlow)
 
@@ -204,20 +241,24 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         networkResolutionMs = 0L
         enginePrepareStartTimeMs = 0L
 
+        // 保持上一频道的 isOfficialWeb 容器形态直至新源解析完毕，避免切台瞬间 SurfaceView 与 WebView 反复拆装
         _orchestratorState.value = _orchestratorState.value.copy(
             status = PlaybackStatus.SWITCHING,
             currentChannel = channel,
             currentSource = null,
-            errorInfo = null,
-            isOfficialWeb = false,
-            officialWebUrl = null
+            errorInfo = null
         )
 
         activePlayJob = orchestratorScope.launch {
             _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.RESOLVING)
 
-            // 2. 加载当前频道的有效直播源
-            val sources = channelRepository.getSourcesForChannelSync(channel.id)
+            // 2. 优先命中邻台预热或预览缓存，免除数据库查询等待
+            val cachedSources = prewarmedSourcesCache.remove(channel.id)
+            val sources = if (!cachedSources.isNullOrEmpty()) {
+                cachedSources
+            } else {
+                channelRepository.getSourcesForChannelSync(channel.id)
+            }
             if (currentToken != activeSessionToken) return@launch // 过期请求立即退出
 
             if (sources.isEmpty()) {
@@ -228,7 +269,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 )
                 _orchestratorState.value = _orchestratorState.value.copy(
                     status = PlaybackStatus.ERROR,
-                    errorInfo = error
+                    errorInfo = error,
+                    isOfficialWeb = false,
+                    officialWebUrl = null
                 )
                 return@launch
             }
@@ -251,14 +294,32 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private fun sortSourcesByHealthAndLatency(sources: List<LiveSource>): List<LiveSource> {
         return sources.sortedWith(
             compareByDescending<LiveSource> { src ->
+                // 第一梯队：健康或未知可用状态 (2)，降级状态次之 (1)，不可用垫底 (0)
+                when (src.healthStatus) {
+                    com.livestream.core.model.SourceHealthStatus.HEALTHY,
+                    com.livestream.core.model.SourceHealthStatus.UNKNOWN -> 2
+                    com.livestream.core.model.SourceHealthStatus.DEGRADED -> 1
+                    com.livestream.core.model.SourceHealthStatus.UNAVAILABLE -> 0
+                }
+            }.thenByDescending { src ->
+                // 在可用梯队内，优先使用 ExoPlayer 原生硬解流 (HLS/DASH/HTTP)，将网页容器作为保底
+                if (src.protocol != com.livestream.core.model.StreamProtocol.OFFICIAL_WEB) 1 else 0
+            }.thenByDescending { src ->
                 when (src.healthStatus) {
                     com.livestream.core.model.SourceHealthStatus.HEALTHY -> 3
                     com.livestream.core.model.SourceHealthStatus.UNKNOWN -> 2
                     com.livestream.core.model.SourceHealthStatus.DEGRADED -> 1
                     com.livestream.core.model.SourceHealthStatus.UNAVAILABLE -> 0
                 }
-            }.thenByDescending { it.priority }
-             .thenBy { sourceLatencyCache[it.id] ?: Long.MAX_VALUE }
+            }.thenByDescending { src ->
+                // 综合清晰度（分辨率加权）与测速加载速度（网络时延）动态优选
+                val latency = sourceLatencyCache[src.id]
+                calculateQualityScore(src, latency)
+            }.thenBy { src ->
+                sourceLatencyCache[src.id] ?: Long.MAX_VALUE
+            }.thenByDescending { src ->
+                src.priority
+            }
         )
     }
 
@@ -269,37 +330,64 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     ) {
         activeProbeJob?.cancel()
         activeProbeJob = orchestratorScope.launch(dispatchers.io) {
-            for (src in sources) {
-                if (sessionToken != activeSessionToken) return@launch
-                val adapter = sourceAdapterRegistry.getAdapter(src.adapterProviderId) ?: continue
-                runCatching {
-                    when (val result = adapter.checkAvailability(channel, src)) {
-                        is com.livestream.source.api.AvailabilityResult.Available -> {
-                            sourceLatencyCache[src.id] = result.latencyMs
-                            channelRepository.updateSourceHealth(
-                                src.id,
-                                com.livestream.core.model.SourceHealthStatus.HEALTHY
-                            )
-                        }
-                        is com.livestream.source.api.AvailabilityResult.Degraded -> {
-                            sourceLatencyCache[src.id] = result.latencyMs
-                            channelRepository.updateSourceHealth(
-                                src.id,
-                                com.livestream.core.model.SourceHealthStatus.DEGRADED
-                            )
-                        }
-                        is com.livestream.source.api.AvailabilityResult.Unavailable -> {
-                            channelRepository.updateSourceHealth(
-                                src.id,
-                                com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
-                            )
+            // 错峰 50ms 启动后台探测，让主播放源优先独占带宽与连接池完成首帧握手
+            delay(50L)
+            if (sessionToken != activeSessionToken) return@launch
+            val probeSemaphore = Semaphore(MAX_CONCURRENT_PROBES)
+            val healthUpdates = java.util.concurrent.ConcurrentHashMap<String, com.livestream.core.model.SourceHealthStatus>()
+
+            coroutineScope {
+                sources.map { src ->
+                    async {
+                        probeSemaphore.withPermit {
+                            if (sessionToken != activeSessionToken) return@withPermit
+                            val adapter = sourceAdapterRegistry.getAdapter(src.adapterProviderId) ?: return@withPermit
+                            runCatching {
+                                when (val result = adapter.checkAvailability(channel, src)) {
+                                    is com.livestream.source.api.AvailabilityResult.Available -> {
+                                        sourceLatencyCache[src.id] = result.latencyMs
+                                        healthUpdates[src.id] = com.livestream.core.model.SourceHealthStatus.HEALTHY
+                                        channelRepository.updateSourceHealth(
+                                            src.id,
+                                            com.livestream.core.model.SourceHealthStatus.HEALTHY
+                                        )
+                                    }
+                                    is com.livestream.source.api.AvailabilityResult.Degraded -> {
+                                        sourceLatencyCache[src.id] = result.latencyMs
+                                        healthUpdates[src.id] = com.livestream.core.model.SourceHealthStatus.DEGRADED
+                                        channelRepository.updateSourceHealth(
+                                            src.id,
+                                            com.livestream.core.model.SourceHealthStatus.DEGRADED
+                                        )
+                                    }
+                                    is com.livestream.source.api.AvailabilityResult.Unavailable -> {
+                                        healthUpdates[src.id] = com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
+                                        channelRepository.updateSourceHealth(
+                                            src.id,
+                                            com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
-                }
+                }.awaitAll()
             }
+
             if (sessionToken == activeSessionToken) {
+                val updatedList = availableSources.map { src ->
+                    val newHealth = healthUpdates[src.id]
+                    if (newHealth != null) src.copy(healthStatus = newHealth) else src
+                }
+                availableSources = sortSourcesByHealthAndLatency(updatedList)
+                val activeSrcId = _orchestratorState.value.currentSource?.id
+                if (activeSrcId != null) {
+                    val idx = availableSources.indexOfFirst { it.id == activeSrcId }
+                    if (idx >= 0) currentSourceIndex = idx
+                }
                 _orchestratorState.value = _orchestratorState.value.copy(
                     availableSources = availableSources,
+                    currentSourceIndex = currentSourceIndex,
                     sourceLatenciesMs = sourceLatencyCache.toMap()
                 )
             }
@@ -556,6 +644,83 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         } else {
             _orchestratorState.value = _orchestratorState.value.copy(status = PlaybackStatus.PLAYING)
         }
+        scheduleAdjacentChannelPrewarm(
+            currentChannel = _orchestratorState.value.currentChannel,
+            sessionToken = activeSessionToken
+        )
+    }
+
+    internal fun isChannelPrewarmed(channelId: String): Boolean {
+        return prewarmedSourcesCache.containsKey(channelId)
+    }
+
+    private fun scheduleAdjacentChannelPrewarm(currentChannel: Channel?, sessionToken: Long) {
+        if (currentChannel == null) return
+        activePrewarmJob?.cancel()
+        activePrewarmJob = orchestratorScope.launch(dispatchers.io) {
+            delay(PREWARM_STABILIZE_DELAY_MS)
+            if (sessionToken != activeSessionToken || _orchestratorState.value.status != PlaybackStatus.PLAYING) {
+                return@launch
+            }
+            val visibleChannels = channelRepository.observeAllVisibleChannels().firstOrNull().orEmpty()
+            if (visibleChannels.size <= 1) return@launch
+
+            val idx = visibleChannels.indexOfFirst { it.id == currentChannel.id }
+            if (idx == -1) return@launch
+
+            val nextIdx = if (idx == visibleChannels.size - 1) 0 else idx + 1
+            val prevIdx = if (idx == 0) visibleChannels.size - 1 else idx - 1
+            val adjacentChannels = listOf(visibleChannels[nextIdx], visibleChannels[prevIdx])
+                .distinctBy { it.id }
+                .filter { it.id != currentChannel.id }
+
+            for (adjChannel in adjacentChannels) {
+                if (sessionToken != activeSessionToken) return@launch
+                prewarmSingleChannel(adjChannel, sessionToken)
+            }
+        }
+    }
+
+    private suspend fun prewarmSingleChannel(targetChannel: Channel, sessionToken: Long) {
+        runCatching {
+            val sources = channelRepository.getSourcesForChannelSync(targetChannel.id)
+            if (sources.isEmpty() || sessionToken != activeSessionToken) return
+            val sorted = sortSourcesByHealthAndLatency(sources)
+            prewarmedSourcesCache[targetChannel.id] = sorted
+
+            // 预热首选源的 DNS 缓存与 TCP/TLS 连接池，并提前淘汰死源
+            val primarySource = sorted.firstOrNull() ?: return
+            val adapter = sourceAdapterRegistry.getAdapter(primarySource.adapterProviderId) ?: return
+            val newHealth = when (val result = adapter.checkAvailability(targetChannel, primarySource)) {
+                is com.livestream.source.api.AvailabilityResult.Available -> {
+                    sourceLatencyCache[primarySource.id] = result.latencyMs
+                    channelRepository.updateSourceHealth(
+                        primarySource.id,
+                        com.livestream.core.model.SourceHealthStatus.HEALTHY
+                    )
+                    com.livestream.core.model.SourceHealthStatus.HEALTHY
+                }
+                is com.livestream.source.api.AvailabilityResult.Degraded -> {
+                    sourceLatencyCache[primarySource.id] = result.latencyMs
+                    channelRepository.updateSourceHealth(
+                        primarySource.id,
+                        com.livestream.core.model.SourceHealthStatus.DEGRADED
+                    )
+                    com.livestream.core.model.SourceHealthStatus.DEGRADED
+                }
+                is com.livestream.source.api.AvailabilityResult.Unavailable -> {
+                    channelRepository.updateSourceHealth(
+                        primarySource.id,
+                        com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
+                    )
+                    com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
+                }
+            }
+            val updated = sorted.map { src ->
+                if (src.id == primarySource.id) src.copy(healthStatus = newHealth) else src
+            }
+            prewarmedSourcesCache[targetChannel.id] = sortSourcesByHealthAndLatency(updated)
+        }
     }
 
     override fun previewChannel(channel: Channel) {
@@ -565,6 +730,11 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             currentSource = null,
             errorInfo = null
         )
+        val token = activeSessionToken
+        activePrewarmJob?.cancel()
+        activePrewarmJob = orchestratorScope.launch(dispatchers.io) {
+            prewarmSingleChannel(channel, token)
+        }
     }
 
     override fun switchChannel(direction: SwitchDirection) {
@@ -659,6 +829,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activeSessionToken++
         activePlayJob?.cancel()
         activeProbeJob?.cancel()
+        activePrewarmJob?.cancel()
         switchStartTimeMs = 0L
         watchdog.stop()
         engine.stop()
@@ -674,6 +845,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activeSessionToken++
         activePlayJob?.cancel()
         activeProbeJob?.cancel()
+        activePrewarmJob?.cancel()
         switchStartTimeMs = 0L
         watchdog.release()
         engine.release()
