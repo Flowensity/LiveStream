@@ -25,7 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,7 +67,8 @@ import java.util.Locale
  *
  * 手机横屏模式优化：
  * 采用左右双栏布局，左侧承载信号源与画面比例控制卡片，右侧独占纵向全高展示今日节目单，
- * 彻底解决横屏下高度局促导致节目单被压缩无法浏览的问题。
+ * 彻底解决横屏下高度局促导致节目单被压缩无法浏览的问题。针对极窄横屏（如分屏多任务）
+ * 提供平滑降级保护。
  */
 @Composable
 fun EpgScheduleDialog(
@@ -91,6 +94,8 @@ fun EpgScheduleDialog(
         deviceType == DeviceType.PHONE_LANDSCAPE ||
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     )
+    // 宽屏横屏下启用双栏；若处于分屏多任务等极窄横屏 (sw < 520dp)，平滑回退单列避免右栏受压
+    val canUseDualColumn = isLandscape && (configuration.screenWidthDp >= 520)
 
     val now = System.currentTimeMillis()
     val listState = rememberLazyListState()
@@ -141,9 +146,9 @@ fun EpgScheduleDialog(
             val activeSource = availableSources.getOrNull(activeSourceIndex)
             val activeLatency = activeSource?.id?.let { sourceLatenciesMs[it] }
 
-            // 横屏下适度加宽至 ~440dp (不超过屏幕 58%)，竖屏/TV 保持 264dp 紧凑标准
-            val drawerWidth = if (isLandscape) {
-                minOf(440.dp, (configuration.screenWidthDp * 0.58f).dp)
+            // 横屏下适度加宽至 380~440dp (不超过屏幕 58%)，竖屏/TV 保持 264dp 紧凑标准
+            val drawerWidth = if (canUseDualColumn) {
+                minOf(440.dp, maxOf(380.dp, (configuration.screenWidthDp * 0.58f).dp))
             } else {
                 OneUiDimensions.panelPlaylistWidth
             }
@@ -211,7 +216,7 @@ fun EpgScheduleDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (isLandscape) {
+                    if (canUseDualColumn) {
                         // 横屏双栏排版：左栏控制（信号源+画面比例），右栏节目单
                         Row(
                             modifier = Modifier
@@ -222,7 +227,8 @@ fun EpgScheduleDialog(
                             Column(
                                 modifier = Modifier
                                     .width(190.dp)
-                                    .fillMaxHeight(),
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 SourceSwitchCard(
@@ -355,7 +361,7 @@ private fun SourceSwitchCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 5.dp),
+                        .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -447,39 +453,26 @@ private fun AspectRatioCard(
         }
 
         if (isTwoByTwoGrid) {
-            val entries = VideoAspectRatio.entries
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    entries.take(2).forEach { ratio ->
-                        AspectRatioButton(
-                            ratio = ratio,
-                            isSelected = aspectRatio == ratio,
-                            onSelect = { onAspectRatioSelected(ratio) },
-                            modifier = Modifier.weight(1f),
-                            shortLabel = false
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    entries.drop(2).take(2).forEach { ratio ->
-                        AspectRatioButton(
-                            ratio = ratio,
-                            isSelected = aspectRatio == ratio,
-                            onSelect = { onAspectRatioSelected(ratio) },
-                            modifier = Modifier.weight(1f),
-                            shortLabel = false
-                        )
+                VideoAspectRatio.entries.chunked(2).forEach { rowEntries ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        rowEntries.forEach { ratio ->
+                            AspectRatioButton(
+                                ratio = ratio,
+                                isSelected = aspectRatio == ratio,
+                                onSelect = { onAspectRatioSelected(ratio) },
+                                modifier = Modifier.weight(1f),
+                                shortLabel = false
+                            )
+                        }
                     }
                 }
             }
@@ -524,7 +517,7 @@ private fun AspectRatioButton(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp),
+                .padding(vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -561,13 +554,18 @@ private fun EpgProgramList(
                 text = "今日节目单 ($todayStr)",
                 color = OneUiTheme.colors.textSecondary,
                 fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
             if (programs.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "共 ${programs.size} 档节目",
+                    text = "共 ${programs.size} 档",
                     color = OneUiTheme.colors.textMuted,
-                    fontSize = 10.5.sp
+                    fontSize = 10.5.sp,
+                    maxLines = 1
                 )
             }
         }
@@ -580,7 +578,7 @@ private fun EpgProgramList(
                     .fillMaxWidth()
                     .weight(1f)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
-                    .background(OneUiTheme.colors.cardBackground, cardShape),
+                .background(OneUiTheme.colors.cardBackground, cardShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
