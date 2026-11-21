@@ -523,6 +523,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                     // 原生播放引擎停止，转入官方合规网页模式
                     engine.stop()
 
+                    val isSameWebTarget = _orchestratorState.value.isOfficialWeb &&
+                        _orchestratorState.value.officialWebUrl == resolution.uri
+
                     _orchestratorState.value = _orchestratorState.value.copy(
                         status = PlaybackStatus.PREPARING,
                         currentSource = source,
@@ -530,6 +533,12 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                         isOfficialWeb = true,
                         officialWebUrl = resolution.uri
                     )
+
+                    if (isSameWebTarget) {
+                        webPlaybackController.reload()
+                    } else {
+                        webPlaybackController.loadOfficialUrl(resolution.uri, null)
+                    }
                 }
                 is SourceResolution.Unavailable -> {
                     val error = PlaybackErrorInfo(
@@ -758,8 +767,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             val sorted = sortSourcesByHealthAndLatency(sources)
             prewarmedSourcesCache[targetChannel.id] = sorted
 
-            // 预热首选源的 DNS 缓存与 TCP/TLS 连接池，并提前淘汰死源
+            // 预热首选源的 DNS 缓存与 TCP/TLS 连接池，并提前淘汰死源（OFFICIAL_WEB 走 Chromium 栈与页内 SPA 复用，无需 OkHttp 重复探测）
             val primarySource = sorted.firstOrNull() ?: return
+            if (primarySource.protocol == com.livestream.core.model.StreamProtocol.OFFICIAL_WEB) return
             val adapter = sourceAdapterRegistry.getAdapter(primarySource.adapterProviderId) ?: return
             val newHealth = when (val result = adapter.checkAvailability(targetChannel, primarySource)) {
                 is com.livestream.source.api.AvailabilityResult.Available -> {
@@ -862,7 +872,11 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     }
 
     override fun selectSource(sourceIndex: Int) {
-        if (sourceIndex !in availableSources.indices || sourceIndex == currentSourceIndex) return
+        if (sourceIndex !in availableSources.indices) return
+        if (sourceIndex == currentSourceIndex) {
+            retry()
+            return
+        }
         val currentToken = activeSessionToken
         currentSourceIndex = sourceIndex
         currentRetryCount = 0

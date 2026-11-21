@@ -275,8 +275,7 @@ class ChannelRepositoryImpl @Inject constructor(
                     if (existing != null) {
                         defaultChannel.copy(
                             isFavorite = existing.isFavorite,
-                            isHidden = existing.isHidden,
-                            orderIndex = existing.orderIndex
+                            isHidden = existing.isHidden
                         ).toEntity()
                     } else {
                         defaultChannel.toEntity()

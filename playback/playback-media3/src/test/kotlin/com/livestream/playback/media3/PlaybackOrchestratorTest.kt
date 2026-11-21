@@ -802,4 +802,40 @@ class PlaybackOrchestratorTest {
             )
         }
     }
+
+    @Test
+    fun `test switchNextSource on single official web source triggers webPlaybackController reload so status does not stick in PREPARING`() = runTest(testDispatcher) {
+        val webSource = sampleSource1.copy(id = "src_web", protocol = StreamProtocol.OFFICIAL_WEB)
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(webSource)
+        coEvery { webPlaybackController.reload() } answers {
+            webStateFlow.value = WebPlaybackState.Loading(0)
+        }
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        webStateFlow.value = WebPlaybackState.Playing
+        advanceUntilIdle()
+        assertEquals(PlaybackStatus.PLAYING, orchestrator.orchestratorState.value.status)
+
+        // 用户在播放菜单中点击「重新连接线路」
+        orchestrator.switchNextSource()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { webPlaybackController.reload() }
+        assertEquals(PlaybackStatus.BUFFERING, orchestrator.orchestratorState.value.status)
+
+        webStateFlow.value = WebPlaybackState.Playing
+        advanceUntilIdle()
+        assertEquals(PlaybackStatus.PLAYING, orchestrator.orchestratorState.value.status)
+    }
 }

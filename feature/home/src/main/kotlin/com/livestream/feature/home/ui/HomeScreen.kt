@@ -165,6 +165,7 @@ fun HomeScreen(
                     onToggleOsd = { playerViewModel.toggleOsd() },
                     onRetry = { playerViewModel.retry() },
                     onSwitchSource = { playerViewModel.switchNextSource() },
+                    onSelectSource = { playerViewModel.selectSource(it) },
                     onOpenDrawer = { channelViewModel.openDrawer() },
                     onCloseDrawer = { channelViewModel.closeDrawer() },
                     onCategorySelected = { channelViewModel.selectCategory(it) },
@@ -258,6 +259,7 @@ fun HomeScreen(
                     onHideOsd = { playerViewModel.hideOsd() },
                     onRetry = { playerViewModel.retry() },
                     onSwitchSource = { playerViewModel.switchNextSource() },
+                    onSelectSource = { playerViewModel.selectSource(it) },
                     onSwitchNextChannel = {
                         homeViewModel.switchNextChannel()
                         playerViewModel.showOsd()

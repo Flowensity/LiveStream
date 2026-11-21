@@ -67,10 +67,23 @@ class DefaultWebPlaybackController @Inject constructor(
             "beacon.qq.com",
             "trace.qq.com",
             "btrace.qq.com",
+            "btrace.yangshipin.cn",
+            "aatc-api.yangshipin.cn",
+            "pcsite.ysp.cctv.cn",
+            "mediadata.xuexi.cn",
+            "o.alicdn.com/qtsdk",
+            "api4.ipify.org",
             "report.url.cn",
             "google-analytics.com",
             "googletagmanager.com",
             "sensorsdata"
+        )
+        private val BLOCKED_PATH_KEYWORDS = arrayOf(
+            "vconsole.min.js",
+            "/static/project/test/player/vr/",
+            "/voapi/omsot/servertime",
+            "/api/yspepg/program/",
+            "/api/oms/pc/config"
         )
         private val BLOCKED_EXTENSIONS = arrayOf(
             ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".bmp",
@@ -91,6 +104,9 @@ class DefaultWebPlaybackController @Inject constructor(
         for (hostKeyword in BLOCKED_HOST_KEYWORDS) {
             if (lower.contains(hostKeyword)) return true
         }
+        for (pathKeyword in BLOCKED_PATH_KEYWORDS) {
+            if (lower.contains(pathKeyword)) return true
+        }
         for (ext in BLOCKED_EXTENSIONS) {
             if (pathPart.endsWith(ext)) return true
         }
@@ -98,40 +114,106 @@ class DefaultWebPlaybackController @Inject constructor(
         return false
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    internal fun extractYangshipinPid(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        val lower = url.lowercase(Locale.ROOT)
+        if (!lower.contains("yangshipin.cn/tv/home")) return null
+        val query = url.substringAfter('?', "")
+        if (query.isEmpty()) return null
+        for (param in query.split('&')) {
+            val key = param.substringBefore('=')
+            val value = param.substringAfter('=', "").substringBefore('#')
+            if (key.equals("pid", ignoreCase = true) && value.isNotBlank() && value.all { it.isDigit() }) {
+                return value
+            }
+        }
+        return null
+    }
+
     override fun loadOfficialUrl(url: String, container: Any?) {
-        val viewGroup = container as? ViewGroup ?: return
+        loadOfficialUrlInternal(url, container, forceReload = false)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun loadOfficialUrlInternal(url: String, container: Any?, forceReload: Boolean) {
+        val viewGroup = (container as? ViewGroup) ?: parentContainer
         isUserPaused = false
         val existingWv = webView
         if (existingWv != null && canReusePooledInstance()) {
-            if (parentContainer != viewGroup) {
+            if (viewGroup != null && parentContainer != viewGroup) {
                 (existingWv.parent as? ViewGroup)?.removeView(existingWv)
                 viewGroup.addView(existingWv)
                 parentContainer = viewGroup
             }
-            if (targetUrl == url) {
+            if (!forceReload && targetUrl == url) {
                 existingWv.animate().cancel()
-                existingWv.alpha = 1f
+                if (_webState.value is WebPlaybackState.Playing || _webState.value is WebPlaybackState.Ready) {
+                    existingWv.alpha = 1f
+                }
                 applyAspectRatioToWebView()
                 injectPlayerStyling(existingWv)
                 return
             }
-            // 实例池化热复用：不同官方网页切换时直接复用已初始化的 Chromium WebView 实例，省去冷启动开销
+            // 实例池化热复用：不同官方网页切换或重连时直接复用已初始化的 Chromium WebView 实例
             loadTimeoutJob?.cancel()
             pageFinishedFallbackJob?.cancel()
+            val prevUrl = targetUrl
+            targetUrl = url
+            _webState.value = WebPlaybackState.Loading(0)
+            applyAspectRatioToWebView()
+            startLoadTimeout(existingWv)
+
+            val prevPid = extractYangshipinPid(prevUrl)
+            val nextPid = extractYangshipinPid(url)
+            if (prevPid != null && nextPid != null) {
+                existingWv.evaluateJavascript(buildInPageChannelSwitchScript(nextPid)) { result ->
+                    if (result != null && result.contains("OK")) {
+                        injectPlayerStyling(existingWv)
+                        pageFinishedFallbackJob?.cancel()
+                        pageFinishedFallbackJob = controllerScope.launch {
+                            delay(1200)
+                            existingWv.post {
+                                existingWv.animate().cancel()
+                                existingWv.alpha = 1f
+                                if (_webState.value is WebPlaybackState.Loading) {
+                                    _webState.value = WebPlaybackState.Ready
+                                }
+                            }
+                        }
+                    } else {
+                        existingWv.stopLoading()
+                        existingWv.animate().cancel()
+                        existingWv.alpha = 0f
+                        existingWv.loadUrl(url)
+                    }
+                }
+                return
+            }
+
             existingWv.stopLoading()
             // 先暂停并清空旧 video 元素，防止旧画面残留或误触发新频道的 onVideoReady
             existingWv.evaluateJavascript(
                 "(function(){try{var v=document.getElementsByTagName('video');for(var i=0;i<v.length;i++){v[i].pause();v[i].removeAttribute('src');v[i].load();}}catch(e){}})();",
                 null
             )
-            targetUrl = url
             existingWv.animate().cancel()
             existingWv.alpha = 0f
-            _webState.value = WebPlaybackState.Loading(0)
-            applyAspectRatioToWebView()
-            startLoadTimeout(existingWv)
             existingWv.loadUrl(url)
+            return
+        }
+
+        if (existingWv == null && canReusePooledInstance()) {
+            if (viewGroup != null) {
+                parentContainer = viewGroup
+            }
+            if (forceReload || targetUrl != url) {
+                targetUrl = url
+                _webState.value = WebPlaybackState.Loading(0)
+            }
+            return
+        }
+
+        if (viewGroup == null) {
             return
         }
 
@@ -185,6 +267,8 @@ class DefaultWebPlaybackController @Inject constructor(
                     @JavascriptInterface
                     fun onVideoReady() {
                         post {
+                            loadTimeoutJob?.cancel()
+                            pageFinishedFallbackJob?.cancel()
                             animate().cancel()
                             alpha = 1f
                             _webState.value = WebPlaybackState.Playing
@@ -296,9 +380,10 @@ class DefaultWebPlaybackController @Inject constructor(
             }
         }
 
-        viewGroup.addView(wv)
+        viewGroup?.addView(wv)
         webView = wv
         _activeWebViewCount.value = 1
+        _webState.value = WebPlaybackState.Loading(0)
         applyAspectRatioToWebView()
 
         startLoadTimeout(wv)
@@ -417,6 +502,84 @@ class DefaultWebPlaybackController @Inject constructor(
         view.evaluateJavascript(buildPlayerStylingScript(currentAspectRatio, isUserPaused), null)
     }
 
+    internal fun buildInPageChannelSwitchScript(targetPid: String): String {
+        return """
+            (function() {
+                try {
+                    var appEl = document.getElementById('app');
+                    var rootVm = appEl && appEl.__vue__;
+                    if (!rootVm) return 'FALLBACK';
+                    function findTvVm(vm) {
+                        if (!vm) return null;
+                        if (vm.tvTabs && vm.${'$'}options && vm.${'$'}options.methods && vm.${'$'}options.methods.changeTV) {
+                            return vm;
+                        }
+                        var children = vm.${'$'}children || [];
+                        for (var i = 0; i < children.length; i++) {
+                            var found = findTvVm(children[i]);
+                            if (found) return found;
+                        }
+                        return null;
+                    }
+                    var vm = findTvVm(rootVm);
+                    if (!vm || !Array.isArray(vm.tvTabs)) return 'FALLBACK';
+                    var target = null;
+                    var targetTabIdx = 0;
+                    for (var ti = 0; ti < vm.tvTabs.length; ti++) {
+                        var tab = vm.tvTabs[ti] || [];
+                        for (var ci = 0; ci < tab.length; ci++) {
+                            if (String(tab[ci].pid) === '$targetPid') {
+                                target = tab[ci];
+                                targetTabIdx = ti;
+                                break;
+                            }
+                        }
+                        if (target) break;
+                    }
+                    if (!target) return 'FALLBACK';
+
+                    var vids = document.getElementsByTagName('video');
+                    for (var vi = 0; vi < vids.length; vi++) {
+                        try {
+                            vids[vi].pause();
+                            vids[vi].removeAttribute('src');
+                            vids[vi].load();
+                        } catch (e) {}
+                    }
+
+                    vm.setTvConfig = function(p, s, c, vr, pt) {
+                        this.videoConfig = {
+                            pid: p,
+                            vid: s,
+                            poster: c,
+                            isTV: true,
+                            autoplay: true,
+                            viewRights: vr,
+                            payType: pt
+                        };
+                    };
+                    vm.getInit = function() {};
+                    vm.currentIndex = targetTabIdx;
+                    vm.selectIndex = targetTabIdx;
+                    vm.tvIndex = target;
+                    if (vm.${'$'}router && vm.${'$'}route) {
+                        try {
+                            var nextQuery = Object.assign({}, vm.${'$'}route.query, { pid: target.pid });
+                            vm.${'$'}router.replace({ query: nextQuery }, function(){}, function(){});
+                        } catch (e) {}
+                    }
+                    vm.videoConfig = {};
+                    vm.${'$'}nextTick(function() {
+                        vm.setTvConfig(target.pid, target.streamId, target.coverUrl, target.viewRights, target.payType, target);
+                    });
+                    return 'OK';
+                } catch (e) {
+                    return 'FALLBACK';
+                }
+            })();
+        """.trimIndent()
+    }
+
     internal fun buildPlayerStylingScript(
         aspectRatio: VideoAspectRatio,
         isPaused: Boolean
@@ -436,6 +599,76 @@ class DefaultWebPlaybackController @Inject constructor(
             (function() {
                 try {
                     window.__livestream_paused = $isPaused;
+
+                    if (!window.__ls_timeout_hooked) {
+                        window.__ls_timeout_hooked = true;
+                        var origSetTimeout = window.setTimeout;
+                        window.setTimeout = function(fn, delay) {
+                            if (delay === 300 && typeof fn === 'function') {
+                                try {
+                                    if (Function.prototype.toString.call(fn).indexOf('videoConfig') !== -1) {
+                                        return origSetTimeout(fn, 0);
+                                    }
+                                } catch (e) {}
+                            }
+                            return origSetTimeout.apply(this, arguments);
+                        };
+                    }
+
+                    if (window['cctvh5-openapi'] && window['cctvh5-openapi'].getSignature && !window.__ls_openapi_warmed) {
+                        window.__ls_openapi_warmed = true;
+                        try {
+                            window['cctvh5-openapi'].getSignature({ yspappid: '519748109' });
+                        } catch (e) {}
+                    }
+
+                    var prefetches = document.querySelectorAll ? document.querySelectorAll('link[rel="prefetch"]') : [];
+                    for (var pi = 0; pi < prefetches.length; pi++) {
+                        if (prefetches[pi].parentNode) {
+                            prefetches[pi].parentNode.removeChild(prefetches[pi]);
+                        }
+                    }
+
+                    var appEl = document.getElementById('app');
+                    var rootVm = appEl && appEl.__vue__;
+                    if (rootVm) {
+                        (function accelerateVue(vm) {
+                            if (!vm) return;
+                            if (vm.${'$'}options && vm.${'$'}options.name === 'tv-home' && !vm.__ls_feed_booted) {
+                                vm.__ls_feed_booted = true;
+                                var origInit = vm.init;
+                                if (!vm.currentTab && typeof origInit === 'function') {
+                                    vm.currentTab = 'PG00000004';
+                                    vm.init = function() {};
+                                    origInit.call(vm, 'PG00000004');
+                                } else {
+                                    vm.init = function() {};
+                                }
+                            }
+                            if (vm.tvTabs && vm.${'$'}options && vm.${'$'}options.methods && vm.${'$'}options.methods.changeTV && !vm.__ls_tv_patched) {
+                                vm.__ls_tv_patched = true;
+                                vm.setTvConfig = function(p, s, c, vr, pt) {
+                                    this.videoConfig = {
+                                        pid: p,
+                                        vid: s,
+                                        poster: c,
+                                        isTV: true,
+                                        autoplay: true,
+                                        viewRights: vr,
+                                        payType: pt
+                                    };
+                                };
+                                vm.getInit = function() {};
+                                if (vm.tvIndex && vm.tvIndex.pid && (!vm.videoConfig || !vm.videoConfig.vid)) {
+                                    vm.setTvConfig(vm.tvIndex.pid, vm.tvIndex.streamId, vm.tvIndex.coverUrl, vm.tvIndex.viewRights, vm.tvIndex.payType, vm.tvIndex);
+                                }
+                            }
+                            var children = vm.${'$'}children || [];
+                            for (var ci = 0; ci < children.length; ci++) {
+                                accelerateVue(children[ci]);
+                            }
+                        })(rootVm);
+                    }
 
                     var meta = document.querySelector('meta[name="viewport"]');
                     if (!meta) {
@@ -589,9 +822,12 @@ class DefaultWebPlaybackController @Inject constructor(
     override fun reload() {
         val url = targetUrl
         val container = parentContainer
-        if (url != null && container != null) {
-            loadOfficialUrl(url, container)
-        } else {
+        if (url != null) {
+            loadOfficialUrlInternal(url, container, forceReload = true)
+        } else if (webView != null) {
+            isUserPaused = false
+            _webState.value = WebPlaybackState.Loading(0)
+            startLoadTimeout(webView!!)
             webView?.reload()
         }
     }

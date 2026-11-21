@@ -150,6 +150,10 @@ class Media3PlaybackEngine @Inject constructor(
             targetPlayer.setMediaItem(builtItem, /* resetPosition = */ true)
             targetPlayer.playWhenReady = playWhenReady
             targetPlayer.prepare()
+            when (targetPlayer.playbackState) {
+                Player.STATE_BUFFERING -> _engineState.value = EngineState.Buffering
+                Player.STATE_READY -> _engineState.value = if (playWhenReady) EngineState.Playing else EngineState.Ready
+            }
         } catch (e: Throwable) {
             _engineState.value = EngineState.Error(
                 PlaybackErrorInfo(

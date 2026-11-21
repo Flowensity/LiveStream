@@ -8,6 +8,7 @@ import com.livestream.domain.channel.repository.UserPreferencesRepository
 import com.livestream.playback.api.PlaybackOrchestrator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.firstOrNull
@@ -46,6 +47,7 @@ class HomeViewModel @Inject constructor(
         hasInitiatedStartupPlay = true
 
         viewModelScope.launch {
+            val prefsDeferred = async { userPreferencesRepository.userPreferences.firstOrNull() }
             channelRepository.checkAndSeedDefaultChannels()
             val channels = if (cachedChannels.isNotEmpty()) {
                 cachedChannels
@@ -55,7 +57,7 @@ class HomeViewModel @Inject constructor(
             if (channels.isEmpty()) return@launch
             cachedChannels = channels
 
-            val prefs = userPreferencesRepository.userPreferences.firstOrNull()
+            val prefs = prefsDeferred.await()
             val targetChannel = if (prefs?.lastPlayedChannelId != null) {
                 channels.find { it.id == prefs.lastPlayedChannelId } ?: channels.first()
             } else {

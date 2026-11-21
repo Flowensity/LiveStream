@@ -210,6 +210,40 @@ class ChannelRepositoryImplTest {
     }
 
     @Test
+    fun `preset channels and sources exclude defunct satellite channels absent from Yangshipin`() {
+        val removedSatelliteIds = setOf(
+            "weishi_600190405", // 吉林卫视
+            "weishi_600190400", // 陕西卫视
+            "weishi_600190408", // 甘肃卫视
+            "weishi_600190737", // 宁夏卫视
+            "weishi_600190401", // 内蒙古卫视
+            "weishi_600190402", // 云南卫视
+            "weishi_600190407", // 山西卫视
+            "weishi_600190406", // 青海卫视
+            "weishi_600190403"  // 西藏卫视
+        )
+        val removedSatelliteNames = setOf(
+            "吉林卫视",
+            "陕西卫视",
+            "甘肃卫视",
+            "宁夏卫视",
+            "内蒙古卫视",
+            "云南卫视",
+            "山西卫视",
+            "青海卫视",
+            "西藏卫视"
+        )
+
+        val allChannels = PresetChannelDataProvider.allDefaultChannels
+        val allSources = PresetChannelDataProvider.allDefaultSourceEntities
+
+        assertTrue(allChannels.none { it.id in removedSatelliteIds || it.name in removedSatelliteNames })
+        assertTrue(allSources.none { it.channelId in removedSatelliteIds })
+        assertEquals(54, allChannels.size)
+        assertEquals((1..54).toList(), allChannels.map { it.channelNumber })
+    }
+
+    @Test
     fun `checkAndSeedDefaultChannels deletes obsolete preset channels from database`() = runTest(testDispatcher) {
         val obsoleteVipChannel = ChannelEntity(
             id = "cctv_600099637",

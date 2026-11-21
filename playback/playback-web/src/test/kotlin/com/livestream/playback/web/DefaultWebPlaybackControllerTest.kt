@@ -134,4 +134,55 @@ class DefaultWebPlaybackControllerTest {
         assertTrue(pausedJs.contains("window.__livestream_paused = true"))
         assertTrue(pausedJs.contains("object-fit"))
     }
+
+    @Test
+    fun `reload transitions pooled instance back to Loading state even when targetUrl is unchanged`() = runTest(testDispatcher) {
+        val mockContainer = mockk<ViewGroup>(relaxed = true)
+        controller.markPooledInstanceReadyForTest("https://www.yangshipin.cn/tv/home?pid=600001859", mockContainer)
+        assertEquals(WebPlaybackState.Ready, controller.webState.value)
+
+        controller.reload()
+
+        assertEquals(WebPlaybackState.Loading(0), controller.webState.value)
+    }
+
+    @Test
+    fun `extractYangshipinPid parses pid from yangshipin tv home URLs and ignores non-matching URLs`() {
+        assertEquals(
+            "600001859",
+            controller.extractYangshipinPid("https://www.yangshipin.cn/tv/home?pid=600001859")
+        )
+        assertEquals(
+            "600002309",
+            controller.extractYangshipinPid("https://www.yangshipin.cn/tv/home?channel=1&pid=600002309#top")
+        )
+        org.junit.Assert.assertNull(
+            controller.extractYangshipinPid("https://tv.cctv.com/live/cctv1")
+        )
+    }
+
+    @Test
+    fun `shouldBlockWebResource blocks slow startup bloat endpoints on Android TV`() {
+        assertTrue(
+            controller.shouldBlockWebResource("https://s.yangshipin.cn/CCTVVideo/CCTVVideoAssets/v1/js/vconsole.min.js")
+        )
+        assertTrue(
+            controller.shouldBlockWebResource("https://m.yangshipin.cn/static/project/test/player/vr/three.js")
+        )
+        assertTrue(
+            controller.shouldBlockWebResource("https://api4.ipify.org/?format=json")
+        )
+        assertTrue(
+            controller.shouldBlockWebResource("https://csapi.yangshipin.cn/voapi/omsot/serverTime")
+        )
+        assertTrue(
+            controller.shouldBlockWebResource("https://capi.yangshipin.cn/api/yspepg/program/600002309/20261122")
+        )
+        assertTrue(
+            controller.shouldBlockWebResource("https://btrace.yangshipin.cn/kvcollect?BossId=3101")
+        )
+        assertTrue(
+            controller.shouldBlockWebResource("https://aatc-api.yangshipin.cn/kvcollect")
+        )
+    }
 }
