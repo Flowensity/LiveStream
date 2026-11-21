@@ -81,13 +81,15 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private val sourceRealResolutionCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Int>>()
     private val prewarmedSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<LiveSource>>()
 
-    // 缓冲卡死看门狗（超时自动换线或自愈）
+    // 缓冲卡死看门狗（多源时超时自动换线，单源时不打断正在进行的缓冲/网页加载）
     internal val watchdog = PlaybackWatchdog(dispatchers) {
         val currentMetrics = _orchestratorState.value.metrics
         _orchestratorState.value = _orchestratorState.value.copy(
             metrics = currentMetrics.copy(stallCount = currentMetrics.stallCount + 1)
         )
-        switchNextSource()
+        if (availableSources.size > 1) {
+            switchNextSource()
+        }
     }
 
     companion object {
