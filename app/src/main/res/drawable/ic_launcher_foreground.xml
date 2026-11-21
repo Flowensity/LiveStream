@@ -6,42 +6,42 @@
     <group
         android:translateX="0"
         android:translateY="0">
-        <!-- Live outer signal wave left -->
+        <!-- Outer broadcast signal wave left (One UI Bright Blue) -->
         <path
-            android:strokeColor="#00E5FF"
-            android:strokeWidth="3.5"
+            android:strokeColor="#3D9BFF"
+            android:strokeWidth="3.6"
             android:strokeLineCap="round"
-            android:pathData="M34,40 A20,20 0 0 0 34,68" />
+            android:pathData="M33,39 A21,21 0 0 0 33,69" />
 
-        <!-- Live inner signal wave left -->
+        <!-- Inner broadcast signal wave left (Soft Sky Blue) -->
         <path
-            android:strokeColor="#7C4DFF"
-            android:strokeWidth="3.5"
+            android:strokeColor="#8CC4FF"
+            android:strokeWidth="3.4"
             android:strokeLineCap="round"
-            android:pathData="M40,46 A12,12 0 0 0 40,62" />
+            android:pathData="M40,45 A13,13 0 0 0 40,63" />
 
-        <!-- Live play triangle (center rightward) -->
+        <!-- Center play emblem -->
         <path
-            android:fillColor="#00E5FF"
-            android:pathData="M48,42 L66,54 L48,66 Z" />
+            android:fillColor="#FFFFFF"
+            android:pathData="M47,42 L66,54 L47,66 Z" />
 
-        <!-- Live inner signal wave right -->
+        <!-- Inner broadcast signal wave right -->
         <path
-            android:strokeColor="#7C4DFF"
-            android:strokeWidth="3.5"
+            android:strokeColor="#8CC4FF"
+            android:strokeWidth="3.4"
             android:strokeLineCap="round"
-            android:pathData="M68,46 A12,12 0 0 1 68,62" />
+            android:pathData="M68,45 A13,13 0 0 1 68,63" />
 
-        <!-- Live outer signal wave right -->
+        <!-- Outer broadcast signal wave right -->
         <path
-            android:strokeColor="#00E5FF"
-            android:strokeWidth="3.5"
+            android:strokeColor="#3D9BFF"
+            android:strokeWidth="3.6"
             android:strokeLineCap="round"
-            android:pathData="M74,40 A20,20 0 0 1 74,68" />
+            android:pathData="M75,39 A21,21 0 0 1 75,69" />
 
-        <!-- Red LIVE dot -->
+        <!-- Live indicator dot (One UI Danger Red) -->
         <path
-            android:fillColor="#FF5252"
-            android:pathData="M78,32 A4,4 0 1 0 78,40 A4,4 0 1 0 78,32 Z" />
+            android:fillColor="#FF5A4F"
+            android:pathData="M78,31 A4,4 0 1 0 78,39 A4,4 0 1 0 78,31 Z" />
     </group>
 </vector>

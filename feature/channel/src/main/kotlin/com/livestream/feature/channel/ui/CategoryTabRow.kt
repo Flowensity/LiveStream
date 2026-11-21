@@ -4,7 +4,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
@@ -21,8 +20,8 @@ import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 
 /**
- * Samsung One UI / TeleflowTv 规范流式药丸分类标签栏 (Pill Chips)
- * 具备均一高度与舒适点击/遥控热区，规避过窄或不统一的胶囊视觉
+ * 现代 One UI 药丸分类标签栏 (Pill Chips)：
+ * 具备均一高度、细腻描边与舒适触控/遥控热区。
  */
 @Composable
 fun CategoryTabRow(
@@ -37,7 +36,7 @@ fun CategoryTabRow(
     Row(
         modifier = modifier
             .horizontalScroll(scrollState)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -50,7 +49,9 @@ fun CategoryTabRow(
                 unfocusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.surfacePill,
                 focusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.accentSoft,
                 focusedBorderColor = OneUiTheme.colors.accent,
-                focusedBorderWidth = 1.5.dp
+                focusedBorderWidth = 1.5.dp,
+                unfocusedBorderColor = if (isSelected) null else OneUiTheme.colors.borderSubtle,
+                unfocusedBorderWidth = 1.dp
             ) { isFocused ->
                 val targetTextColor = when {
                     isSelected -> Color.White
@@ -60,13 +61,13 @@ fun CategoryTabRow(
 
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = category.name,
                         color = targetTextColor,
-                        fontSize = 12.5.sp,
+                        fontSize = 13.sp,
                         fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
                     )
                 }

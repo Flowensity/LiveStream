@@ -3,75 +3,77 @@
     android:height="180dp"
     android:viewportWidth="320"
     android:viewportHeight="180">
-    <!-- Dark TV card background -->
+    <!-- Modern One UI Dark TV card background -->
     <path
-        android:fillColor="#0D1117"
+        android:fillColor="#0F1115"
         android:pathData="M0,0h320v180h-320z" />
 
-    <!-- Ambient glowing backdrop pattern -->
+    <!-- Layered geometric ambient backdrop -->
     <path
-        android:fillColor="#161B22"
-        android:pathData="M0,0 L180,0 L120,180 L0,180 Z" />
+        android:fillColor="#161A24"
+        android:pathData="M0,0 L190,0 L130,180 L0,180 Z" />
     <path
-        android:fillColor="#1F242C"
-        android:pathData="M160,0 L320,0 L320,180 L100,180 Z" />
+        android:fillColor="#1D2331"
+        android:pathData="M170,0 L320,0 L320,180 L110,180 Z" />
 
-    <!-- Cyan & Purple Accent Lines -->
+    <!-- Subtle One UI Blue top & bottom accent lines -->
     <path
-        android:strokeColor="#00E5FF"
-        android:strokeWidth="2"
-        android:pathData="M0,178 L320,178" />
+        android:strokeColor="#3D9BFF"
+        android:strokeWidth="2.5"
+        android:pathData="M0,178.5 L320,178.5" />
     <path
-        android:strokeColor="#7C4DFF"
+        android:strokeColor="#0A7AFF"
         android:strokeWidth="2"
-        android:pathData="M0,2 L320,2" />
+        android:pathData="M0,1.5 L320,1.5" />
 
-    <!-- Live signal icon on the left (center Y: 90) -->
+    <!-- Live signal emblem on the left -->
     <group
-        android:translateX="40"
+        android:translateX="44"
         android:translateY="35">
-        <!-- Outer left arc -->
         <path
-            android:strokeColor="#00E5FF"
-            android:strokeWidth="4"
+            android:strokeColor="#3D9BFF"
+            android:strokeWidth="4.2"
             android:strokeLineCap="round"
             android:pathData="M18,30 A24,24 0 0 0 18,80" />
-        <!-- Inner left arc -->
         <path
-            android:strokeColor="#7C4DFF"
-            android:strokeWidth="4"
+            android:strokeColor="#8CC4FF"
+            android:strokeWidth="3.8"
             android:strokeLineCap="round"
             android:pathData="M26,38 A15,15 0 0 0 26,72" />
-        <!-- Play triangle -->
         <path
-            android:fillColor="#00E5FF"
-            android:pathData="M36,36 L62,55 L36,74 Z" />
-        <!-- Inner right arc -->
+            android:fillColor="#FFFFFF"
+            android:pathData="M37,37 L63,55 L37,73 Z" />
         <path
-            android:strokeColor="#7C4DFF"
-            android:strokeWidth="4"
+            android:strokeColor="#8CC4FF"
+            android:strokeWidth="3.8"
             android:strokeLineCap="round"
             android:pathData="M72,38 A15,15 0 0 1 72,72" />
-        <!-- Outer right arc -->
         <path
-            android:strokeColor="#00E5FF"
-            android:strokeWidth="4"
+            android:strokeColor="#3D9BFF"
+            android:strokeWidth="4.2"
             android:strokeLineCap="round"
             android:pathData="M80,30 A24,24 0 0 1 80,80" />
-
-        <!-- Red LIVE pulsing dot -->
         <path
-            android:fillColor="#FF5252"
+            android:fillColor="#FF5A4F"
             android:pathData="M86,22 A5,5 0 1 0 86,32 A5,5 0 1 0 86,22 Z" />
     </group>
 
-    <!-- LIVE badge pill on upper right -->
+    <!-- Sleek LIVE pill badge on upper right -->
     <path
-        android:fillColor="#E50914"
-        android:pathData="M245,28 h45 a6,6 0 0 1 6,6 v12 a6,6 0 0 1 -6,6 h-45 a6,6 0 0 1 -6,-6 v-12 a6,6 0 0 1 6,-6 z" />
+        android:fillColor="#0A7AFF"
+        android:pathData="M242,30 h48 a11,11 0 0 1 11,11 v0 a11,11 0 0 1 -11,11 h-48 a11,11 0 0 1 -11,-11 v0 a11,11 0 0 1 11,-11 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M246,41 A3.2,3.2 0 1 0 246,41.1 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M254,39.5 h28 a1.5,1.5 0 0 1 1.5,1.5 v0 a1.5,1.5 0 0 1 -1.5,1.5 h-28 a1.5,1.5 0 0 1 -1.5,-1.5 v0 a1.5,1.5 0 0 1 1.5,-1.5 z" />
 
-    <!-- Text-like design accents: 4K HDR badge -->
+    <!-- Secondary visual card bar -->
     <path
-        android:fillColor="#21262D"
-        android:pathData="M245,58 h45 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-45 a4,4 0 0 1 -4,-4 v-10 a4,4 0 0 1 4,-4 z" />
+        android:fillColor="#262C3D"
+        android:pathData="M168,78 h118 a6,6 0 0 1 6,6 v6 a6,6 0 0 1 -6,6 h-118 a6,6 0 0 1 -6,-6 v-6 a6,6 0 0 1 6,-6 z" />
+    <path
+        android:fillColor="#1E2330"
+        android:pathData="M168,104 h84 a5,5 0 0 1 5,5 v4 a5,5 0 0 1 -5,5 h-84 a5,5 0 0 1 -5,-5 v-4 a5,5 0 0 1 5,-5 z" />
 </vector>

@@ -22,7 +22,7 @@ class CustomSourceAdapter @Inject constructor(
     override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
         val streamUrl = source.url.ifBlank { channelRepository.getStreamUrl(source.id) }
         if (streamUrl.isNullOrBlank()) {
-            return SourceResolution.Unavailable("未找到对应自定义直播源播放地址")
+            return SourceResolution.Unavailable("未找到该自定义线路的播放地址")
         }
 
         return SourceResolution.NativeMedia(

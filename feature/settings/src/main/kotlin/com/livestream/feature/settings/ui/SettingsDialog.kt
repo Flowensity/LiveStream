@@ -237,11 +237,11 @@ private fun SettingsDrawerPanel(
                     Text(
                         text = "系统与设置",
                         color = OneUiTheme.colors.textPrimary,
-                        fontSize = 16.sp,
+                        fontSize = 16.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "播放与偏好配置",
+                        text = "频道源、外观主题与解码偏好",
                         color = OneUiTheme.colors.textSecondary,
                         fontSize = 11.5.sp,
                         modifier = Modifier.padding(top = 2.dp)

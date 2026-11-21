@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LiveStream</string>
-    <string name="welcome_placeholder">LiveStream 架构基线已就绪</string>
+    <string name="welcome_placeholder">高清电视直播</string>
+    <string name="category_all">全部频道</string>
+    <string name="category_recent">最近观看</string>
+    <string name="category_favorite">我的收藏</string>
+    <string name="search_channel_hint">搜索频道名称或台号...</string>
+    <string name="action_clear">清空</string>
+    <string name="action_close">关闭</string>
+    <string name="action_retry">重试</string>
+    <string name="action_settings">设置</string>
+    <string name="action_fullscreen">全屏</string>
+    <string name="action_exit_fullscreen">退出全屏</string>
+    <string name="dialog_exit_title">退出应用</string>
+    <string name="dialog_exit_message">确定要退出 LiveStream 吗？</string>
+    <string name="action_continue_watching">继续观看</string>
 </resources>

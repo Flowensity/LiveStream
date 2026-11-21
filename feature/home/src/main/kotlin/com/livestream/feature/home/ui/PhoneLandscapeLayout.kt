@@ -6,15 +6,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -33,10 +33,9 @@ import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.theme.AppBackground
-import com.livestream.core.ui.theme.AppSurfaceElevated
-import com.livestream.core.ui.theme.AppTextPrimary
-import com.livestream.core.ui.theme.FocusHighlight
+import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
+import com.livestream.core.ui.util.SystemBarsUtil
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.player.PlayerUiState
@@ -55,9 +54,8 @@ import com.livestream.playback.api.web.WebPlaybackController
 /**
  * 手机横屏全屏模式：
  * 1. 沉浸式全屏播放
- * 2. 左屏滑动调节屏幕亮度，右屏滑动调节系统音量
- * 3. 顶部快速退出全屏按钮
- * 4. 侧边栏与设置抽屉无缝呼出
+ * 2. 左屏上下滑动调节屏幕亮度，右屏上下滑动调节系统音量，双击快速切换线路
+ * 3. 顶部毛玻璃快捷栏（退出全屏、频道列表、系统设置）
  */
 @Composable
 fun PhoneLandscapeLayout(
@@ -106,11 +104,11 @@ fun PhoneLandscapeLayout(
     val controlHelper = remember { DeviceControlHelper(context) }
 
     // 手机横屏播放时强制隐藏状态栏与导航栏，实现沉浸式全屏观影
-    androidx.compose.runtime.DisposableEffect(Unit) {
+    DisposableEffect(Unit) {
         val window = activity?.window
-        com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, true)
+        SystemBarsUtil.setImmersiveFullscreen(window, true)
         onDispose {
-            com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, false)
+            SystemBarsUtil.setImmersiveFullscreen(window, false)
         }
     }
 
@@ -185,58 +183,77 @@ fun PhoneLandscapeLayout(
             onCycleAspectRatio = onCycleAspectRatio
         )
 
-        // 3. 手势悬浮 HUD（音量/亮度调节提示）
+        // 3. 手势悬浮 HUD（音量/亮度调节进度条胶囊）
         GestureHud(
             state = gestureHudState,
             modifier = Modifier.align(Alignment.Center)
         )
 
-        // 4. 顶部操作快捷栏（全屏退出、频道菜单、设置）
-        if (playerUiState.isOsdVisible && !channelUiState.isDrawerOpen && !settingsUiState.isSettingsOpen) {
-            val pillShape = RoundedCornerShape(50)
-            val btnBg = Color(0xCC1A1B20)
+        // 4. 顶部操作快捷栏（退出全屏、频道列表、设置）
+        if (playerUiState.isOsdVisible &&
+            !channelUiState.isDrawerOpen &&
+            !settingsUiState.isSettingsOpen &&
+            !playerUiState.isEpgSheetVisible
+        ) {
+            val pillShape = OneUiShapes.pill
+            val btnBg = Color(0xD912151E)
             val btnBorder = BorderStroke(1.dp, Color(0x33FFFFFF))
 
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .border(btnBorder, pillShape)
                         .background(btnBg, pillShape)
+                        .clip(pillShape)
                         .clickable {
                             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                         }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "退出全屏",
+                        color = OneUiTheme.colors.accent,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-
-                Spacer(modifier = Modifier.width(10.dp))
 
                 Box(
                     modifier = Modifier
                         .border(btnBorder, pillShape)
                         .background(btnBg, pillShape)
+                        .clip(pillShape)
                         .clickable { onOpenDrawer() }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "频道菜单", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "频道列表",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-
-                Spacer(modifier = Modifier.width(10.dp))
 
                 Box(
                     modifier = Modifier
                         .border(btnBorder, pillShape)
                         .background(btnBg, pillShape)
+                        .clip(pillShape)
                         .clickable { onOpenSettings() }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(text = "设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "设置",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
@@ -251,7 +268,8 @@ fun PhoneLandscapeLayout(
             },
             onFavoriteToggle = onFavoriteToggle,
             onSearchQueryChanged = onSearchQueryChanged,
-            onCloseDrawer = onCloseDrawer
+            onCloseDrawer = onCloseDrawer,
+            onOpenSettings = onOpenSettings
         )
 
         // 6. 系统设置弹窗
@@ -277,7 +295,7 @@ fun PhoneLandscapeLayout(
             onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
         )
 
-        // 7. 综合播放菜单弹窗（集成信号源切换、画面比例与今日节目单）
+        // 7. 综合播放设置与今日节目单抽屉
         EpgScheduleDialog(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,

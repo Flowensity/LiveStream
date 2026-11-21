@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,15 +36,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,7 +49,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
+import com.livestream.core.ui.component.OneUiSearchBar
 import com.livestream.core.ui.component.TvFocusableBox
+import com.livestream.core.ui.device.DeviceType
+import com.livestream.core.ui.device.rememberDeviceType
 import com.livestream.core.ui.theme.OneUiDimensions
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
@@ -61,7 +60,7 @@ import com.livestream.feature.channel.ChannelUiState
 import kotlinx.coroutines.delay
 
 /**
- * TeleflowTv 规范频道面板 (PlaylistView, 316dp 浮动卡片抽屉)
+ * 现代 One UI 规范左侧频道列表抽屉面板 (288dp 浮动毛玻璃抽屉)
  */
 @Composable
 fun ChannelDrawer(
@@ -77,6 +76,7 @@ fun ChannelDrawer(
     val activeItemFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     var isSearchFocused by remember { mutableStateOf(false) }
+    val isTv = rememberDeviceType() == DeviceType.TV
 
     LaunchedEffect(uiState.isDrawerOpen, uiState.selectedCategory?.id, uiState.channels) {
         if (uiState.isDrawerOpen && uiState.channels.isNotEmpty()) {
@@ -102,7 +102,7 @@ fun ChannelDrawer(
         exit = slideOutHorizontally(targetOffsetX = { -it }),
         modifier = modifier
     ) {
-        val drawerShape = RoundedCornerShape(20.dp)
+        val drawerShape = OneUiShapes.panel
         val categories = uiState.categories
         val currentCategoryIndex = categories.indexOfFirst { it.id == uiState.selectedCategory?.id }
         val currentCategoryTitle = uiState.selectedCategory?.name ?: "频道列表"
@@ -110,12 +110,12 @@ fun ChannelDrawer(
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 8.dp)
+                .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp)
                 .width(OneUiDimensions.panelPlaylistWidth)
                 .clip(drawerShape)
                 .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), drawerShape)
                 .background(OneUiTheme.colors.panelBackground)
-                .padding(vertical = 10.dp)
+                .padding(vertical = 12.dp)
                 .onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
@@ -161,20 +161,18 @@ fun ChannelDrawer(
                 }
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // 1. One UI 顶部大标题与分组快速切换器 (‹ 分类名 ›)
-
+                // 1. 顶部大标题与分类快速切换器 (‹ 分类名 ›)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                        .padding(horizontal = 14.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // 左切换按钮 ‹
                     if (categories.size > 1) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(OneUiShapes.pill)
                                 .background(OneUiTheme.colors.surfacePill)
                                 .clickable {
@@ -191,28 +189,35 @@ fun ChannelDrawer(
                             )
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.size(34.dp))
                     }
 
-                    // 中间分类大标题
-                    Text(
-                        text = currentCategoryTitle,
-                        color = OneUiTheme.colors.textPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 8.dp)
-                    )
+                    ) {
+                        Text(
+                            text = currentCategoryTitle,
+                            color = OneUiTheme.colors.textPrimary,
+                            fontSize = 16.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "共 ${uiState.channels.size} 个频道",
+                            color = OneUiTheme.colors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
 
-                    // 右切换按钮 ›
                     if (categories.size > 1) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(OneUiShapes.pill)
                                 .background(OneUiTheme.colors.surfacePill)
                                 .clickable {
@@ -229,106 +234,41 @@ fun ChannelDrawer(
                             )
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.size(34.dp))
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // 2. 搜索框 (TeleflowTv Quick Channel Search Bar, 34dp 高度)
-                val searchShape = RoundedCornerShape(17.dp)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 4.dp)
-                        .height(34.dp)
-                        .clip(searchShape)
-                        .background(OneUiTheme.colors.cardSecondary)
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BasicTextField(
-                            value = uiState.searchQuery,
-                            onValueChange = onSearchQueryChanged,
-                            textStyle = TextStyle(
-                                color = OneUiTheme.colors.textPrimary,
-                                fontSize = 13.sp
-                            ),
-                            cursorBrush = SolidColor(OneUiTheme.colors.accent),
-                            singleLine = true,
-                            modifier = Modifier
-                                .weight(1f)
-                                .onFocusChanged { isSearchFocused = it.isFocused },
-                            decorationBox = { innerTextField ->
-                                if (uiState.searchQuery.isEmpty()) {
-                                    Text(
-                                        text = "搜索频道...",
-                                        color = OneUiTheme.colors.textMuted,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        )
+                // 2. 统一搜索框 (OneUiSearchBar)
+                OneUiSearchBar(
+                    query = uiState.searchQuery,
+                    onQueryChange = onSearchQueryChanged,
+                    placeholder = "搜索频道名称或台号...",
+                    height = 38.dp,
+                    onFocusChange = { isSearchFocused = it },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
 
-                        if (uiState.searchQuery.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(OneUiShapes.pill)
-                                    .background(OneUiTheme.colors.surfacePill)
-                                    .clickable { onSearchQueryChanged("") },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "✕",
-                                    color = OneUiTheme.colors.textSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 4. 频道列表卡片容器 (TeleflowTv flChannelCard)
+                // 3. 频道列表卡片容器
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(horizontal = 10.dp)
                         .clip(OneUiShapes.cardMedium)
+                        .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), OneUiShapes.cardMedium)
                         .background(OneUiTheme.colors.cardBackground)
                 ) {
                     if (uiState.channels.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Text(
-                                    text = if (uiState.searchQuery.isNotBlank()) "未搜寻到匹配频道" else "该分类下暂无频道",
-                                    color = OneUiTheme.colors.textPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "请切换分类或清除搜索条件",
-                                    color = OneUiTheme.colors.textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
+                        ChannelEmptyState(
+                            searchQuery = uiState.searchQuery,
+                            selectedCategoryId = uiState.selectedCategory?.id,
+                            onClearSearch = { onSearchQueryChanged("") },
+                            modifier = Modifier.fillMaxSize()
+                        )
                     } else {
                         val hasActive = uiState.channels.any { it.id == uiState.activeChannelId }
                         val targetIdx = if (hasActive) {
@@ -341,7 +281,7 @@ fun ChannelDrawer(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             itemsIndexed(
                                 items = uiState.channels,
@@ -366,19 +306,21 @@ fun ChannelDrawer(
                     }
                 }
 
-                // 5. 底部操作提示与关闭入口
+                // 4. 底部操作提示与快捷入口（根据 TV / 触控端自动适配自然提示文案）
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp, bottom = 2.dp, start = 12.dp, end = 12.dp),
+                        .padding(top = 8.dp, bottom = 2.dp, start = 12.dp, end = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "左右键换分类 · 点击换台",
+                        text = if (isTv) "左右键切换分类 · 确认键换台" else "点击频道换台 · 长按可收藏",
                         color = OneUiTheme.colors.textMuted,
-                        fontSize = 10.5.sp,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
                     if (onOpenSettings != null) {
@@ -394,11 +336,11 @@ fun ChannelDrawer(
                             focusedBorderWidth = 1.5.dp
                         ) { isFocused ->
                             Text(
-                                text = "手机遥控 / 设置",
+                                text = if (isTv) "扫码遥控 / 设置" else "设置",
                                 color = if (isFocused) Color.White else OneUiTheme.colors.accent,
-                                fontSize = 10.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(6.dp))
@@ -414,9 +356,9 @@ fun ChannelDrawer(
                         Text(
                             text = "关闭",
                             color = if (isFocused) Color.White else OneUiTheme.colors.textSecondary,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
                 }

@@ -745,7 +745,7 @@ private const val HTML_PAGE = """<!DOCTYPE html>
         <div class="remote-grid">
           <button class="btn-pill-action" onclick="sendRemote('SWITCH_SOURCE')">⇄ 切换线路</button>
           <button class="btn-pill-action" onclick="sendRemote('ASPECT_RATIO')">◱ 画面比例</button>
-          <button class="btn-pill-action" onclick="sendRemote('RETRY')">↻ 重试当前源</button>
+          <button class="btn-pill-action" onclick="sendRemote('RETRY')">↻ 重连当前线路</button>
           <button class="btn-pill-action" onclick="loadChannels()">⟳ 同步频道列表</button>
         </div>
       </div>
@@ -929,12 +929,12 @@ private const val HTML_PAGE = """<!DOCTYPE html>
         actions.className = 'ch-actions';
         var favBtn = document.createElement('button');
         favBtn.className = 'btn-sm btn-fav' + (c.favorite ? ' fav-on' : '');
-        favBtn.textContent = c.favorite ? '★ 已藏' : '☆ 收藏';
+        favBtn.textContent = c.favorite ? '★ 已收藏' : '☆ 收藏';
         favBtn.onclick = function(ev) { ev.stopPropagation(); toggleFav(c.id); };
 
         var playBtn = document.createElement('button');
         playBtn.className = 'btn-sm btn-primary';
-        playBtn.textContent = c.playing ? '当前台' : '切台';
+        playBtn.textContent = c.playing ? '播放中' : '切台';
         playBtn.onclick = function(ev) { ev.stopPropagation(); playOnTv(c.id); };
 
         actions.appendChild(favBtn);

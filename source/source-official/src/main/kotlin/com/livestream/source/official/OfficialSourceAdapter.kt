@@ -23,7 +23,7 @@ class OfficialSourceAdapter @Inject constructor(
     override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
         val streamUrl = source.url.ifBlank { channelRepository.getStreamUrl(source.id) }
         if (streamUrl.isNullOrBlank()) {
-            return SourceResolution.Unavailable("官方公开资源地址未配置")
+            return SourceResolution.Unavailable("当前频道未配置官方播放地址")
         }
 
         return if (source.protocol == StreamProtocol.OFFICIAL_WEB) {

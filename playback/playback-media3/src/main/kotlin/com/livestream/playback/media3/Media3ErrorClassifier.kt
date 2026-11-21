@@ -42,13 +42,13 @@ object Media3ErrorClassifier {
         }
 
         val userMessage = when (errorType) {
-            PlaybackErrorType.NETWORK_TIMEOUT -> "网络连接超时，请检查网络状态"
-            PlaybackErrorType.NETWORK_DISCONNECTED -> "网络已断开"
-            PlaybackErrorType.SOURCE_UNAVAILABLE -> "直播源暂时无法访问或格式异常"
-            PlaybackErrorType.DECODER_INIT_FAILED -> "硬件解码器初始化异常，正在尝试适配"
-            PlaybackErrorType.DRM_AUTHORIZATION_FAILED -> "数字版权鉴权未通过"
-            PlaybackErrorType.RENDERER_CRASHED -> "渲染器异常"
-            PlaybackErrorType.UNKNOWN -> "播放遇到未知异常 ($errorCodeName)"
+            PlaybackErrorType.NETWORK_TIMEOUT -> "网络连接超时，请检查网络后重试"
+            PlaybackErrorType.NETWORK_DISCONNECTED -> "网络连接已断开，请检查网络设置"
+            PlaybackErrorType.SOURCE_UNAVAILABLE -> "当前线路暂时无法连接，建议切换线路或重试"
+            PlaybackErrorType.DECODER_INIT_FAILED -> "硬件解码初始化失败，可在设置中尝试关闭硬件加速"
+            PlaybackErrorType.DRM_AUTHORIZATION_FAILED -> "当前频道受版权保护，暂无法播放"
+            PlaybackErrorType.RENDERER_CRASHED -> "画面渲染异常，正在尝试恢复"
+            PlaybackErrorType.UNKNOWN -> "播放出现异常，请重试或切换线路 ($errorCodeName)"
         }
 
         val canRetry = retryCount < 3 && errorType != PlaybackErrorType.DRM_AUTHORIZATION_FAILED

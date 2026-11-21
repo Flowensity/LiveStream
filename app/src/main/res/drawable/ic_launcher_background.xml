@@ -3,15 +3,15 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Deep space dark background -->
+    <!-- Deep obsidian dark background matching One UI Dark theme -->
     <path
-        android:fillColor="#0D1117"
+        android:fillColor="#0F1115"
         android:pathData="M0,0h108v108h-108z" />
-    <!-- Gradient accent geometric circle -->
+    <!-- Subtle layered radial ambient glow -->
     <path
-        android:fillColor="#161B22"
-        android:pathData="M54,14 A40,40 0 1 0 54,94 A40,40 0 1 0 54,14 Z" />
+        android:fillColor="#161B26"
+        android:pathData="M54,12 A42,42 0 1 0 54,96 A42,42 0 1 0 54,12 Z" />
     <path
-        android:fillColor="#21262D"
-        android:pathData="M54,26 A28,28 0 1 0 54,82 A28,28 0 1 0 54,26 Z" />
+        android:fillColor="#1D2536"
+        android:pathData="M54,24 A30,30 0 1 0 54,84 A30,30 0 1 0 54,24 Z" />
 </vector>

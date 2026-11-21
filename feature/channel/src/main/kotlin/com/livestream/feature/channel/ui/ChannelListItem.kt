@@ -1,8 +1,6 @@
 package com.livestream.feature.channel.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,8 +31,8 @@ import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 
 /**
- * TeleflowTv 规范频道列表行 (item_channel, 48dp 标准行高)
- * 统一 Squircle 序号容器与全行高光底衬，彻底消除尺寸不均与突兀视觉
+ * 现代 One UI 频道列表行 (46dp 舒适行高)：
+ * 配备标准台号胶囊、正在播放呼吸圆点指示器与星标收藏胶囊。
  */
 @Composable
 fun ChannelListItem(
@@ -43,7 +42,7 @@ fun ChannelListItem(
     onFavoriteToggle: (Channel) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rowShape = RoundedCornerShape(10.dp)
+    val rowShape = RoundedCornerShape(12.dp)
 
     TvFocusableBox(
         onClick = { onChannelClick(channel) },
@@ -53,11 +52,11 @@ fun ChannelListItem(
         focusedBackgroundColor = OneUiTheme.colors.accentSoft,
         focusedBorderColor = OneUiTheme.colors.accent,
         focusedBorderWidth = 2.dp,
-        unfocusedBorderColor = if (isActive) OneUiTheme.colors.accent.copy(alpha = 0.5f) else null,
+        unfocusedBorderColor = if (isActive) OneUiTheme.colors.accent.copy(alpha = 0.55f) else null,
         unfocusedBorderWidth = 1.dp,
         modifier = modifier
             .fillMaxWidth()
-            .height(42.dp)
+            .height(OneUiDimensions.rowHeightChannel)
     ) { isFocused ->
         Row(
             modifier = Modifier
@@ -70,45 +69,60 @@ fun ChannelListItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // 1. 统一标准尺寸的序号胶囊容器 (32dp x 22dp)
+                // 1. 统一标准尺寸的台号胶囊容器 (36dp x 24dp)
                 Box(
                     modifier = Modifier
-                        .size(width = 32.dp, height = 22.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(width = OneUiDimensions.badgeChannelNumberWidth, height = 24.dp)
+                        .clip(RoundedCornerShape(7.dp))
                         .background(
-                            if (isActive || isFocused) OneUiTheme.colors.accentSoft
+                            if (isActive) OneUiTheme.colors.accent
+                            else if (isFocused) OneUiTheme.colors.accentSoft
                             else OneUiTheme.colors.surfacePill
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "%02d".format(channel.channelNumber),
-                        color = if (isActive || isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                        color = when {
+                            isActive -> Color.White
+                            isFocused -> OneUiTheme.colors.accent
+                            else -> OneUiTheme.colors.textSecondary
+                        },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 // 2. 频道名称
                 Text(
                     text = channel.name,
                     color = when {
-                        isFocused -> OneUiTheme.colors.accent
-                        isActive -> OneUiTheme.colors.accent
+                        isFocused || isActive -> OneUiTheme.colors.accent
                         else -> OneUiTheme.colors.textPrimary
                     },
                     fontSize = 14.sp,
                     fontWeight = if (isActive || isFocused) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+
+                // 正在播放状态指示点
+                if (isActive) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(OneUiTheme.colors.accent)
+                    )
+                }
             }
 
-            // 3. 收藏状态指示与切换胶囊 (无论是否收藏均提供明确操作入口，长按 OK 或点击切换)
-            Spacer(modifier = Modifier.width(6.dp))
+            // 3. 收藏状态指示与切换胶囊
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .clip(OneUiShapes.pill)
@@ -117,11 +131,11 @@ fun ChannelListItem(
                         else OneUiTheme.colors.surfacePill
                     )
                     .clickable { onFavoriteToggle(channel) }
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(horizontal = 9.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (channel.isFavorite) "已收藏" else "收藏",
+                    text = if (channel.isFavorite) "★ 已收藏" else "☆ 收藏",
                     color = if (channel.isFavorite) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
                     fontSize = 11.sp,
                     fontWeight = if (channel.isFavorite) FontWeight.Bold else FontWeight.Medium

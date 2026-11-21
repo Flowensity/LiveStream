@@ -19,15 +19,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,27 +40,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.livestream.core.model.Channel
 import com.livestream.core.model.ChannelCategory
 import com.livestream.core.model.CustomPlaylistSource
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.model.VideoAspectRatio
+import com.livestream.core.ui.component.OneUiSearchBar
+import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.AppBackground
 import com.livestream.core.ui.theme.AppSurface
-import com.livestream.core.ui.theme.AppSurfaceElevated
-import com.livestream.core.ui.theme.AppTextMuted
 import com.livestream.core.ui.theme.AppTextPrimary
-import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
+import com.livestream.core.ui.util.SystemBarsUtil
 import com.livestream.feature.channel.ChannelUiState
 import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelDrawer
+import com.livestream.feature.channel.ui.ChannelEmptyState
 import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
 import com.livestream.feature.player.ui.EpgScheduleDialog
@@ -73,9 +71,9 @@ import com.livestream.feature.settings.ui.SettingsDialog
 import com.livestream.playback.api.web.WebPlaybackController
 
 /**
- * 平板电脑分栏响应式布局（Tablet Dual-Pane）：
- * 左栏 (360dp)：常驻频道导航、搜索、分类筛选与快捷设置入口
- * 右栏 (自适应宽)：全尺寸播放区域、技术统计浮层与全屏切换
+ * 平板电脑大屏分栏响应式布局（Tablet Dual-Pane）：
+ * 左栏 (360dp)：常驻频道导航、搜索、分类筛选与快捷导入/设置入口（含系统状态栏安全边距）
+ * 右栏 (自适应宽)：全尺寸播放区域、播放状态控制浮层与右上角全屏切换
  */
 @Composable
 fun TabletDualPaneLayout(
@@ -131,9 +129,9 @@ fun TabletDualPaneLayout(
     // 平板全屏时沉浸式隐藏系统状态栏与导航栏
     DisposableEffect(isFullscreen) {
         val window = activity?.window
-        com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, isFullscreen)
+        SystemBarsUtil.setImmersiveFullscreen(window, isFullscreen)
         onDispose {
-            com.livestream.core.ui.util.SystemBarsUtil.setImmersiveFullscreen(window, false)
+            SystemBarsUtil.setImmersiveFullscreen(window, false)
         }
     }
 
@@ -152,6 +150,8 @@ fun TabletDualPaneLayout(
                         .width(360.dp)
                         .fillMaxHeight()
                         .background(AppSurface)
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
                         .padding(16.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
@@ -159,7 +159,7 @@ fun TabletDualPaneLayout(
                         val currentCategoryIndex = categories.indexOfFirst { it.id == channelUiState.selectedCategory?.id }
                         val currentCategoryTitle = channelUiState.selectedCategory?.name ?: "全部频道"
 
-                        // 顶部标题与分类快速切换 (‹ 分类名 ›) + 设置
+                        // 顶部标题与分类快速切换 (‹ 分类名 ›) + 导入/设置
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -173,7 +173,7 @@ fun TabletDualPaneLayout(
                                 if (categories.size > 1) {
                                     Box(
                                         modifier = Modifier
-                                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                                            .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
                                             .clip(OneUiShapes.pill)
                                             .clickable {
                                                 val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
@@ -188,24 +188,36 @@ fun TabletDualPaneLayout(
                                                 .background(OneUiTheme.colors.surfacePill),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "‹", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = "‹",
+                                                color = OneUiTheme.colors.textPrimary,
+                                                fontSize = 17.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
                                 }
 
-                                Text(
-                                    text = currentCategoryTitle,
-                                    color = AppTextPrimary,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    Text(
+                                        text = currentCategoryTitle,
+                                        color = AppTextPrimary,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "共 ${channelUiState.channels.size} 个频道",
+                                        color = OneUiTheme.colors.textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
 
                                 if (categories.size > 1) {
                                     Box(
                                         modifier = Modifier
-                                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                                            .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
                                             .clip(OneUiShapes.pill)
                                             .clickable {
                                                 val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
@@ -220,30 +232,50 @@ fun TabletDualPaneLayout(
                                                 .background(OneUiTheme.colors.surfacePill),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "›", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = "›",
+                                                color = OneUiTheme.colors.textPrimary,
+                                                fontSize = 17.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
                                 }
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                                    .clip(OneUiShapes.pill)
-                                    .clickable { onOpenSettings() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(OneUiShapes.pill)
-                                        .background(OneUiTheme.colors.cardSecondary)
-                                        .padding(horizontal = 12.dp, vertical = 5.dp)
-                                ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TvFocusableBox(
+                                    onClick = onOpenImportDialog,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                    focusedBackgroundColor = OneUiTheme.colors.accent,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp
+                                ) { isFocused ->
+                                    Text(
+                                        text = "+ 导入源",
+                                        color = if (isFocused) Color.White else OneUiTheme.colors.accent,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
+                                    )
+                                }
+
+                                TvFocusableBox(
+                                    onClick = onOpenSettings,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.cardSecondary,
+                                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp,
+                                    unfocusedBorderColor = OneUiTheme.colors.borderSubtle
+                                ) { isFocused ->
                                     Text(
                                         text = "设置",
-                                        color = OneUiTheme.colors.textPrimary,
+                                        color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                                     )
                                 }
                             }
@@ -259,67 +291,59 @@ fun TabletDualPaneLayout(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // One UI 药丸搜索框
-                        OutlinedTextField(
-                            value = channelUiState.searchQuery,
-                            onValueChange = onSearchQueryChanged,
-                            placeholder = { Text("搜索频道...", color = OneUiTheme.colors.textMuted, fontSize = 12.sp) },
-                            trailingIcon = {
-                                if (channelUiState.searchQuery.isNotEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(OneUiShapes.pill)
-                                            .clickable { onSearchQueryChanged("") }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = "清空",
-                                            color = OneUiTheme.colors.textMuted,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = OneUiTheme.colors.cardSecondary,
-                                unfocusedContainerColor = OneUiTheme.colors.cardSecondary,
-                                focusedBorderColor = OneUiTheme.colors.accent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedTextColor = OneUiTheme.colors.textPrimary,
-                                unfocusedTextColor = OneUiTheme.colors.textPrimary
-                            ),
-                            shape = OneUiShapes.pill,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // 频道列表
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentPadding = PaddingValues(vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            items(
-                                items = channelUiState.channels,
-                                key = { it.id }
-                            ) { channel ->
-                                ChannelListItem(
-                                    channel = channel,
-                                    isActive = channel.id == channelUiState.activeChannelId,
-                                    onChannelClick = onChannelSelected,
-                                    onFavoriteToggle = onFavoriteToggle
-                                )
+                        // 统一药丸搜索框 (OneUiSearchBar)
+                        OneUiSearchBar(
+                            query = channelUiState.searchQuery,
+                            onQueryChange = onSearchQueryChanged,
+                            placeholder = "搜索频道名称或台号...",
+                            height = 40.dp
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 频道列表或空状态
+                        if (channelUiState.channels.isEmpty()) {
+                            ChannelEmptyState(
+                                searchQuery = channelUiState.searchQuery,
+                                selectedCategoryId = channelUiState.selectedCategory?.id,
+                                onClearSearch = { onSearchQueryChanged("") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                items(
+                                    items = channelUiState.channels,
+                                    key = { it.id }
+                                ) { channel ->
+                                    ChannelListItem(
+                                        channel = channel,
+                                        isActive = channel.id == channelUiState.activeChannelId,
+                                        onChannelClick = onChannelSelected,
+                                        onFavoriteToggle = onFavoriteToggle
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                // 分栏垂直细分割线
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(OneUiTheme.colors.borderSubtle)
+                )
             }
 
             // 2. 右栏：全尺寸播放器区域或官方网页容器
@@ -365,77 +389,81 @@ fun TabletDualPaneLayout(
                     onCycleAspectRatio = onCycleAspectRatio
                 )
 
-                // 平板全屏时的顶部快捷操作条（退出全屏、节目单、频道抽屉、设置）
-                if (isFullscreen && playerUiState.isOsdVisible && !channelUiState.isDrawerOpen && !settingsUiState.isSettingsOpen) {
-                    val pillShape = RoundedCornerShape(50)
-                    val btnBg = Color(0xCC1A1B20)
+                // 右上角全屏切换与快捷操作栏（统一胶囊视觉语言，避免与底部 OSD 发生重叠）
+                if (playerUiState.isOsdVisible &&
+                    !channelUiState.isDrawerOpen &&
+                    !settingsUiState.isSettingsOpen &&
+                    !playerUiState.isEpgSheetVisible &&
+                    playerUiState.quickChannelNumber.isEmpty()
+                ) {
+                    val pillShape = OneUiShapes.pill
+                    val btnBg = Color(0xD912151E)
                     val btnBorder = BorderStroke(1.dp, Color(0x33FFFFFF))
 
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .statusBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
                             modifier = Modifier
                                 .border(btnBorder, pillShape)
                                 .background(btnBg, pillShape)
-                                .clickable { isFullscreen = false }
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
-                        ) {
-                            Text(text = "退出全屏", color = OneUiTheme.colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .border(btnBorder, pillShape)
-                                .background(btnBg, pillShape)
-                                .clickable { onOpenDrawer() }
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
-                        ) {
-                            Text(text = "频道菜单", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .border(btnBorder, pillShape)
-                                .background(btnBg, pillShape)
-                                .clickable { onOpenSettings() }
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
-                        ) {
-                            Text(text = "设置", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        }
-                    }
-                }
-
-                // 平板右下角全屏 / 退出全屏控制按钮
-                if (playerUiState.isOsdVisible) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(18.dp)
-                            .background(AppSurfaceElevated.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
-                            .clickable {
-                                isFullscreen = !isFullscreen
-                                if (isFullscreen && activity?.resources?.configuration?.orientation != Configuration.ORIENTATION_LANDSCAPE) {
-                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                } else if (!isFullscreen) {
-                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                .clip(pillShape)
+                                .clickable {
+                                    isFullscreen = !isFullscreen
+                                    if (isFullscreen && activity?.resources?.configuration?.orientation != Configuration.ORIENTATION_LANDSCAPE) {
+                                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                    } else if (!isFullscreen) {
+                                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                    }
                                 }
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = if (isFullscreen) "退出全屏" else "⤢ 全屏观看",
+                                color = if (isFullscreen) OneUiTheme.colors.accent else Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (isFullscreen) {
+                            Box(
+                                modifier = Modifier
+                                    .border(btnBorder, pillShape)
+                                    .background(btnBg, pillShape)
+                                    .clip(pillShape)
+                                    .clickable { onOpenDrawer() }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = "频道列表",
+                                    color = Color.White,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = if (isFullscreen) "退出全屏" else "平板全屏",
-                            color = FocusHighlight,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+
+                            Box(
+                                modifier = Modifier
+                                    .border(btnBorder, pillShape)
+                                    .background(btnBg, pillShape)
+                                    .clip(pillShape)
+                                    .clickable { onOpenSettings() }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = "设置",
+                                    color = Color.White,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -451,7 +479,8 @@ fun TabletDualPaneLayout(
             },
             onFavoriteToggle = onFavoriteToggle,
             onSearchQueryChanged = onSearchQueryChanged,
-            onCloseDrawer = onCloseDrawer
+            onCloseDrawer = onCloseDrawer,
+            onOpenSettings = onOpenSettings
         )
 
         // 4. 设置弹窗
@@ -477,7 +506,7 @@ fun TabletDualPaneLayout(
             onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
         )
 
-        // 5. 综合播放菜单弹窗（集成信号源切换、画面比例与今日节目单）
+        // 5. 综合播放设置与今日节目单抽屉
         EpgScheduleDialog(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
@@ -495,4 +524,3 @@ fun TabletDualPaneLayout(
         )
     }
 }
-

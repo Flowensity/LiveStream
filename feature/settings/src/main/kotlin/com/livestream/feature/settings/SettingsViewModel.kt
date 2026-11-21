@@ -362,7 +362,7 @@ class SettingsViewModel internal constructor(
             }
             val parsed = if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
                 if (!M3uPlaylistParser.isSafeAndValidStreamUrl(downloadUrl)) {
-                    val err = Exception("订阅地址被安全策略拦截或格式无效")
+                    val err = Exception("订阅链接格式无效，或包含受限的本地地址")
                     _uiState.update {
                         it.copy(isImporting = false, refreshingSourceId = null, importError = err.message)
                     }
@@ -372,30 +372,30 @@ class SettingsViewModel internal constructor(
                 okHttpClient.newCall(req).execute().use { resp ->
                     val finalUrl = resp.request.url.toString()
                     if (!M3uPlaylistParser.isSafeAndValidStreamUrl(finalUrl)) {
-                        val err = Exception("订阅重定向目标地址被安全策略拦截")
+                        val err = Exception("订阅链接跳转目标受安全限制，无法导入")
                         _uiState.update {
                             it.copy(isImporting = false, refreshingSourceId = null, importError = err.message)
                         }
                         return@withContext Result.failure(err)
                     }
                     if (!resp.isSuccessful) {
-                        return@withContext Result.failure(Exception("下载 M3U 订阅失败: HTTP ${resp.code}"))
+                        return@withContext Result.failure(Exception("下载播放列表失败 (HTTP ${resp.code})"))
                     }
                     val body = resp.body
-                        ?: return@withContext Result.failure(Exception("导入内容不能为空"))
+                        ?: return@withContext Result.failure(Exception("请输入订阅链接或 M3U 播放列表内容"))
                     body.charStream().use { reader ->
                         M3uPlaylistParser.parse(reader)
                     }
                 }
             } else {
                 if (trimmed.isBlank()) {
-                    return@withContext Result.failure(Exception("导入内容不能为空"))
+                    return@withContext Result.failure(Exception("请输入订阅链接或 M3U 播放列表内容"))
                 }
                 M3uPlaylistParser.parse(trimmed)
             }
 
             if (parsed.channels.isEmpty()) {
-                return@withContext Result.failure(Exception("未能从播放列表中解析出合法频道或所有源均被安全策略拦截"))
+                return@withContext Result.failure(Exception("未解析到有效频道，请检查链接或 M3U 格式"))
             }
 
             // 若是刷新已有订阅源，先清理该源旧频道与关联源，避免残留失效记录
@@ -495,7 +495,7 @@ class SettingsViewModel internal constructor(
                 it.copy(
                     isImporting = false,
                     refreshingSourceId = null,
-                    importError = "解析导入失败: ${e.message}"
+                    importError = "导入失败：${e.message}"
                 )
             }
             Result.failure(e)
@@ -505,7 +505,7 @@ class SettingsViewModel internal constructor(
     fun importM3uContent() {
         val content = _uiState.value.importText.trim()
         if (content.isEmpty()) {
-            _uiState.update { it.copy(importError = "导入内容不能为空") }
+            _uiState.update { it.copy(importError = "请输入订阅链接或 M3U 播放列表内容") }
             return
         }
 
@@ -567,7 +567,7 @@ class SettingsViewModel internal constructor(
         if (channels.isEmpty() || _uiState.value.isProbingSources) return
 
         viewModelScope.launch(dispatchers.io) {
-            _uiState.update { it.copy(isProbingSources = true, sourceHealthSummary = "正在测活 ${channels.size} 个自定义频道...") }
+            _uiState.update { it.copy(isProbingSources = true, sourceHealthSummary = "正在检测 ${channels.size} 个自定义频道的线路连通性...") }
             val probe = networkProbe ?: NetworkProbe(okHttpClient)
             val semaphore = Semaphore(6)
             val deadChannelIds = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
@@ -609,7 +609,7 @@ class SettingsViewModel internal constructor(
                 it.copy(
                     isProbingSources = false,
                     unavailableCustomChannelIds = deadChannelIds.toSet(),
-                    sourceHealthSummary = "测活完成：$aliveCount 个可用，${deadChannelIds.size} 个失效"
+                    sourceHealthSummary = "检测完成：$aliveCount 个可用，${deadChannelIds.size} 个无法连接"
                 )
             }
         }
@@ -625,7 +625,7 @@ class SettingsViewModel internal constructor(
             _uiState.update {
                 it.copy(
                     unavailableCustomChannelIds = emptySet(),
-                    sourceHealthSummary = "已清理 ${deadIds.size} 个失效频道"
+                    sourceHealthSummary = "已清理 ${deadIds.size} 个无法连接的频道"
                 )
             }
         }

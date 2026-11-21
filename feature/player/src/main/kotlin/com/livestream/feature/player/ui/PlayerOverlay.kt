@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,10 +50,11 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Samsung One UI / TeleflowTv 规范播放器控制浮层 (ChannelBarView HUD)
- * 极致紧凑双行排版：
- * 第 1 行：频道序号与名称 + 线路与节目单并排胶囊按钮
- * 第 2 行：正在播出与稍后节目简明预告
+ * 现代 One UI 规范播放器状态与控制浮层 (HUD)：
+ * 1. 悬浮高对比度毛玻璃缓冲指示器
+ * 2. 清晰友好的播放异常诊断与一键换线/重试卡片
+ * 3. 数字键选台悬浮提示
+ * 4. 底部紧凑双行信息栏（支持一键换线、播放设置及实时节目进度）
  */
 @Composable
 fun PlayerOverlay(
@@ -60,13 +63,13 @@ fun PlayerOverlay(
     onSwitchSource: () -> Unit,
     onOpenEpgSchedule: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    osdFocusedIndex: Int = -1, // 0: 换线聚焦, 1: 节目单聚焦, 2: 遥控/设置聚焦, -1: 无遥控强制聚焦
+    osdFocusedIndex: Int = -1,
     aspectRatio: VideoAspectRatio = uiState.aspectRatio,
     onCycleAspectRatio: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        // 1. 换台与缓冲平滑过渡加载指示器（删除居中频道预告卡片，仅保留轻量加载动效）
+        // 1. 换台与缓冲平滑过渡加载指示器
         AnimatedVisibility(
             visible = uiState.isBuffering && uiState.status != PlaybackStatus.ERROR,
             enter = fadeIn(animationSpec = tween(durationMillis = 180)),
@@ -74,10 +77,10 @@ fun PlayerOverlay(
             modifier = Modifier.align(Alignment.Center)
         ) {
             val statusText = when (uiState.status) {
-                PlaybackStatus.SWITCHING -> "正在换台..."
-                PlaybackStatus.RESOLVING -> "正在解析直播信号..."
-                PlaybackStatus.PREPARING -> "正在初始化解码器..."
-                else -> "正在缓冲数据..."
+                PlaybackStatus.SWITCHING -> "正在切换频道..."
+                PlaybackStatus.RESOLVING -> "正在连接直播线路..."
+                PlaybackStatus.PREPARING -> "正在准备画面..."
+                else -> "正在缓冲画面..."
             }
             StreamLoadingIndicator(message = statusText)
         }
@@ -94,33 +97,65 @@ fun PlayerOverlay(
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .padding(horizontal = 20.dp)
+                    .widthIn(min = 280.dp, max = 340.dp)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), errCardShape)
                     .background(
                         color = OneUiTheme.colors.panelBackground,
                         shape = errCardShape
                     )
-                    .padding(24.dp)
+                    .padding(horizontal = 24.dp, vertical = 22.dp)
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.width(320.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(OneUiTheme.colors.dangerSoft, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "!",
+                            color = OneUiTheme.colors.danger,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Text(
-                        text = "播放异常",
-                        color = OneUiTheme.colors.danger,
-                        fontSize = 18.sp,
+                        text = "播放遇到问题",
+                        color = OneUiTheme.colors.textPrimary,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     Text(
                         text = uiState.error.message,
                         color = OneUiTheme.colors.textSecondary,
                         fontSize = 13.sp,
-                        lineHeight = 18.sp
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (uiState.activeSource != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "当前线路：${uiState.activeSource.name}",
+                            color = OneUiTheme.colors.textMuted,
+                            fontSize = 11.5.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         TvFocusableBox(
@@ -140,7 +175,12 @@ fun PlayerOverlay(
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("重试", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(
+                                    text = "立即重试",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
                             }
                         }
                         if (uiState.totalSources > 1) {
@@ -151,9 +191,8 @@ fun PlayerOverlay(
                                 focusedBackgroundColor = OneUiTheme.colors.accentSoft,
                                 focusedBorderColor = OneUiTheme.colors.accent,
                                 focusedBorderWidth = 2.dp,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), OneUiShapes.pill)
+                                unfocusedBorderColor = OneUiTheme.colors.borderSubtle,
+                                modifier = Modifier.weight(1f)
                             ) { isFocused ->
                                 Box(
                                     modifier = Modifier
@@ -162,9 +201,9 @@ fun PlayerOverlay(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        "换线 (${uiState.activeSourceIndex + 1}/${uiState.totalSources})",
+                                        text = "切换线路 (${uiState.activeSourceIndex + 1}/${uiState.totalSources})",
                                         color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                        fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
+                                        fontWeight = if (isFocused) FontWeight.Bold else FontWeight.SemiBold,
                                         fontSize = 13.sp
                                     )
                                 }
@@ -184,25 +223,25 @@ fun PlayerOverlay(
                     .padding(24.dp)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), quickShape)
                     .background(OneUiTheme.colors.panelBackground, quickShape)
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                    .padding(horizontal = 22.dp, vertical = 12.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = uiState.quickChannelNumber,
                         color = OneUiTheme.colors.accent,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Black
                     )
                     Text(
-                        text = "正在换台...",
+                        text = "即将切换频道...",
                         color = OneUiTheme.colors.textSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.5.sp
                     )
                 }
             }
         }
 
-        // 4. 紧凑浮动 HUD (ChannelBarView - 压缩高度，删除冗余分辨率行)
+        // 4. 底部紧凑浮动信息栏 (ChannelBarView HUD)
         AnimatedVisibility(
             visible = uiState.isOsdVisible && uiState.activeChannel != null,
             enter = fadeIn(),
@@ -219,19 +258,18 @@ fun PlayerOverlay(
                     .fillMaxWidth()
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), panelShape)
                     .background(OneUiTheme.colors.panelBackground, panelShape)
-                    .padding(horizontal = 18.dp, vertical = 8.dp)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    // 第 1 行：左区 [台号 + 频道名] + 右区 [播放菜单]
+                    // 第 1 行：左区 [台号 + 频道名] + 右区 [换线 (多线路时) + 播放设置]
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // 左侧：纯粹的频道编号与标题（已移除线路与徽标显示）
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -241,8 +279,8 @@ fun PlayerOverlay(
                             val numStr = "%02d".format(channel.channelNumber)
                             Box(
                                 modifier = Modifier
-                                    .size(width = 32.dp, height = 22.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .size(width = OneUiDimensions.badgeChannelNumberWidth, height = 24.dp)
+                                    .clip(RoundedCornerShape(7.dp))
                                     .background(OneUiTheme.colors.accentSoft),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -253,7 +291,7 @@ fun PlayerOverlay(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = channel.name,
                                 color = OneUiTheme.colors.textPrimary,
@@ -264,33 +302,62 @@ fun PlayerOverlay(
                             )
                         }
 
-                        // 右侧单一聚合胶囊：仅保留 [播放菜单] 一个胶囊入口
-                        if (onOpenEpgSchedule != null) {
-                            val isMenuFocused = osdFocusedIndex >= 0
-                            TvFocusableBox(
-                                onClick = onOpenEpgSchedule,
-                                shape = OneUiShapes.pill,
-                                unfocusedBackgroundColor = if (isMenuFocused) OneUiTheme.colors.accentSoft else OneUiTheme.colors.surfacePill,
-                                focusedBackgroundColor = OneUiTheme.colors.accentSoft,
-                                focusedBorderColor = OneUiTheme.colors.accent,
-                                focusedBorderWidth = 1.5.dp
-                            ) { isFocused ->
-                                Box(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "播放菜单",
-                                        color = if (isFocused || isMenuFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = if (isFocused || isMenuFocused) FontWeight.Bold else FontWeight.Medium
-                                    )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (uiState.totalSources > 1) {
+                                TvFocusableBox(
+                                    onClick = onSwitchSource,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp,
+                                    unfocusedBorderColor = OneUiTheme.colors.borderSubtle
+                                ) { isFocused ->
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "换线 ${uiState.activeSourceIndex + 1}/${uiState.totalSources}",
+                                            color = if (isFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (onOpenEpgSchedule != null) {
+                                val isMenuFocused = osdFocusedIndex >= 0
+                                TvFocusableBox(
+                                    onClick = onOpenEpgSchedule,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = if (isMenuFocused) OneUiTheme.colors.accentSoft else OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = OneUiTheme.colors.accentSoft,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.5.dp,
+                                    unfocusedBorderColor = OneUiTheme.colors.borderSubtle
+                                ) { isFocused ->
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "播放设置",
+                                            color = if (isFocused || isMenuFocused) OneUiTheme.colors.accent else OneUiTheme.colors.textPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (isFocused || isMenuFocused) FontWeight.Bold else FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // 第 2 行：正在播出与稍后播出按比例分配宽度（防止稍后播出过长挤压正在播出的内容）+ 进度条
+                    // 第 2 行：正在播出与稍后播出节目单，或无 EPG 时的信号线路状态信息
                     val currentProg = uiState.currentProgram
                     val nextProg = uiState.nextProgram
                     if (currentProg != null || nextProg != null) {
@@ -307,7 +374,7 @@ fun PlayerOverlay(
                                 Text(
                                     text = "▶ 正在播出 $startTime-$endTime  ${currentProg.title}",
                                     color = OneUiTheme.colors.textPrimary,
-                                    fontSize = 11.5.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -319,7 +386,7 @@ fun PlayerOverlay(
                                 Text(
                                     text = "稍后 $nextTime  ${nextProg.title}",
                                     color = OneUiTheme.colors.textSecondary,
-                                    fontSize = 11.sp,
+                                    fontSize = 11.5.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(if (currentProg != null) 0.42f else 1f)
@@ -327,7 +394,7 @@ fun PlayerOverlay(
                             }
                         }
 
-                        // 当前节目实时播放进度条 (2.5dp 极细胶囊进度条)
+                        // 当前节目实时播放进度条 (3dp 胶囊进度条)
                         if (currentProg != null && currentProg.endTimestamp > currentProg.startTimestamp) {
                             val now = System.currentTimeMillis()
                             val totalDuration = (currentProg.endTimestamp - currentProg.startTimestamp).coerceAtLeast(1L)
@@ -336,7 +403,7 @@ fun PlayerOverlay(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 3.dp)
-                                    .height(2.5.dp)
+                                    .height(3.dp)
                                     .clip(OneUiShapes.pill)
                                     .background(OneUiTheme.colors.surfacePill)
                             ) {
@@ -348,6 +415,33 @@ fun PlayerOverlay(
                                         .background(OneUiTheme.colors.accent)
                                 )
                             }
+                        }
+                    } else {
+                        // 无 EPG 数据时展示当前直播状态与信号线路信息，保持卡片视觉层次丰满
+                        val sourceName = uiState.activeSource?.name ?: "默认线路"
+                        val activeLatency = uiState.activeSource?.id?.let { uiState.sourceLatenciesMs[it] }
+                        val latencySuffix = if (activeLatency != null && activeLatency > 0L) " · ${activeLatency}ms" else ""
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 1.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "● 正在直播 · $sourceName$latencySuffix",
+                                color = OneUiTheme.colors.textSecondary,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (uiState.isEpgLoading) "正在同步节目单..." else "画面比例：${aspectRatio.label}",
+                                color = OneUiTheme.colors.textMuted,
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
                         }
                     }
                 }

@@ -3,6 +3,7 @@ package com.livestream.core.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -10,8 +11,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 // =========================================================================
 // Samsung One UI Design Tokens & Theme Specification
@@ -97,25 +100,78 @@ object OneUiTheme {
 
 object OneUiShapes {
     val cardSmall = RoundedCornerShape(12.dp)
-    val cardMedium = RoundedCornerShape(18.dp)
-    val cardLarge = RoundedCornerShape(24.dp)
-    val panel = RoundedCornerShape(24.dp)
+    val cardMedium = RoundedCornerShape(16.dp)
+    val cardLarge = RoundedCornerShape(22.dp)
+    val panel = RoundedCornerShape(22.dp)
     val pill = RoundedCornerShape(50)
-    val searchBar = RoundedCornerShape(24.dp)
-    val dialog = RoundedCornerShape(26.dp)
-    val bottomSheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val searchBar = RoundedCornerShape(22.dp)
+    val dialog = RoundedCornerShape(24.dp)
+    val bottomSheet = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
 }
 
 object OneUiDimensions {
-    val panelPlaylistWidth = 264.dp
+    val panelPlaylistWidth = 288.dp
     val panelSettingsWidth = 460.dp
     val panelSettingsPhoneWidth = 360.dp
-    val panelExitConfirmWidth = 284.dp
-    val hudChannelBarWidth = 440.dp
-    val rowHeightChannel = 48.dp
-    val rowHeightSetting = 52.dp
-    val badgeChannelNumberWidth = 34.dp
+    val panelExitConfirmWidth = 312.dp
+    val hudChannelBarWidth = 460.dp
+    val rowHeightChannel = 46.dp
+    val rowHeightSetting = 54.dp
+    val badgeChannelNumberWidth = 36.dp
 }
+
+val LiveStreamTypography = Typography(
+    headlineSmall = TextStyle(
+        fontSize = 20.sp,
+        lineHeight = 28.sp,
+        fontWeight = FontWeight.Bold
+    ),
+    titleLarge = TextStyle(
+        fontSize = 17.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.Bold
+    ),
+    titleMedium = TextStyle(
+        fontSize = 15.sp,
+        lineHeight = 22.sp,
+        fontWeight = FontWeight.SemiBold
+    ),
+    titleSmall = TextStyle(
+        fontSize = 13.5.sp,
+        lineHeight = 19.sp,
+        fontWeight = FontWeight.SemiBold
+    ),
+    bodyLarge = TextStyle(
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.Normal
+    ),
+    bodyMedium = TextStyle(
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        fontWeight = FontWeight.Normal
+    ),
+    bodySmall = TextStyle(
+        fontSize = 11.5.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.Normal
+    ),
+    labelLarge = TextStyle(
+        fontSize = 12.5.sp,
+        lineHeight = 17.sp,
+        fontWeight = FontWeight.SemiBold
+    ),
+    labelMedium = TextStyle(
+        fontSize = 11.5.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.Medium
+    ),
+    labelSmall = TextStyle(
+        fontSize = 10.5.sp,
+        lineHeight = 14.sp,
+        fontWeight = FontWeight.Medium
+    )
+)
 
 private val DarkColorScheme = darkColorScheme(
     primary = OneUiDarkAccent,
@@ -229,6 +285,7 @@ fun LiveStreamTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
+            typography = LiveStreamTypography,
             content = content
         )
     }

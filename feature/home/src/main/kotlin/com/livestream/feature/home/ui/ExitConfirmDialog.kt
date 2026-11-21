@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +33,7 @@ import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 
 /**
- * TeleflowTv 规范二次退出确认弹窗 (ExitConfirmView, 284dp 居中浮动面板)
+ * 现代 One UI 规范二次退出确认弹窗 (312dp 居中毛玻璃卡片)
  */
 @Composable
 fun ExitConfirmDialog(
@@ -47,7 +46,9 @@ fun ExitConfirmDialog(
 
     LaunchedEffect(visible) {
         if (visible) {
-            cancelFocusRequester.requestFocus()
+            try {
+                cancelFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
     }
 
@@ -63,7 +64,7 @@ fun ExitConfirmDialog(
                 .background(Color.Black.copy(alpha = 0.65f)),
             contentAlignment = Alignment.Center
         ) {
-            val panelShape = OneUiShapes.panel
+            val panelShape = OneUiShapes.dialog
             val pillShape = OneUiShapes.pill
 
             Box(
@@ -71,7 +72,7 @@ fun ExitConfirmDialog(
                     .width(OneUiDimensions.panelExitConfirmWidth)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), panelShape)
                     .background(OneUiTheme.colors.panelBackground, panelShape)
-                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .padding(horizontal = 24.dp, vertical = 22.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -83,17 +84,17 @@ fun ExitConfirmDialog(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "是否确定退出应用程序？",
+                        text = "确定要退出 LiveStream 吗？",
                         color = OneUiTheme.colors.textSecondary,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // 1. 继续观看按钮 (次级操作，默认高亮聚焦)
+                    // 1. 继续观看按钮 (默认高亮聚焦)
                     TvFocusableBox(
                         onClick = onDismiss,
                         shape = pillShape,
@@ -103,7 +104,7 @@ fun ExitConfirmDialog(
                         focusedBorderWidth = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(38.dp)
+                            .height(42.dp)
                             .focusRequester(cancelFocusRequester)
                     ) { isFocused ->
                         Box(
@@ -113,15 +114,15 @@ fun ExitConfirmDialog(
                             Text(
                                 text = "继续观看",
                                 color = if (isFocused) Color.White else OneUiTheme.colors.accent,
-                                fontSize = 13.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // 2. 退出应用按钮 (危险警示按钮，TeleflowTv #DB332A)
+                    // 2. 退出应用按钮 (危险警示红)
                     TvFocusableBox(
                         onClick = onConfirm,
                         shape = pillShape,
@@ -131,7 +132,7 @@ fun ExitConfirmDialog(
                         focusedBorderWidth = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(38.dp)
+                            .height(42.dp)
                     ) { isFocused ->
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -140,7 +141,7 @@ fun ExitConfirmDialog(
                             Text(
                                 text = "退出应用",
                                 color = if (isFocused) Color.White else OneUiTheme.colors.danger,
-                                fontSize = 13.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }

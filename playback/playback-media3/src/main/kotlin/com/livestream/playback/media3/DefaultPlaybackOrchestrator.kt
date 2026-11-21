@@ -217,7 +217,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                         handlePlaybackFailure(
                             PlaybackErrorInfo(
                                 errorType = PlaybackErrorType.RENDERER_CRASHED,
-                                message = "官方网页渲染进程异常崩溃，正在恢复",
+                                message = "画面渲染进程异常，正在自动恢复",
                                 canRetry = true
                             )
                         )
@@ -300,7 +300,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             if (sources.isEmpty()) {
                 val error = PlaybackErrorInfo(
                     errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
-                    message = "当前频道暂无可用直播源",
+                    message = "当前频道暂无可用线路",
                     canRetry = false
                 )
                 _orchestratorState.value = _orchestratorState.value.copy(
@@ -451,7 +451,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         if (source == null) {
             val error = PlaybackErrorInfo(
                 errorType = PlaybackErrorType.SOURCE_UNAVAILABLE,
-                message = "所有后备直播源均不可用",
+                message = "当前频道所有线路均无法连接，请稍后重试",
                 canRetry = false
             )
             _orchestratorState.value = _orchestratorState.value.copy(
@@ -553,7 +553,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             if (sessionToken != activeSessionToken) return
             val error = PlaybackErrorInfo(
                 errorType = PlaybackErrorType.UNKNOWN,
-                message = "播放源启动异常: ${e.message}",
+                message = "线路启动失败：${e.message}",
                 canRetry = true
             )
             handlePlaybackFailure(error)
@@ -858,7 +858,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             handlePlaybackFailure(
                 PlaybackErrorInfo(
                     errorType = PlaybackErrorType.NETWORK_TIMEOUT,
-                    message = "所有直播线路均连接超时，请检查网络",
+                    message = "当前频道所有线路均连接超时，请检查网络设置",
                     canRetry = true
                 )
             )
