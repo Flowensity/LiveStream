@@ -27,12 +27,16 @@ class NetworkProbe @Inject constructor(
         private val HLS_RESOLUTION_REGEX = Regex("""RESOLUTION=(\d+)x(\d+)""", RegexOption.IGNORE_CASE)
     }
 
-    suspend fun probeUrl(url: String): ProbeResult = withContext(Dispatchers.IO) {
+    suspend fun probeUrl(
+        url: String,
+        userAgent: String? = null,
+        referer: String? = null
+    ): ProbeResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         val headRequest = Request.Builder()
             .url(url)
             .head()
-            .header("User-Agent", "LiveStream-Android/1.0")
+            .applyProbeHeaders(userAgent, referer)
             .build()
 
         try {
@@ -54,7 +58,7 @@ class NetworkProbe @Inject constructor(
                 val getStart = System.currentTimeMillis()
                 val getRequest = Request.Builder()
                     .url(url)
-                    .header("User-Agent", "LiveStream-Android/1.0")
+                    .applyProbeHeaders(userAgent, referer)
                     .header("Range", "bytes=0-1024")
                     .build()
 
@@ -84,5 +88,13 @@ class NetworkProbe @Inject constructor(
         } catch (e: IllegalArgumentException) {
             ProbeResult.Failure("非法URL: ${e.message}", e)
         }
+    }
+
+    private fun Request.Builder.applyProbeHeaders(userAgent: String?, referer: String?): Request.Builder {
+        header("User-Agent", userAgent?.takeIf { it.isNotBlank() } ?: "LiveStream-Android/1.0")
+        if (!referer.isNullOrBlank()) {
+            header("Referer", referer)
+        }
+        return this
     }
 }

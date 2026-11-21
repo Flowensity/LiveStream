@@ -499,6 +499,12 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                         officialWebUrl = null
                     )
 
+                    val resolvedUserAgent = resolution.userAgent ?: source.userAgent
+                    val resolvedReferer = resolution.referer ?: source.referer
+                    val customHeaders = buildMap {
+                        if (!resolvedReferer.isNullOrBlank()) put("Referer", resolvedReferer)
+                        if (!resolvedUserAgent.isNullOrBlank()) put("User-Agent", resolvedUserAgent)
+                    }
                     val mediaItem = PlaybackMediaItem(
                         uri = resolution.uri,
                         protocol = source.protocol,
@@ -506,7 +512,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                         channelId = channel.id,
                         sourceId = source.id,
                         headersProfileId = resolution.headersProfileId ?: source.headersProfileId,
-                        drmProfileId = resolution.drmProfileId ?: source.drmProfileId
+                        drmProfileId = resolution.drmProfileId ?: source.drmProfileId,
+                        customHeaders = customHeaders,
+                        userAgent = resolvedUserAgent
                     )
 
                     engine.prepare(mediaItem, playWhenReady = true)

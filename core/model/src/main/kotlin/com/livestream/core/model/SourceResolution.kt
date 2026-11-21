@@ -13,7 +13,9 @@ sealed interface SourceResolution {
         val uri: String,
         val protocol: String,
         val headersProfileId: String? = null,
-        val drmProfileId: String? = null
+        val drmProfileId: String? = null,
+        val userAgent: String? = null,
+        val referer: String? = null
     ) : SourceResolution
 
     @Serializable

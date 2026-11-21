@@ -68,6 +68,8 @@ object M3uPlaylistParser {
         var detectedEpgUrl: String? = null
 
         var currentExtInf: String? = null
+        var pendingUserAgent: String? = null
+        var pendingReferer: String? = null
         var globalChannelSequence = 1
         val baseChannelNumber = startingChannelNumber.coerceAtLeast(1)
 
@@ -86,8 +88,21 @@ object M3uPlaylistParser {
                     }
                 } else if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
                     currentExtInf = trimmed
+                    pendingUserAgent = null
+                    pendingReferer = null
+                } else if (trimmed.startsWith("#EXTVLCOPT:", ignoreCase = true) && currentExtInf != null) {
+                    val option = trimmed.substringAfter(":").trim()
+                    val eqIdx = option.indexOf('=')
+                    if (eqIdx > 0) {
+                        val key = option.substring(0, eqIdx).trim().lowercase(Locale.ROOT)
+                        val valStr = option.substring(eqIdx + 1).trim().takeIf { it.isNotEmpty() }
+                        when (key) {
+                            "http-user-agent" -> pendingUserAgent = valStr
+                            "http-referrer", "http-referer" -> pendingReferer = valStr
+                        }
+                    }
                 } else if (!trimmed.startsWith("#") && currentExtInf != null) {
-                    val streamUrl = stripPipeHeaderSuffix(trimmed)
+                    val (streamUrl, pipeHeaders) = parseUrlAndPipeHeaders(trimmed)
                     val extInf = currentExtInf!!
                     if (isSafeAndValidStreamUrl(streamUrl)) {
                         val attrs = extractExtInfAttributes(extInf)
@@ -157,6 +172,8 @@ object M3uPlaylistParser {
                             // 统一保持客观基准优先级 10，真实画质由底层播放探针与解码器硬件确认
                             val priority = 10
 
+                            val resolvedUa = pipeHeaders.first ?: pendingUserAgent
+                            val resolvedReferer = pipeHeaders.second ?: pendingReferer
                             val protocol = inferProtocol(streamUrl)
                             val source = LiveSource(
                                 id = "user_src_${UUID.nameUUIDFromBytes("${channel.id}_$streamUrl".toByteArray())}",
@@ -166,12 +183,16 @@ object M3uPlaylistParser {
                                 adapterProviderId = "custom_user_source",
                                 priority = priority,
                                 healthStatus = SourceHealthStatus.UNKNOWN,
-                                url = streamUrl
+                                url = streamUrl,
+                                userAgent = resolvedUa,
+                                referer = resolvedReferer
                             )
                             sourcesList.add(source)
                         }
                     }
                     currentExtInf = null
+                    pendingUserAgent = null
+                    pendingReferer = null
                 }
             }
         }
@@ -320,6 +341,29 @@ object M3uPlaylistParser {
 
     private fun stripPipeHeaderSuffix(url: String): String {
         return url.trim().substringBefore('|').trim()
+    }
+
+    private fun parseUrlAndPipeHeaders(rawLine: String): Pair<String, Pair<String?, String?>> {
+        val pipeIdx = rawLine.indexOf('|')
+        if (pipeIdx == -1) return rawLine.trim() to (null to null)
+
+        val baseUrl = rawLine.substring(0, pipeIdx).trim()
+        val headerPart = rawLine.substring(pipeIdx + 1).trim()
+        var userAgent: String? = null
+        var referer: String? = null
+        for (segment in headerPart.split('&', ';')) {
+            val eqIdx = segment.indexOf('=')
+            if (eqIdx <= 0) continue
+            val key = segment.substring(0, eqIdx).trim().lowercase(Locale.ROOT)
+            val rawVal = segment.substring(eqIdx + 1).trim()
+            val decoded = runCatching { java.net.URLDecoder.decode(rawVal, "UTF-8") }.getOrDefault(rawVal)
+                .takeIf { it.isNotBlank() } ?: continue
+            when (key) {
+                "user-agent", "user_agent", "ua" -> userAgent = decoded
+                "referer", "referrer" -> referer = decoded
+            }
+        }
+        return baseUrl to (userAgent to referer)
     }
 
     /**

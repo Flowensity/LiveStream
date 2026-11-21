@@ -39,5 +39,7 @@ data class LiveSource(
     val lastCheckedTimestamp: Long = 0L,
     val headersProfileId: String? = null,
     val drmProfileId: String? = null,
-    val url: String = ""
+    val url: String = "",
+    val userAgent: String? = null,
+    val referer: String? = null
 )

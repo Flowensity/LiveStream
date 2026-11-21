@@ -756,4 +756,50 @@ class PlaybackOrchestratorTest {
 
         coVerify(exactly = 1) { channelRepository.recordPlaybackHistory("cctv1", "src_1") }
     }
+
+    @Test
+    fun `test NativeMedia resolution forwards custom userAgent and referer headers to PlaybackEngine`() = runTest(testDispatcher) {
+        val headerSource = sampleSource1.copy(
+            userAgent = "IptvPlayer/2.0",
+            referer = "https://portal.example.com/"
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(headerSource)
+        val headerRegistry = DefaultSourceAdapterRegistry().apply {
+            register(
+                object : SourceAdapter {
+                    override val providerId: String = "cctv"
+                    override suspend fun resolve(channel: Channel, source: LiveSource) = SourceResolution.NativeMedia(
+                        uri = "https://cdn.example.com/stream.m3u8",
+                        protocol = "HLS",
+                        userAgent = source.userAgent,
+                        referer = source.referer
+                    )
+                    override suspend fun checkAvailability(channel: Channel, source: LiveSource) =
+                        AvailabilityResult.Available(10L)
+                }
+            )
+        }
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            headerRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            engine.prepare(
+                match {
+                    it.userAgent == "IptvPlayer/2.0" &&
+                        it.customHeaders["Referer"] == "https://portal.example.com/"
+                },
+                true
+            )
+        }
+    }
 }

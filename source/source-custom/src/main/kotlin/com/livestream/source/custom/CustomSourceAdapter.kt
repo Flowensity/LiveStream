@@ -29,7 +29,9 @@ class CustomSourceAdapter @Inject constructor(
             uri = streamUrl,
             protocol = source.protocol.name,
             headersProfileId = source.headersProfileId,
-            drmProfileId = source.drmProfileId
+            drmProfileId = source.drmProfileId,
+            userAgent = source.userAgent,
+            referer = source.referer
         )
     }
 
@@ -38,7 +40,16 @@ class CustomSourceAdapter @Inject constructor(
             ?.takeIf { it.isNotBlank() }
             ?: return AvailabilityResult.Unavailable("缺少播放地址")
 
-        return when (val probeResult = networkProbe.probeUrl(streamUrl)) {
+        val probeResult = if (source.userAgent.isNullOrBlank() && source.referer.isNullOrBlank()) {
+            networkProbe.probeUrl(streamUrl)
+        } else {
+            networkProbe.probeUrl(
+                url = streamUrl,
+                userAgent = source.userAgent,
+                referer = source.referer
+            )
+        }
+        return when (probeResult) {
             is ProbeResult.Success -> {
                 if (probeResult.latencyMs > 3000) {
                     AvailabilityResult.Degraded(

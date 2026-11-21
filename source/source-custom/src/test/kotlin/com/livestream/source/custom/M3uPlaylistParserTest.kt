@@ -170,5 +170,28 @@ class M3uPlaylistParserTest {
         assertEquals(1, parsed.channels.size)
         assertEquals(850, parsed.channels[0].channelNumber)
         assertEquals("http://live.example.com/channel/stream.ts", parsed.sources[0].url)
+        assertEquals("Mozilla/5.0 (Linux)", parsed.sources[0].userAgent)
+        assertEquals("https://live.example.com/", parsed.sources[0].referer)
+    }
+
+    @Test
+    fun `test EXTVLCOPT http-user-agent and http-referrer headers are extracted onto LiveSource`() {
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1 group-title="卫视",东方卫视
+            #EXTVLCOPT:http-user-agent=VLC/3.0.18
+            #EXTVLCOPT:http-referrer=https://origin.example.com/live
+            https://stream.example.com/dragon.m3u8
+            #EXTINF:-1 group-title="卫视",浙江卫视
+            https://stream.example.com/zhejiang.m3u8
+        """.trimIndent()
+
+        val parsed = M3uPlaylistParser.parse(m3u)
+        assertEquals(2, parsed.sources.size)
+        assertEquals("VLC/3.0.18", parsed.sources[0].userAgent)
+        assertEquals("https://origin.example.com/live", parsed.sources[0].referer)
+        // Must not leak EXTVLCOPT headers onto subsequent channel
+        assertEquals(null, parsed.sources[1].userAgent)
+        assertEquals(null, parsed.sources[1].referer)
     }
 }

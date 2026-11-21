@@ -198,4 +198,33 @@ class NetworkProbeTest {
 
         assertTrue(dns.cacheSizeForTest() <= 3)
     }
+
+    @Test
+    fun `probeUrl attaches custom User-Agent and Referer headers when supplied`() = runTest {
+        val okHttpClient = mockk<OkHttpClient>()
+        val capturedRequests = mutableListOf<Request>()
+        val call = mockk<Call>()
+        val response = Response.Builder()
+            .request(Request.Builder().url("https://example.com/live.m3u8").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .body("".toResponseBody())
+            .build()
+
+        every { okHttpClient.newCall(capture(capturedRequests)) } returns call
+        every { call.execute() } returns response
+
+        val probe = NetworkProbe(okHttpClient)
+        val result = probe.probeUrl(
+            url = "https://example.com/live.m3u8",
+            userAgent = "CustomAgent/2.0",
+            referer = "https://ref.example.com/"
+        )
+
+        assertTrue(result is ProbeResult.Success)
+        val req = capturedRequests.single()
+        assertEquals("CustomAgent/2.0", req.header("User-Agent"))
+        assertEquals("https://ref.example.com/", req.header("Referer"))
+    }
 }

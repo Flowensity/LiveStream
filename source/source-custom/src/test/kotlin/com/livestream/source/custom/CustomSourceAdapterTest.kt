@@ -55,4 +55,29 @@ class CustomSourceAdapterTest {
         assertTrue(availability is AvailabilityResult.Available)
         assertEquals(80L, (availability as AvailabilityResult.Available).latencyMs)
     }
+
+    @Test
+    fun `test resolve and checkAvailability forward userAgent and referer headers`() = runTest {
+        val headerSource = sampleSource.copy(
+            url = "https://cdn.example.com/live.m3u8",
+            userAgent = "CustomAgent/1.0",
+            referer = "https://player.example.com/"
+        )
+        coEvery {
+            networkProbe.probeUrl(
+                "https://cdn.example.com/live.m3u8",
+                userAgent = "CustomAgent/1.0",
+                referer = "https://player.example.com/"
+            )
+        } returns ProbeResult.Success(45L, 200)
+
+        val adapter = CustomSourceAdapter(channelRepository, networkProbe)
+        val resolution = adapter.resolve(sampleChannel, headerSource) as SourceResolution.NativeMedia
+        assertEquals("CustomAgent/1.0", resolution.userAgent)
+        assertEquals("https://player.example.com/", resolution.referer)
+
+        val availability = adapter.checkAvailability(sampleChannel, headerSource)
+        assertTrue(availability is AvailabilityResult.Available)
+        assertEquals(45L, (availability as AvailabilityResult.Available).latencyMs)
+    }
 }

@@ -14,6 +14,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -59,6 +60,7 @@ class Media3PlaybackEngine @Inject constructor(
     private var prepareStartTimeMs = 0L
     private var attachedOutput: Any? = null
     private var hardwareDecodePreferred: Boolean = true
+    private var httpDataSourceFactory: HttpDataSource.Factory? = null
 
     private fun createExoPlayer(): ExoPlayer {
         // 1. 软硬解自适应策略：根据用户设置切换硬件 MediaCodec 优先或软件解码器优先，并开启安全回退
@@ -100,7 +102,7 @@ class Media3PlaybackEngine @Inject constructor(
             .build()
 
         // 3. 优先使用全局共享 OkHttpClient 连接池与 IPv4 优先 DNS 缓存（直接复用探针阶段已握手的连接）
-        val httpDataSourceFactory = if (okHttpClient != null) {
+        val factory = if (okHttpClient != null) {
             SharedOkHttpDataSource.Factory(okHttpClient)
         } else {
             DefaultHttpDataSource.Factory()
@@ -108,9 +110,10 @@ class Media3PlaybackEngine @Inject constructor(
                 .setReadTimeoutMs(4000)
                 .setAllowCrossProtocolRedirects(true)
         }
+        httpDataSourceFactory = factory
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
-            .setDataSourceFactory(httpDataSourceFactory)
+            .setDataSourceFactory(factory)
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -142,9 +145,11 @@ class Media3PlaybackEngine @Inject constructor(
 
         try {
             // 解码器热复用：直接 setMediaItem 切换媒体源，不调用 stop()/clearMediaItems() 销毁已初始化的硬件 MediaCodec
-            player.setMediaItem(builtItem, /* resetPosition = */ true)
-            player.playWhenReady = playWhenReady
-            player.prepare()
+            val targetPlayer = player
+            httpDataSourceFactory?.setDefaultRequestProperties(buildRequestHeaders(mediaItem))
+            targetPlayer.setMediaItem(builtItem, /* resetPosition = */ true)
+            targetPlayer.playWhenReady = playWhenReady
+            targetPlayer.prepare()
         } catch (e: Throwable) {
             _engineState.value = EngineState.Error(
                 PlaybackErrorInfo(
@@ -222,6 +227,7 @@ class Media3PlaybackEngine @Inject constructor(
         _player = null
         if (mediaItemToRestore != null) {
             val newPlayer = player
+            httpDataSourceFactory?.setDefaultRequestProperties(buildRequestHeaders(mediaItemToRestore))
             val builtItem = buildMedia3Item(
                 mediaItem = mediaItemToRestore,
                 targetOffsetMs = 3000L,
@@ -262,6 +268,19 @@ class Media3PlaybackEngine @Inject constructor(
     }
 
     companion object {
+        internal fun buildRequestHeaders(mediaItem: PlaybackMediaItem): Map<String, String> {
+            val ua = mediaItem.userAgent?.takeIf { it.isNotBlank() }
+            if (mediaItem.customHeaders.isEmpty() && ua == null) {
+                return emptyMap()
+            }
+            return buildMap {
+                putAll(mediaItem.customHeaders)
+                if (ua != null) {
+                    put("User-Agent", ua)
+                }
+            }
+        }
+
         internal fun resolveMimeType(protocol: StreamProtocol): String? = when (protocol) {
             StreamProtocol.HLS -> MimeTypes.APPLICATION_M3U8
             StreamProtocol.DASH -> MimeTypes.APPLICATION_MPD
