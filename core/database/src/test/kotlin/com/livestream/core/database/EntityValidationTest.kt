@@ -1,5 +1,10 @@
 package com.livestream.core.database
 
+import androidx.room.EntityInsertionAdapter
+import androidx.room.EntityUpsertionAdapter
+import com.livestream.core.database.dao.CategoryDao_Impl
+import com.livestream.core.database.dao.ChannelDao_Impl
+import com.livestream.core.database.dao.LiveSourceDao_Impl
 import com.livestream.core.database.entity.CategoryEntity
 import com.livestream.core.database.entity.ChannelEntity
 import com.livestream.core.database.entity.EpgProgramEntity
@@ -77,5 +82,38 @@ class EntityValidationTest {
         )
         assertEquals("cctv1", history.channelId)
         assertEquals(120000L, history.durationWatchedMs)
+    }
+
+    @Test
+    fun `parent DAOs use Upsert instead of Insert REPLACE to prevent CASCADE deletion of children`() {
+        val implClasses = listOf(
+            CategoryDao_Impl::class.java,
+            ChannelDao_Impl::class.java,
+            LiveSourceDao_Impl::class.java
+        )
+        for (implClass in implClasses) {
+            val hasUpsertionAdapter = implClass.declaredFields.any { field ->
+                EntityUpsertionAdapter::class.java.isAssignableFrom(field.type)
+            }
+            assertTrue(
+                "${implClass.simpleName} should use @Upsert (EntityUpsertionAdapter)",
+                hasUpsertionAdapter
+            )
+        }
+
+        // Verify generated DAOs use EntityUpsertionAdapter instead of REPLACE insertion adapters
+        val categoryImplSource = CategoryDao_Impl::class.java
+        val upsertFields = categoryImplSource.declaredFields.filter {
+            EntityUpsertionAdapter::class.java.isAssignableFrom(it.type)
+        }
+        assertEquals(1, upsertFields.size)
+        val insertionFields = ChannelDao_Impl::class.java.declaredFields.filter {
+            EntityInsertionAdapter::class.java.isAssignableFrom(it.type)
+        }
+        assertEquals(0, insertionFields.size)
+        val sourceInsertionFields = LiveSourceDao_Impl::class.java.declaredFields.filter {
+            EntityInsertionAdapter::class.java.isAssignableFrom(it.type)
+        }
+        assertEquals(0, sourceInsertionFields.size)
     }
 }

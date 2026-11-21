@@ -1,9 +1,8 @@
 package com.livestream.core.database.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.livestream.core.database.entity.ChannelEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -34,10 +33,10 @@ interface ChannelDao {
     @Query("SELECT * FROM channels")
     suspend fun getAllChannelsSync(): List<ChannelEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertChannels(channels: List<ChannelEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertChannel(channel: ChannelEntity)
 
     @Query("UPDATE channels SET is_favorite = :isFavorite, updated_at = :timestamp WHERE id = :channelId")

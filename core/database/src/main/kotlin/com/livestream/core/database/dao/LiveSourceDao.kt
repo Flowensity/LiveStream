@@ -1,9 +1,8 @@
 package com.livestream.core.database.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.livestream.core.database.entity.LiveSourceEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -19,10 +18,10 @@ interface LiveSourceDao {
     @Query("SELECT * FROM live_sources WHERE id = :sourceId LIMIT 1")
     suspend fun getSourceById(sourceId: String): LiveSourceEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertSources(sources: List<LiveSourceEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertSource(source: LiveSourceEntity)
 
     @Query("UPDATE live_sources SET health_status = :status, last_checked_timestamp = :timestamp WHERE id = :sourceId")

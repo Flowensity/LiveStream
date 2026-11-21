@@ -13,6 +13,8 @@ import com.livestream.core.model.StreamProtocol
  */
 object PresetChannelDataProvider {
 
+    const val PRESET_DATA_VERSION = 1
+
     val categories = listOf(
         ChannelCategory(
             id = "cctv",

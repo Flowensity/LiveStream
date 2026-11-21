@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.livestream.core.model.CustomPlaylistSource
@@ -12,6 +13,7 @@ import com.livestream.core.model.TvKeyMappingScheme
 import com.livestream.core.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -34,6 +36,7 @@ class UserPreferencesDataStore @Inject constructor(
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val VIDEO_ASPECT_RATIO = stringPreferencesKey("video_aspect_ratio")
         val CUSTOM_PLAYLIST_SOURCES = stringPreferencesKey("custom_playlist_sources")
+        val PRESET_SEED_VERSION = intPreferencesKey("preset_seed_version")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -175,6 +178,21 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun clearCustomPlaylistSources() {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.CUSTOM_PLAYLIST_SOURCES] = "[]"
+        }
+    }
+
+    suspend fun getPresetSeedVersion(): Int {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) emit(emptyPreferences()) else throw exception
+            }
+            .map { preferences -> preferences[PreferencesKeys.PRESET_SEED_VERSION] ?: 0 }
+            .first()
+    }
+
+    suspend fun setPresetSeedVersion(version: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PRESET_SEED_VERSION] = version
         }
     }
 }

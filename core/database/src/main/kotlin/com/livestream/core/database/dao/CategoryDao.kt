@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.livestream.core.database.entity.CategoryEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -16,13 +17,13 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :categoryId LIMIT 1")
     suspend fun getCategoryById(categoryId: String): CategoryEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertCategories(categories: List<CategoryEntity>)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCategoriesIgnore(categories: List<CategoryEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertCategory(category: CategoryEntity)
 
     @Query("DELETE FROM categories WHERE id = :categoryId")

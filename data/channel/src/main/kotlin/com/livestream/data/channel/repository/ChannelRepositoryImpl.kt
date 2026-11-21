@@ -4,6 +4,7 @@ import com.livestream.core.common.dispatcher.AppDispatchers
 import com.livestream.core.database.dao.CategoryDao
 import com.livestream.core.database.dao.ChannelDao
 import com.livestream.core.database.dao.LiveSourceDao
+import com.livestream.core.datastore.UserPreferencesDataStore
 import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
 import com.livestream.data.channel.mapper.toDomain
@@ -25,8 +26,16 @@ class ChannelRepositoryImpl @Inject constructor(
     private val channelDao: ChannelDao,
     private val liveSourceDao: LiveSourceDao,
     private val categoryDao: CategoryDao,
-    private val dispatchers: AppDispatchers
+    private val dispatchers: AppDispatchers,
+    private val userPreferencesDataStore: UserPreferencesDataStore? = null
 ) : ChannelRepository {
+
+    constructor(
+        channelDao: ChannelDao,
+        liveSourceDao: LiveSourceDao,
+        categoryDao: CategoryDao,
+        dispatchers: AppDispatchers
+    ) : this(channelDao, liveSourceDao, categoryDao, dispatchers, null)
 
     private var hasSeeded = false
     private val seedMutex = kotlinx.coroutines.sync.Mutex()
@@ -203,11 +212,18 @@ class ChannelRepositoryImpl @Inject constructor(
             seedMutex.withLock {
                 if (hasSeeded) return@withLock
 
-                // Always ensure predefined categories are up-to-date (e.g. 地方卫视)
+                val seededVersion = userPreferencesDataStore?.getPresetSeedVersion() ?: 0
+                if (seededVersion >= PresetChannelDataProvider.PRESET_DATA_VERSION && channelDao.getChannelCount() > 0) {
+                    hasSeeded = true
+                    return@withLock
+                }
+
+                // Read existing channels before upserting categories/channels so user state is always preserved
+                val existingChannels = channelDao.getAllChannelsSync().associateBy { it.id }
+
+                // Upsert predefined categories without cascading deletes
                 categoryDao.insertCategories(PresetChannelDataProvider.categories.map { it.toEntity() })
 
-                // Preserve user-favorite and user-hidden settings for existing channels
-                val existingChannels = channelDao.getAllChannelsSync().associateBy { it.id }
                 val defaultChannelIds = PresetChannelDataProvider.allDefaultChannels.mapTo(HashSet()) { it.id }
                 val obsoletePresetIds = existingChannels.keys.filter { id ->
                     (id.startsWith("cctv_") || id.startsWith("weishi_")) && id !in defaultChannelIds
@@ -222,7 +238,8 @@ class ChannelRepositoryImpl @Inject constructor(
                     if (existing != null) {
                         defaultChannel.copy(
                             isFavorite = existing.isFavorite,
-                            isHidden = existing.isHidden
+                            isHidden = existing.isHidden,
+                            orderIndex = existing.orderIndex
                         ).toEntity()
                     } else {
                         defaultChannel.toEntity()
@@ -233,6 +250,7 @@ class ChannelRepositoryImpl @Inject constructor(
                 // Upsert all preset official sources so satellite and CCTV sources are always populated
                 liveSourceDao.insertSources(PresetChannelDataProvider.allDefaultSourceEntities)
 
+                userPreferencesDataStore?.setPresetSeedVersion(PresetChannelDataProvider.PRESET_DATA_VERSION)
                 hasSeeded = true
             }
         }

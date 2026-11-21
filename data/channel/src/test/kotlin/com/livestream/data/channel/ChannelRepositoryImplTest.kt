@@ -7,10 +7,12 @@ import com.livestream.core.database.dao.ChannelDao
 import com.livestream.core.database.dao.LiveSourceDao
 import com.livestream.core.database.entity.ChannelEntity
 import com.livestream.core.database.entity.LiveSourceEntity
+import com.livestream.core.datastore.UserPreferencesDataStore
 import com.livestream.data.channel.preset.PresetChannelDataProvider
 import com.livestream.data.channel.repository.ChannelRepositoryImpl
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
@@ -228,5 +230,46 @@ class ChannelRepositoryImplTest {
 
         coVerify(exactly = 1) { channelDao.deleteChannelsByIds(listOf("cctv_600099637")) }
         coVerify(exactly = 1) { liveSourceDao.deleteSourcesByChannelIds(listOf("cctv_600099637")) }
+    }
+
+    @Test
+    fun `checkAndSeedDefaultChannels reads existing channels before upserting categories`() = runTest(testDispatcher) {
+        coEvery { channelDao.getAllChannelsSync() } returns emptyList()
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+        repo.checkAndSeedDefaultChannels()
+
+        coVerifyOrder {
+            channelDao.getAllChannelsSync()
+            categoryDao.insertCategories(any())
+            channelDao.insertChannels(any())
+            liveSourceDao.insertSources(any())
+        }
+    }
+
+    @Test
+    fun `checkAndSeedDefaultChannels skips DB writes when preset version already seeded`() = runTest(testDispatcher) {
+        val prefs = mockk<UserPreferencesDataStore>(relaxed = true)
+        coEvery { prefs.getPresetSeedVersion() } returns PresetChannelDataProvider.PRESET_DATA_VERSION
+        coEvery { channelDao.getChannelCount() } returns 63
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers, prefs)
+        repo.checkAndSeedDefaultChannels()
+
+        coVerify(exactly = 0) { categoryDao.insertCategories(any()) }
+        coVerify(exactly = 0) { channelDao.insertChannels(any()) }
+        coVerify(exactly = 0) { liveSourceDao.insertSources(any()) }
+    }
+
+    @Test
+    fun `checkAndSeedDefaultChannels persists seed version after seeding`() = runTest(testDispatcher) {
+        val prefs = mockk<UserPreferencesDataStore>(relaxed = true)
+        coEvery { prefs.getPresetSeedVersion() } returns 0
+        coEvery { channelDao.getAllChannelsSync() } returns emptyList()
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers, prefs)
+        repo.checkAndSeedDefaultChannels()
+
+        coVerify(exactly = 1) { prefs.setPresetSeedVersion(PresetChannelDataProvider.PRESET_DATA_VERSION) }
     }
 }
