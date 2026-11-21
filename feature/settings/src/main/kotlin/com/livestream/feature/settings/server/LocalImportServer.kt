@@ -8,10 +8,14 @@ import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.Inet4Address
@@ -44,7 +48,8 @@ class LocalImportServer @Inject constructor() {
 
     private var serverSocket: ServerSocket? = null
     private var serverJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val connectionSemaphore = Semaphore(MAX_CONCURRENT_CONNECTIONS)
 
     @Volatile
     private var consoleActions: WebConsoleActions? = null
@@ -63,6 +68,7 @@ class LocalImportServer @Inject constructor() {
         const val DEFAULT_PORT = 52026
         const val MAX_HEADER_BYTES = 8 * 1024
         const val MAX_BODY_BYTES = 10 * 1024 * 1024
+        const val MAX_CONCURRENT_CONNECTIONS = 16
 
         /**
          * 获取当前设备的局域网 IPv4 地址 (Wi-Fi 或 Ethernet)
@@ -152,7 +158,9 @@ class LocalImportServer @Inject constructor() {
                 try {
                     val socket = ss.accept()
                     launch {
-                        handleClient(socket, onContentReceived)
+                        connectionSemaphore.withPermit {
+                            handleClient(socket, onContentReceived)
+                        }
                     }
                 } catch (_: Exception) {
                     break
@@ -184,7 +192,7 @@ class LocalImportServer @Inject constructor() {
         try {
             socket.use { s ->
                 s.soTimeout = 10000
-                val input = s.getInputStream()
+                val input = BufferedInputStream(s.getInputStream(), 8192)
                 val output = s.getOutputStream()
 
                 // 1. 读取 HTTP 头部字节序列（以 CRLFCRLF 或 LFLF 为界，限制最大 8KB 防止恶意长连接耗尽内存）

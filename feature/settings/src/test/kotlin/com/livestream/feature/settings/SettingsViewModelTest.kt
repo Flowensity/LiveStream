@@ -295,4 +295,45 @@ class SettingsViewModelTest {
         assertEquals("cctv5p", index.match("CCTV5+ FHD")?.id)
         assertEquals("hunan", index.match("湖南卫视-超高清 4K")?.id)
     }
+
+    @Test
+    fun `ensureLocalServerStarted defers server startup off main thread construction`() = runTest(testDispatcher) {
+        val deferredServer = mockk<LocalImportServer>(relaxed = true)
+        io.mockk.every { deferredServer.start(any()) } returns "http://192.168.1.20:52026/"
+
+        val vm = SettingsViewModel(
+            userPreferencesRepository = userPreferencesRepository,
+            channelRepository = channelRepository,
+            categoryRepository = categoryRepository,
+            localImportServer = deferredServer,
+            okHttpClient = okHttpClient,
+            dispatchers = dispatchers,
+            isTv = true
+        )
+
+        // Must not synchronously block constructor/main thread before coroutine runs
+        coVerify(exactly = 0) { deferredServer.start(any()) }
+
+        advanceUntilIdle()
+        coVerify(atLeast = 1) { deferredServer.start(any()) }
+        assertEquals("http://192.168.1.20:52026/", vm.uiState.value.localServerUrl)
+    }
+
+    @Test
+    fun `importM3uInternal rejects loopback and unsafe URLs before making network call`() = runTest(testDispatcher) {
+        val strictOkHttp = mockk<OkHttpClient>(relaxed = true)
+        val vm = SettingsViewModel(
+            userPreferencesRepository = userPreferencesRepository,
+            channelRepository = channelRepository,
+            categoryRepository = categoryRepository,
+            localImportServer = localImportServer,
+            okHttpClient = strictOkHttp,
+            dispatchers = dispatchers,
+            isTv = false
+        )
+
+        val result = vm.importM3uInternal("http://127.0.0.1:52026/secret.m3u")
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { strictOkHttp.newCall(any()) }
+    }
 }

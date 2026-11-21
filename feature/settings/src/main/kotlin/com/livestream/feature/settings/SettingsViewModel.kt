@@ -20,6 +20,7 @@ import com.livestream.playback.api.PlaybackOrchestrator
 import com.livestream.playback.api.SwitchDirection
 import com.livestream.source.custom.parser.M3uPlaylistParser
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -134,6 +135,7 @@ class SettingsViewModel internal constructor(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private var serverStartJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -168,21 +170,29 @@ class SettingsViewModel internal constructor(
 
     fun ensureLocalServerStarted() {
         if (!isTvDevice) return
-        localImportServer.registerActions(createWebConsoleActions())
-        val serverUrl = localImportServer.start { rawInput ->
-            importM3uInternal(rawInput)
-        }
-        if (!serverUrl.isNullOrBlank()) {
-            val qr = _uiState.value.qrBitmap ?: try {
-                LocalImportServer.generateQrCodeBitmap(serverUrl, 512)
-            } catch (_: Exception) {
-                null
+        if (serverStartJob?.isActive == true) return
+        serverStartJob = viewModelScope.launch {
+            val serverUrl = withContext(dispatchers.io) {
+                localImportServer.registerActions(createWebConsoleActions())
+                localImportServer.start { rawInput ->
+                    importM3uInternal(rawInput)
+                }
             }
-            _uiState.update {
-                it.copy(
-                    localServerUrl = serverUrl,
-                    qrBitmap = qr
-                )
+            if (!serverUrl.isNullOrBlank()) {
+                val existingQr = _uiState.value.qrBitmap
+                val qr = existingQr ?: withContext(dispatchers.default) {
+                    try {
+                        LocalImportServer.generateQrCodeBitmap(serverUrl, 512)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                _uiState.update {
+                    it.copy(
+                        localServerUrl = serverUrl,
+                        qrBitmap = qr
+                    )
+                }
             }
         }
     }
@@ -340,8 +350,23 @@ class SettingsViewModel internal constructor(
                 downloadUrl = downloadUrl.replace("github.com/", "raw.githubusercontent.com/").replace("/blob/", "/")
             }
             val parsed = if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
+                if (!M3uPlaylistParser.isSafeAndValidStreamUrl(downloadUrl)) {
+                    val err = Exception("订阅地址被安全策略拦截或格式无效")
+                    _uiState.update {
+                        it.copy(isImporting = false, refreshingSourceId = null, importError = err.message)
+                    }
+                    return@withContext Result.failure(err)
+                }
                 val req = Request.Builder().url(downloadUrl).build()
                 okHttpClient.newCall(req).execute().use { resp ->
+                    val finalUrl = resp.request.url.toString()
+                    if (!M3uPlaylistParser.isSafeAndValidStreamUrl(finalUrl)) {
+                        val err = Exception("订阅重定向目标地址被安全策略拦截")
+                        _uiState.update {
+                            it.copy(isImporting = false, refreshingSourceId = null, importError = err.message)
+                        }
+                        return@withContext Result.failure(err)
+                    }
                     if (!resp.isSuccessful) {
                         return@withContext Result.failure(Exception("下载 M3U 订阅失败: HTTP ${resp.code}"))
                     }

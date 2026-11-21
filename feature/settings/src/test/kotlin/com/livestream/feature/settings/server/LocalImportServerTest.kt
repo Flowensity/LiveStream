@@ -145,4 +145,27 @@ http://example.com/hunan.m3u8"""
         assertTrue(cmdResp.isSuccessful)
         assertEquals("ASPECT_RATIO", remoteCmd)
     }
+
+    @Test
+    fun `test malformed or aborted client connection does not break subsequent requests`() = runBlocking {
+        server.registerActions(object : WebConsoleActions {
+            override suspend fun getChannels(): List<WebChannelInfo> = emptyList()
+            override suspend fun playChannel(channelId: String): Boolean = true
+            override suspend fun toggleFavorite(channelId: String): Boolean = true
+            override suspend fun executeRemoteCommand(command: String): Boolean = true
+        })
+        server.start { Result.success(1) }
+        val port = server.currentPort!!
+
+        // Send incomplete/malformed request and close immediately
+        java.net.Socket("127.0.0.1", port).use { badSocket ->
+            badSocket.getOutputStream().write("INVALID_GARBAGE".toByteArray(Charsets.UTF_8))
+            badSocket.getOutputStream().flush()
+        }
+
+        val listReq = Request.Builder().url("http://127.0.0.1:$port/api/channels").get().build()
+        val listResp = okHttpClient.newCall(listReq).execute()
+        assertTrue(listResp.isSuccessful)
+        assertTrue(listResp.body!!.string().contains(""""success":true"""))
+    }
 }
