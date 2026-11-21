@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -75,6 +76,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var availableSources: List<LiveSource> = emptyList()
     private var currentSourceIndex: Int = 0
     private var currentRetryCount: Int = 0
+    private val attemptedSourceIdsInSession = mutableSetOf<String>()
     private val sourceLatencyCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val sourceRealResolutionCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Int>>()
     private val prewarmedSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<LiveSource>>()
@@ -249,6 +251,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activeProbeJob?.cancel()
         activePrewarmJob?.cancel()
         currentRetryCount = 0
+        attemptedSourceIdsInSession.clear()
         watchdog.start(statusFlow)
 
         // 记录切台起始时间点
@@ -400,23 +403,25 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 }.awaitAll()
             }
 
-            if (sessionToken == activeSessionToken) {
-                val updatedList = availableSources.map { src ->
-                    val newHealth = healthUpdates[src.id]
-                    if (newHealth != null) src.copy(healthStatus = newHealth) else src
+            withContext(dispatchers.main) {
+                if (sessionToken == activeSessionToken) {
+                    val updatedList = availableSources.map { src ->
+                        val newHealth = healthUpdates[src.id]
+                        if (newHealth != null) src.copy(healthStatus = newHealth) else src
+                    }
+                    availableSources = sortSourcesByHealthAndLatency(updatedList)
+                    val activeSrcId = _orchestratorState.value.currentSource?.id
+                    if (activeSrcId != null) {
+                        val idx = availableSources.indexOfFirst { it.id == activeSrcId }
+                        if (idx >= 0) currentSourceIndex = idx
+                    }
+                    _orchestratorState.value = _orchestratorState.value.copy(
+                        availableSources = availableSources,
+                        currentSourceIndex = currentSourceIndex,
+                        sourceLatenciesMs = sourceLatencyCache.toMap(),
+                        sourceResolutions = sourceRealResolutionCache.toMap()
+                    )
                 }
-                availableSources = sortSourcesByHealthAndLatency(updatedList)
-                val activeSrcId = _orchestratorState.value.currentSource?.id
-                if (activeSrcId != null) {
-                    val idx = availableSources.indexOfFirst { it.id == activeSrcId }
-                    if (idx >= 0) currentSourceIndex = idx
-                }
-                _orchestratorState.value = _orchestratorState.value.copy(
-                    availableSources = availableSources,
-                    currentSourceIndex = currentSourceIndex,
-                    sourceLatenciesMs = sourceLatencyCache.toMap(),
-                    sourceResolutions = sourceRealResolutionCache.toMap()
-                )
             }
         }
     }
@@ -439,6 +444,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         }
 
         val channel = _orchestratorState.value.currentChannel ?: return
+        attemptedSourceIdsInSession.add(source.id)
 
         _orchestratorState.value = _orchestratorState.value.copy(
             status = PlaybackStatus.RESOLVING,
@@ -573,9 +579,17 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             }
         }
 
-        // 尝试源回退策略：切换同频道的备选源
-        if (currentSourceIndex + 1 < availableSources.size) {
-            currentSourceIndex++
+        // 尝试源回退策略：从当前索引之后循环查找本轮尚未尝试过的备选源
+        val total = availableSources.size
+        val nextFallbackIndex = if (total > 1) {
+            (1 until total)
+                .map { offset -> (currentSourceIndex + offset) % total }
+                .firstOrNull { idx -> availableSources[idx].id !in attemptedSourceIdsInSession }
+        } else {
+            null
+        }
+        if (nextFallbackIndex != null) {
+            currentSourceIndex = nextFallbackIndex
             activePlayJob?.cancel()
             activePlayJob = orchestratorScope.launch {
                 delay(100) // 调优：由 300ms 降至 100ms 快速换线切换备用源
@@ -792,7 +806,11 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     override val watchdogStallTimeoutMs: Long get() = watchdog.stallTimeoutMs
 
     override fun switchNextSource() {
-        if (availableSources.size <= 1) return
+        if (availableSources.isEmpty()) return
+        if (availableSources.size == 1) {
+            retry()
+            return
+        }
         val currentToken = activeSessionToken
         val nextIndex = currentSourceIndex + 1
         if (nextIndex >= availableSources.size && _orchestratorState.value.status != PlaybackStatus.PLAYING) {
@@ -819,6 +837,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         val currentToken = activeSessionToken
         currentSourceIndex = sourceIndex
         currentRetryCount = 0
+        attemptedSourceIdsInSession.clear()
         activePlayJob?.cancel()
         activePlayJob = orchestratorScope.launch {
             executeSourcePlayback(currentToken)
@@ -828,6 +847,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     override fun retry() {
         val currentToken = activeSessionToken
         currentRetryCount = 0
+        attemptedSourceIdsInSession.clear()
         activePlayJob?.cancel()
         activePlayJob = orchestratorScope.launch {
             executeSourcePlayback(currentToken)
@@ -857,6 +877,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activePlayJob?.cancel()
         activeProbeJob?.cancel()
         activePrewarmJob?.cancel()
+        attemptedSourceIdsInSession.clear()
         switchStartTimeMs = 0L
         watchdog.stop()
         engine.stop()
@@ -873,6 +894,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         activePlayJob?.cancel()
         activeProbeJob?.cancel()
         activePrewarmJob?.cancel()
+        attemptedSourceIdsInSession.clear()
         switchStartTimeMs = 0L
         watchdog.release()
         engine.release()

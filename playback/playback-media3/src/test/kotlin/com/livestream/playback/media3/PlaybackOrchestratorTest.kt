@@ -623,4 +623,92 @@ class PlaybackOrchestratorTest {
         val reordered = orchestrator.orchestratorState.value.availableSources
         assertEquals("src_fast_1080p", reordered.first().id)
     }
+
+    @Test
+    fun `test switchNextSource retries playback when channel has only one source`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        orchestrator.switchNextSource()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { engine.prepare(match { it.sourceId == "src_1" }, true) }
+    }
+
+    @Test
+    fun `test handlePlaybackFailure wraps around to index 0 when preferred source at index 1 fails`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1, preferredSourceId = "src_2")
+        advanceUntilIdle()
+        assertEquals("src_2", orchestrator.orchestratorState.value.currentSource?.id)
+
+        engineStateFlow.value = EngineState.Error(
+            PlaybackErrorInfo(PlaybackErrorType.NETWORK_TIMEOUT, "超时", canRetry = true)
+        )
+        advanceUntilIdle()
+
+        assertEquals("src_1", orchestrator.orchestratorState.value.currentSource?.id)
+        coVerify(exactly = 1) { engine.prepare(match { it.sourceId == "src_1" }, true) }
+    }
+
+    @Test
+    fun `test probeCandidateSources commits state updates on main dispatcher without racing IO thread`() = runTest {
+        val mainDispatcher = StandardTestDispatcher(testScheduler)
+        val ioDispatcher = StandardTestDispatcher(testScheduler)
+        val splitDispatchers = object : AppDispatchers {
+            override val main: CoroutineDispatcher = mainDispatcher
+            override val io: CoroutineDispatcher = ioDispatcher
+            override val default: CoroutineDispatcher = mainDispatcher
+        }
+        val mainThreadStates = mutableListOf<String>()
+        val probeRegistry = DefaultSourceAdapterRegistry().apply {
+            register(object : SourceAdapter {
+                override val providerId: String = "cctv"
+                override suspend fun resolve(channel: Channel, source: LiveSource): SourceResolution {
+                    return SourceResolution.NativeMedia("https://live.example.com/${source.id}.m3u8", "HLS")
+                }
+                override suspend fun checkAvailability(channel: Channel, source: LiveSource): AvailabilityResult {
+                    return AvailabilityResult.Available(latencyMs = if (source.id == "src_2") 40L else 600L)
+                }
+            })
+        }
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1, sampleSource2)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            probeRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            splitDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+        mainThreadStates.add(orchestrator.orchestratorState.value.availableSources.first().id)
+
+        assertEquals("src_2", mainThreadStates.single())
+        assertEquals(2, orchestrator.orchestratorState.value.sourceLatenciesMs.size)
+    }
 }
