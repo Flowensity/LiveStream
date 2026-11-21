@@ -16,6 +16,8 @@
 
 `LiveStream` 是一款专为 **Android TV / 电视机顶盒**、**智能手机** 与 **平板电脑** 量身打造的多端自适应电视直播应用，基于 **AndroidX Media3 (ExoPlayer)** 原生内核与 **Jetpack Compose** 现代响应式 UI 构建。
 
+> **说明：** 本项目全程由 AI 编写。
+
 ---
 
 ## ✨ 核心特性

@@ -16,6 +16,8 @@
 
 `LiveStream` is a multi-device adaptive live TV streaming application built for **Android TV / Set-Top Boxes**, **Smartphones**, and **Tablets**, powered by **AndroidX Media3 (ExoPlayer)** and **Jetpack Compose**.
 
+> **Note:** This entire project was written by AI.
+
 ---
 
 ## ✨ Key Features
