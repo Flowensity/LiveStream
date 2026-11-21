@@ -48,12 +48,43 @@ class PlayerViewModel @Inject constructor(
 
     private var osdDismissJob: Job? = null
     private var numberKeyJob: Job? = null
-    private var epgJob: Job? = null
+    private var epgRefreshJob: Job? = null
+    private var epgObserveJob: Job? = null
     private var currentObservedChannelId: String? = null
+    private var isEpgPollingActive: Boolean = false
 
     init {
         observeOrchestratorState()
         scheduleOsdDismiss(5000L)
+    }
+
+    private fun startEpgObservation(channelId: String) {
+        epgObserveJob?.cancel()
+        epgObserveJob = viewModelScope.launch {
+            launch {
+                getCurrentProgramUseCase(channelId).collect { program ->
+                    _uiState.update { it.copy(currentProgram = program) }
+                }
+            }
+            launch {
+                getNextProgramUseCase(channelId).collect { program ->
+                    _uiState.update { it.copy(nextProgram = program) }
+                }
+            }
+            launch {
+                val cal = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val startOfDay = cal.timeInMillis
+                val endOfDay = startOfDay + 24 * 60 * 60 * 1000L
+                getProgramsForChannelUseCase(channelId, startOfDay, endOfDay).collect { list ->
+                    _uiState.update { it.copy(dayPrograms = list) }
+                }
+            }
+        }
     }
 
     private fun observeOrchestratorState() {
@@ -65,48 +96,34 @@ class PlayerViewModel @Inject constructor(
                     state.status == PlaybackStatus.SWITCHING
 
                 val isPlaying = state.status == PlaybackStatus.PLAYING
+                val shouldPollEpg = state.status != PlaybackStatus.PAUSED && state.status != PlaybackStatus.RELEASED
 
                 val channelId = state.currentChannel?.id
                 if (channelId != currentObservedChannelId) {
                     currentObservedChannelId = channelId
-                    epgJob?.cancel()
+                    epgRefreshJob?.cancel()
+                    epgObserveJob?.cancel()
+                    isEpgPollingActive = false
                     if (channelId != null) {
                         val chName = state.currentChannel?.name.orEmpty()
-                        epgJob = viewModelScope.launch {
-                            // 1. 异步触发网络拉取真实 CNTV 节目单入库（增加防抖，避免切台过程中高频触发网络拉取）
-                            launch {
-                                delay(300L)
-                                refreshEpgUseCase(channelId, chName)
-                            }
-                            // 2. 观察当前节目
-                            launch {
-                                getCurrentProgramUseCase(channelId).collect { program ->
-                                    _uiState.update { it.copy(currentProgram = program) }
-                                }
-                            }
-                            // 3. 观察下一节目
-                            launch {
-                                getNextProgramUseCase(channelId).collect { program ->
-                                    _uiState.update { it.copy(nextProgram = program) }
-                                }
-                            }
-                            // 4. 观察当天完整节目单
-                            launch {
-                                val cal = Calendar.getInstance().apply {
-                                    set(Calendar.HOUR_OF_DAY, 0)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
-                                val startOfDay = cal.timeInMillis
-                                val endOfDay = startOfDay + 24 * 60 * 60 * 1000L
-                                getProgramsForChannelUseCase(channelId, startOfDay, endOfDay).collect { list ->
-                                    _uiState.update { it.copy(dayPrograms = list) }
-                                }
-                            }
+                        epgRefreshJob = viewModelScope.launch {
+                            delay(300L)
+                            refreshEpgUseCase(channelId, chName)
+                        }
+                        if (shouldPollEpg) {
+                            isEpgPollingActive = true
+                            startEpgObservation(channelId)
                         }
                     } else {
                         _uiState.update { it.copy(currentProgram = null, nextProgram = null, dayPrograms = emptyList()) }
+                    }
+                } else if (channelId != null) {
+                    if (shouldPollEpg && !isEpgPollingActive) {
+                        isEpgPollingActive = true
+                        startEpgObservation(channelId)
+                    } else if (!shouldPollEpg && isEpgPollingActive) {
+                        isEpgPollingActive = false
+                        epgObserveJob?.cancel()
                     }
                 }
 

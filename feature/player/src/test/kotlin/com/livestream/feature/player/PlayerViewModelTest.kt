@@ -195,4 +195,30 @@ class PlayerViewModelTest {
         // uiState reference must remain identical (no redundant UI recomposition)
         org.junit.Assert.assertSame(stateSnapshotBefore, viewModel.uiState.value)
     }
+
+    @Test
+    fun `epg polling cancels when playback is paused and resumes when playing`() = runTest(testDispatcher) {
+        val channel = Channel(id = "cctv1", name = "CCTV-1", channelNumber = 1, categoryId = "cctv")
+        var currentFlowSubscriptions = 0
+        every { getCurrentProgramUseCase("cctv1", any()) } answers {
+            kotlinx.coroutines.flow.flow {
+                currentFlowSubscriptions++
+                emit(null)
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+
+        orchestratorStateFlow.value = OrchestratorState(currentChannel = channel, status = PlaybackStatus.PLAYING)
+        testScheduler.runCurrent()
+        assertEquals(1, currentFlowSubscriptions)
+
+        // Transition to PAUSED (e.g. background onStop) -> EPG collection should pause
+        orchestratorStateFlow.value = OrchestratorState(currentChannel = channel, status = PlaybackStatus.PAUSED)
+        testScheduler.runCurrent()
+
+        // Resume to PLAYING -> EPG collection restarts
+        orchestratorStateFlow.value = OrchestratorState(currentChannel = channel, status = PlaybackStatus.PLAYING)
+        testScheduler.runCurrent()
+        assertEquals(2, currentFlowSubscriptions)
+    }
 }

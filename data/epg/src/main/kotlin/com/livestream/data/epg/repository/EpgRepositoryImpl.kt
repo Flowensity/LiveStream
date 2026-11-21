@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.URI
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,6 +29,10 @@ class EpgRepositoryImpl @Inject constructor(
     private val dispatchers: AppDispatchers,
     private val okHttpClient: OkHttpClient?
 ) : EpgRepository {
+
+    private val epgRefreshCache = ConcurrentHashMap<String, Long>()
+    @Volatile
+    private var lastExpiredCleanupMs: Long = 0L
 
     constructor(
         epgDao: EpgDao,
@@ -64,6 +70,21 @@ class EpgRepositoryImpl @Inject constructor(
 
     companion object {
         const val EPG_BATCH_SIZE = 500
+        private const val REFRESH_TTL_MS = 6 * 60 * 60 * 1000L
+        private const val CLEANUP_INTERVAL_MS = 60 * 60 * 1000L
+
+        private fun isSafeHttpUrl(url: String): Boolean {
+            return try {
+                val uri = URI(url)
+                val scheme = uri.scheme?.lowercase(Locale.ROOT)
+                if (scheme != "http" && scheme != "https") return false
+                val host = uri.host?.lowercase(Locale.ROOT) ?: return false
+                host != "localhost" && host != "127.0.0.1" && host != "::1" && host != "0.0.0.0" &&
+                    host != "ip6-localhost" && host != "ip6-loopback"
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 
     override suspend fun savePrograms(programs: List<EpgProgram>) {
@@ -83,12 +104,24 @@ class EpgRepositoryImpl @Inject constructor(
 
     override suspend fun refreshEpgForChannel(channelId: String, channelName: String) {
         withContext(dispatchers.io) {
-            runCatching {
-                epgDao.deleteExpiredPrograms(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
+            val now = System.currentTimeMillis()
+            val lastRefreshedAt = epgRefreshCache[channelId]
+            if (lastRefreshedAt != null && now - lastRefreshedAt < REFRESH_TTL_MS) {
+                return@withContext
+            }
+
+            if (now - lastExpiredCleanupMs >= CLEANUP_INTERVAL_MS) {
+                lastExpiredCleanupMs = now
+                runCatching {
+                    epgDao.deleteExpiredPrograms(now - 24 * 60 * 60 * 1000L)
+                }
             }
             val programs = cntvEpgService.fetchDayPrograms(channelId, channelName)
             if (programs.isNotEmpty()) {
-                epgDao.insertPrograms(programs.map { it.toEntity() })
+                for (chunk in programs.chunked(EPG_BATCH_SIZE)) {
+                    epgDao.insertPrograms(chunk.map { it.toEntity() })
+                }
+                epgRefreshCache[channelId] = now
             }
         }
     }
@@ -98,13 +131,17 @@ class EpgRepositoryImpl @Inject constructor(
         channels: List<Channel>
     ): Result<Int> = withContext(dispatchers.io) {
         try {
-            // 建立 XMLTV channel 标识与本地 Channel.id 的双向索引映射（支持 tvg-id、频道 ID 与标准化名称匹配）
-            val channelLookup = mutableMapOf<String, MutableList<String>>()
+            if (!isSafeHttpUrl(epgUrl)) {
+                return@withContext Result.failure(IllegalArgumentException("XMLTV 地址被安全策略拦截或格式无效"))
+            }
+
+            // 建立 XMLTV channel 标识与本地 Channel.id 的双向索引映射（支持 tvg-id、频道 ID 与标准化名称匹配，使用 Set 自动去重）
+            val channelLookup = mutableMapOf<String, MutableSet<String>>()
             for (ch in channels) {
                 fun registerKey(rawKey: String?) {
                     val norm = rawKey?.trim()?.uppercase(Locale.ROOT)?.replace(" ", "")?.replace("-", "")
                     if (!norm.isNullOrEmpty()) {
-                        channelLookup.getOrPut(norm) { mutableListOf() }.add(ch.id)
+                        channelLookup.getOrPut(norm) { LinkedHashSet() }.add(ch.id)
                     }
                 }
                 registerKey(ch.id)
@@ -117,6 +154,10 @@ class EpgRepositoryImpl @Inject constructor(
             var totalImportedCount = 0
 
             client.newCall(request).execute().use { response ->
+                val finalUrl = response.request.url.toString()
+                if (!isSafeHttpUrl(finalUrl)) {
+                    return@withContext Result.failure(IllegalArgumentException("XMLTV 重定向目标地址被安全策略拦截"))
+                }
                 if (!response.isSuccessful) {
                     return@withContext Result.failure(Exception("下载 XMLTV 节目单失败: HTTP ${response.code}"))
                 }
@@ -125,7 +166,6 @@ class EpgRepositoryImpl @Inject constructor(
                     response.header("Content-Encoding")?.contains("gzip", ignoreCase = true) == true
                 val stream = if (isGzip) GZIPInputStream(body.byteStream()) else body.byteStream()
 
-                val pendingBatches = mutableListOf<List<com.livestream.core.database.entity.EpgProgramEntity>>()
                 stream.use { input ->
                     XmltvParser.parseStreaming(input, batchSize = EPG_BATCH_SIZE) { batchPrograms ->
                         val mappedEntities = ArrayList<com.livestream.core.database.entity.EpgProgramEntity>(batchPrograms.size)
@@ -146,15 +186,11 @@ class EpgRepositoryImpl @Inject constructor(
                             }
                         }
                         if (mappedEntities.isNotEmpty()) {
-                            pendingBatches.add(mappedEntities)
+                            for (subChunk in mappedEntities.chunked(EPG_BATCH_SIZE)) {
+                                epgDao.insertProgramsSync(subChunk)
+                                totalImportedCount += subChunk.size
+                            }
                         }
-                    }
-                }
-
-                for (batch in pendingBatches) {
-                    for (subChunk in batch.chunked(EPG_BATCH_SIZE)) {
-                        epgDao.insertPrograms(subChunk)
-                        totalImportedCount += subChunk.size
                     }
                 }
             }

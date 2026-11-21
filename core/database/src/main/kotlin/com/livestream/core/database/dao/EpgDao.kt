@@ -22,6 +22,9 @@ interface EpgDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPrograms(programs: List<EpgProgramEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertProgramsSync(programs: List<EpgProgramEntity>)
+
     @Query("DELETE FROM epg_programs WHERE end_timestamp < :beforeTimestamp")
     suspend fun deleteExpiredPrograms(beforeTimestamp: Long)
 }
