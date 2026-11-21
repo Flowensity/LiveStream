@@ -1,7 +1,13 @@
 package com.livestream.playback.web
 
+import android.app.Activity
+import android.content.Context
+import android.view.ViewGroup
 import com.livestream.core.common.dispatcher.AppDispatchers
 import com.livestream.playback.api.web.WebPlaybackState
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -86,5 +92,28 @@ class DefaultWebPlaybackControllerTest {
         org.junit.Assert.assertFalse(
             controller.shouldBlockWebResource("https://live-play.yangshipin.cn/live/cctv1_001.ts")
         )
+    }
+
+    @Test
+    fun `resolveWebViewContext unwraps activity context to application context to prevent memory leak`() {
+        val appContext = mockk<Context>(relaxed = true)
+        val activityContext = mockk<Activity>(relaxed = true) {
+            every { applicationContext } returns appContext
+        }
+
+        val resolved = controller.resolveWebViewContext(activityContext)
+        org.junit.Assert.assertFalse(resolved === activityContext)
+        assertEquals(appContext, resolved)
+    }
+
+    @Test
+    fun `stopAndDestroy clears parentContainer and targetUrl so reload cannot resurrect leaked container`() = runTest(testDispatcher) {
+        val mockContainer = mockk<ViewGroup>(relaxed = true)
+        controller.markPooledInstanceReadyForTest("https://www.yangshipin.cn/tv/home?pid=600001859", mockContainer)
+
+        controller.stopAndDestroy()
+        controller.reload()
+
+        verify(exactly = 0) { mockContainer.addView(any()) }
     }
 }

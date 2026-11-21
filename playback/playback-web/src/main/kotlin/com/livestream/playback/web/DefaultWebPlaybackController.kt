@@ -1,6 +1,7 @@
 package com.livestream.playback.web
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
 import android.view.Gravity
@@ -137,7 +138,7 @@ class DefaultWebPlaybackController @Inject constructor(
         targetUrl = url
         parentContainer = viewGroup
 
-        val context = viewGroup.context
+        val context = resolveWebViewContext(viewGroup.context)
         val wv = WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -316,14 +317,19 @@ class DefaultWebPlaybackController @Inject constructor(
         }
     }
 
+    internal fun resolveWebViewContext(containerContext: Context): Context {
+        return containerContext.applicationContext ?: containerContext
+    }
+
     internal fun canReusePooledInstance(): Boolean {
         return _activeWebViewCount.value > 0 &&
             _webState.value !is WebPlaybackState.Destroyed &&
             _webState.value !is WebPlaybackState.RendererCrashed
     }
 
-    internal fun markPooledInstanceReadyForTest(url: String) {
+    internal fun markPooledInstanceReadyForTest(url: String, container: ViewGroup? = null) {
         targetUrl = url
+        parentContainer = container
         _activeWebViewCount.value = 1
         _webState.value = WebPlaybackState.Ready
     }
@@ -580,12 +586,15 @@ class DefaultWebPlaybackController @Inject constructor(
 
         webView?.let { wv ->
             wv.stopLoading()
+            wv.removeJavascriptInterface("LiveStreamBridge")
             wv.clearHistory()
             wv.loadUrl("about:blank")
             (wv.parent as? ViewGroup)?.removeView(wv)
             wv.destroy()
         }
         webView = null
+        parentContainer = null
+        targetUrl = null
         _activeWebViewCount.value = 0
         _webState.value = WebPlaybackState.Destroyed
     }

@@ -19,15 +19,12 @@ import androidx.core.view.WindowCompat
 import com.livestream.core.model.PlaybackStatus
 import com.livestream.core.model.ThemeMode
 import com.livestream.core.ui.theme.LiveStreamTheme
-import com.livestream.domain.channel.repository.ChannelRepository
-import com.livestream.domain.channel.repository.UserPreferencesRepository
 import com.livestream.feature.channel.ChannelViewModel
 import com.livestream.feature.home.HomeViewModel
 import com.livestream.feature.home.ui.HomeScreen
 import com.livestream.feature.player.PlayerViewModel
 import com.livestream.feature.settings.SettingsViewModel
 import com.livestream.playback.api.PlaybackOrchestrator
-import com.livestream.source.api.SourceAdapterRegistry
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -35,16 +32,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var channelRepository: ChannelRepository
-
-    @Inject
-    lateinit var userPreferencesRepository: UserPreferencesRepository
-
-    @Inject
     lateinit var playbackOrchestrator: PlaybackOrchestrator
-
-    @Inject
-    lateinit var sourceAdapterRegistry: SourceAdapterRegistry
 
     private val homeViewModel: HomeViewModel by viewModels()
     private val playerViewModel: PlayerViewModel by viewModels()
@@ -155,5 +143,13 @@ class MainActivity : ComponentActivity() {
             pausedByLifecycle = true
             playbackOrchestrator.pause()
         }
+    }
+
+    override fun onDestroy() {
+        playbackOrchestrator.detachOutput()
+        if (!isChangingConfigurations) {
+            playbackOrchestrator.release()
+        }
+        super.onDestroy()
     }
 }

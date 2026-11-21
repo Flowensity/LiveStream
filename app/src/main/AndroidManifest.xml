@@ -33,7 +33,7 @@
             android:hardwareAccelerated="true"
             android:supportsPictureInPicture="true"
             android:banner="@drawable/tv_banner"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode|fontScale|locale|density"
             android:theme="@style/Theme.LiveStream">
 
             <!-- 手机与平板启动入口 -->
