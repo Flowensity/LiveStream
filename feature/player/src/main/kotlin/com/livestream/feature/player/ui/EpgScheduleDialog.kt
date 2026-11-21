@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.livestream.core.model.Channel
 import com.livestream.core.model.EpgProgram
 import com.livestream.core.model.LiveSource
+import com.livestream.core.model.SourceHealthStatus
 import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.device.DeviceType
@@ -85,7 +86,8 @@ fun EpgScheduleDialog(
     totalSources: Int = 1,
     availableSources: List<LiveSource> = emptyList(),
     sourceLatenciesMs: Map<String, Long> = emptyMap(),
-    onSwitchSource: () -> Unit = {}
+    onSwitchSource: () -> Unit = {},
+    onSelectSource: (Int) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val deviceType = rememberDeviceType()
@@ -267,7 +269,11 @@ fun EpgScheduleDialog(
                                         safeTotalSources = safeTotalSources,
                                         activeSource = activeSource,
                                         activeLatency = activeLatency,
+                                        availableSources = availableSources,
+                                        activeSourceIndex = activeSourceIndex,
+                                        sourceLatenciesMs = sourceLatenciesMs,
                                         onSwitchSource = onSwitchSource,
+                                        onSelectSource = onSelectSource,
                                         focusRequester = if (isTv) firstFocusRequester else null
                                     )
 
@@ -425,7 +431,11 @@ fun EpgScheduleDialog(
                             safeTotalSources = safeTotalSources,
                             activeSource = activeSource,
                             activeLatency = activeLatency,
+                            availableSources = availableSources,
+                            activeSourceIndex = activeSourceIndex,
+                            sourceLatenciesMs = sourceLatenciesMs,
                             onSwitchSource = onSwitchSource,
+                            onSelectSource = onSelectSource,
                             cardShape = cardShape,
                             focusRequester = if (isTv) firstFocusRequester else null
                         )
@@ -468,7 +478,11 @@ private fun SourceSwitchSection(
     safeTotalSources: Int,
     activeSource: LiveSource?,
     activeLatency: Long?,
+    availableSources: List<LiveSource>,
+    activeSourceIndex: Int,
+    sourceLatenciesMs: Map<String, Long>,
     onSwitchSource: () -> Unit,
+    onSelectSource: (Int) -> Unit,
     focusRequester: FocusRequester?
 ) {
     val sourceSubtitle = buildString {
@@ -532,6 +546,12 @@ private fun SourceSwitchSection(
                 )
             }
         }
+        SelectableSourceList(
+            availableSources = availableSources,
+            activeSourceIndex = activeSourceIndex,
+            sourceLatenciesMs = sourceLatenciesMs,
+            onSelectSource = onSelectSource
+        )
     }
 }
 
@@ -598,7 +618,11 @@ private fun SourceSwitchCard(
     safeTotalSources: Int,
     activeSource: LiveSource?,
     activeLatency: Long?,
+    availableSources: List<LiveSource>,
+    activeSourceIndex: Int,
+    sourceLatenciesMs: Map<String, Long>,
     onSwitchSource: () -> Unit,
+    onSelectSource: (Int) -> Unit,
     cardShape: RoundedCornerShape,
     focusRequester: FocusRequester?,
     modifier: Modifier = Modifier
@@ -656,6 +680,84 @@ private fun SourceSwitchCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 )
+            }
+        }
+        SelectableSourceList(
+            availableSources = availableSources,
+            activeSourceIndex = activeSourceIndex,
+            sourceLatenciesMs = sourceLatenciesMs,
+            onSelectSource = onSelectSource
+        )
+    }
+}
+
+@Composable
+private fun SelectableSourceList(
+    availableSources: List<LiveSource>,
+    activeSourceIndex: Int,
+    sourceLatenciesMs: Map<String, Long>,
+    onSelectSource: (Int) -> Unit
+) {
+    if (availableSources.size <= 1) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        availableSources.forEachIndexed { index, source ->
+            val isSelected = index == activeSourceIndex
+            val latencyMs = sourceLatenciesMs[source.id]
+            val statusColor = when (source.healthStatus) {
+                SourceHealthStatus.UNAVAILABLE -> OneUiTheme.colors.danger
+                SourceHealthStatus.DEGRADED -> OneUiTheme.colors.statusWarning
+                else -> if (isSelected) Color.White else OneUiTheme.colors.textSecondary
+            }
+            val metaText = buildString {
+                if (latencyMs != null && latencyMs > 0L) append("${latencyMs}ms")
+                else if (source.healthStatus == SourceHealthStatus.UNAVAILABLE) append("异常")
+                else if (isSelected) append("当前")
+            }
+            TvFocusableBox(
+                onClick = { onSelectSource(index) },
+                shape = RoundedCornerShape(8.dp),
+                scaleOnFocus = 1.01f,
+                unfocusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.cardSecondary,
+                focusedBackgroundColor = if (isSelected) OneUiTheme.colors.accent else OneUiTheme.colors.accentSoft,
+                focusedBorderColor = OneUiTheme.colors.accent,
+                focusedBorderWidth = 1.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) { isFocused ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${index + 1}. ${source.name}",
+                        color = when {
+                            isSelected -> Color.White
+                            isFocused -> OneUiTheme.colors.accent
+                            else -> OneUiTheme.colors.textPrimary
+                        },
+                        fontSize = 10.5.sp,
+                        fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = 6.dp)
+                    )
+                    if (metaText.isNotEmpty()) {
+                        Text(
+                            text = metaText,
+                            color = statusColor,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
+                }
             }
         }
     }

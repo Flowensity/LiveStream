@@ -73,6 +73,8 @@ fun SettingsDialog(
     onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
     onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onRefreshAllCustomSources: () -> Unit = {},
+    onProbeCustomSources: () -> Unit = {},
+    onRemoveUnavailableCustomChannels: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hasAnyOverlay = uiState.isSettingsOpen || uiState.isImportDialogOpen || uiState.isSourceManagementOpen
@@ -188,7 +190,9 @@ fun SettingsDialog(
                 onDeleteSingleCustomChannel = onDeleteSingleCustomChannel,
                 onClearAllCustomSources = onClearAllCustomSources,
                 onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
-                onRefreshAllCustomSources = onRefreshAllCustomSources
+                onRefreshAllCustomSources = onRefreshAllCustomSources,
+                onProbeCustomSources = onProbeCustomSources,
+                onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
             )
         }
     }

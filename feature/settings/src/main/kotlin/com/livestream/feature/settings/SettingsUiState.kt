@@ -25,5 +25,8 @@ data class SettingsUiState(
     val localServerUrl: String? = null,
     val qrBitmap: Bitmap? = null,
     val customSources: List<CustomPlaylistSource> = emptyList(),
-    val customChannels: List<Channel> = emptyList()
+    val customChannels: List<Channel> = emptyList(),
+    val isProbingSources: Boolean = false,
+    val unavailableCustomChannelIds: Set<String> = emptySet(),
+    val sourceHealthSummary: String? = null
 )

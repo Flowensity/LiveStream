@@ -29,8 +29,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.content.Context
+import com.livestream.core.network.NetworkProbe
+import com.livestream.core.network.ProbeResult
 import com.livestream.core.ui.device.DeviceDetector
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.Locale
@@ -47,6 +54,7 @@ class SettingsViewModel internal constructor(
     private val dispatchers: AppDispatchers,
     private val epgRepository: EpgRepository?,
     private val playbackOrchestrator: PlaybackOrchestrator?,
+    private val networkProbe: NetworkProbe? = null,
     val isTvDevice: Boolean
 ) : ViewModel() {
 
@@ -60,6 +68,7 @@ class SettingsViewModel internal constructor(
         dispatchers: AppDispatchers,
         epgRepository: EpgRepository?,
         playbackOrchestrator: PlaybackOrchestrator?,
+        networkProbe: NetworkProbe?,
         @ApplicationContext context: Context
     ) : this(
         userPreferencesRepository = userPreferencesRepository,
@@ -70,6 +79,7 @@ class SettingsViewModel internal constructor(
         dispatchers = dispatchers,
         epgRepository = epgRepository,
         playbackOrchestrator = playbackOrchestrator,
+        networkProbe = networkProbe,
         isTvDevice = DeviceDetector.isTv(context)
     )
 
@@ -91,6 +101,7 @@ class SettingsViewModel internal constructor(
         dispatchers = dispatchers,
         epgRepository = epgRepository,
         playbackOrchestrator = playbackOrchestrator,
+        networkProbe = null,
         isTvDevice = true
     )
 
@@ -547,17 +558,91 @@ class SettingsViewModel internal constructor(
     fun deleteSingleCustomChannel(channelId: String) {
         viewModelScope.launch {
             channelRepository.deleteChannelById(channelId)
-            for (source in _uiState.value.customSources) {
-                if (channelId in source.channelIds) {
-                    val updatedChannelIds = source.channelIds.filterNot { it == channelId }
-                    val updatedCount = (source.channelCount - 1).coerceAtLeast(updatedChannelIds.size)
-                    userPreferencesRepository.saveCustomPlaylistSource(
-                        source.copy(
-                            channelIds = updatedChannelIds,
-                            channelCount = updatedCount
-                        )
+            syncCustomSourcesAfterChannelDeletion(setOf(channelId))
+        }
+    }
+
+    fun probeCustomSources() {
+        val channels = _uiState.value.customChannels
+        if (channels.isEmpty() || _uiState.value.isProbingSources) return
+
+        viewModelScope.launch(dispatchers.io) {
+            _uiState.update { it.copy(isProbingSources = true, sourceHealthSummary = "正在测活 ${channels.size} 个自定义频道...") }
+            val probe = networkProbe ?: NetworkProbe(okHttpClient)
+            val semaphore = Semaphore(6)
+            val deadChannelIds = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+
+            coroutineScope {
+                channels.map { ch ->
+                    async {
+                        semaphore.withPermit {
+                            val sources = channelRepository.getSourcesForChannelSync(ch.id)
+                            var hasAliveSource = false
+                            for (src in sources) {
+                                if (src.url.isBlank()) continue
+                                when (probe.probeUrl(src.url, userAgent = src.userAgent, referer = src.referer)) {
+                                    is ProbeResult.Success -> {
+                                        hasAliveSource = true
+                                        channelRepository.updateSourceHealth(
+                                            src.id,
+                                            com.livestream.core.model.SourceHealthStatus.HEALTHY
+                                        )
+                                    }
+                                    is ProbeResult.Failure -> {
+                                        channelRepository.updateSourceHealth(
+                                            src.id,
+                                            com.livestream.core.model.SourceHealthStatus.UNAVAILABLE
+                                        )
+                                    }
+                                }
+                            }
+                            if (!hasAliveSource && sources.isNotEmpty()) {
+                                deadChannelIds.add(ch.id)
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+
+            val aliveCount = (channels.size - deadChannelIds.size).coerceAtLeast(0)
+            _uiState.update {
+                it.copy(
+                    isProbingSources = false,
+                    unavailableCustomChannelIds = deadChannelIds.toSet(),
+                    sourceHealthSummary = "测活完成：$aliveCount 个可用，${deadChannelIds.size} 个失效"
+                )
+            }
+        }
+    }
+
+    fun removeUnavailableCustomChannels() {
+        val deadIds = _uiState.value.unavailableCustomChannelIds
+        if (deadIds.isEmpty()) return
+
+        viewModelScope.launch {
+            channelRepository.deleteChannelsByIds(deadIds.toList())
+            syncCustomSourcesAfterChannelDeletion(deadIds)
+            _uiState.update {
+                it.copy(
+                    unavailableCustomChannelIds = emptySet(),
+                    sourceHealthSummary = "已清理 ${deadIds.size} 个失效频道"
+                )
+            }
+        }
+    }
+
+    private suspend fun syncCustomSourcesAfterChannelDeletion(deletedIds: Set<String>) {
+        for (source in _uiState.value.customSources) {
+            val removedCount = source.channelIds.count { it in deletedIds }
+            if (removedCount > 0) {
+                val updatedChannelIds = source.channelIds.filterNot { it in deletedIds }
+                val updatedCount = (source.channelCount - removedCount).coerceAtLeast(updatedChannelIds.size)
+                userPreferencesRepository.saveCustomPlaylistSource(
+                    source.copy(
+                        channelIds = updatedChannelIds,
+                        channelCount = updatedCount
                     )
-                }
+                )
             }
         }
     }
@@ -566,7 +651,14 @@ class SettingsViewModel internal constructor(
         viewModelScope.launch {
             channelRepository.deleteAllCustomChannelsAndSources()
             userPreferencesRepository.clearCustomPlaylistSources()
-            _uiState.update { it.copy(importSuccessCount = null, importError = null) }
+            _uiState.update {
+                it.copy(
+                    importSuccessCount = null,
+                    importError = null,
+                    unavailableCustomChannelIds = emptySet(),
+                    sourceHealthSummary = null
+                )
+            }
         }
     }
 

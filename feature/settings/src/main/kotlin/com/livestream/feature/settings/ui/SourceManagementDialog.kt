@@ -47,6 +47,8 @@ internal fun SourceManagementDialog(
     onClearAllCustomSources: () -> Unit,
     onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onRefreshAllCustomSources: () -> Unit = {},
+    onProbeCustomSources: () -> Unit = {},
+    onRemoveUnavailableCustomChannels: () -> Unit = {},
     sourceCloseFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
@@ -127,6 +129,42 @@ internal fun SourceManagementDialog(
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (uiState.customChannels.isNotEmpty()) {
+                                TvFocusableBox(
+                                    onClick = onProbeCustomSources,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.surfacePill,
+                                    focusedBackgroundColor = OneUiTheme.colors.accent,
+                                    focusedBorderColor = OneUiTheme.colors.accent,
+                                    focusedBorderWidth = 1.dp
+                                ) { isFocused ->
+                                    Text(
+                                        text = if (uiState.isProbingSources) "测活中" else "测活",
+                                        color = if (isFocused) Color.White else OneUiTheme.colors.textPrimary,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                            if (uiState.unavailableCustomChannelIds.isNotEmpty()) {
+                                TvFocusableBox(
+                                    onClick = onRemoveUnavailableCustomChannels,
+                                    shape = OneUiShapes.pill,
+                                    unfocusedBackgroundColor = OneUiTheme.colors.dangerSoft,
+                                    focusedBackgroundColor = OneUiTheme.colors.danger,
+                                    focusedBorderColor = OneUiTheme.colors.danger,
+                                    focusedBorderWidth = 1.dp
+                                ) { isFocused ->
+                                    Text(
+                                        text = "清理失效(${uiState.unavailableCustomChannelIds.size})",
+                                        color = if (isFocused) Color.White else OneUiTheme.colors.danger,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
                             if (uiState.customSources.any { it.url.startsWith("http") }) {
                                 TvFocusableBox(
                                     onClick = onRefreshAllCustomSources,
@@ -154,7 +192,7 @@ internal fun SourceManagementDialog(
                                 focusedBorderWidth = 1.dp
                             ) { isFocused ->
                                 Text(
-                                    text = "清空全部",
+                                    text = "清空",
                                     color = if (isFocused) Color.White else OneUiTheme.colors.danger,
                                     fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold,
@@ -162,6 +200,18 @@ internal fun SourceManagementDialog(
                                 )
                             }
                         }
+                    }
+
+                    val summary = uiState.sourceHealthSummary
+                    if (!summary.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = summary,
+                            color = OneUiTheme.colors.accent,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -281,6 +331,15 @@ internal fun SourceManagementDialog(
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f).padding(end = 6.dp)
                                 )
+                                if (ch.id in uiState.unavailableCustomChannelIds) {
+                                    Text(
+                                        text = "失效",
+                                        color = OneUiTheme.colors.danger,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(end = 4.dp)
+                                    )
+                                }
                                 TvFocusableBox(
                                     onClick = { onDeleteSingleCustomChannel(ch.id) },
                                     shape = OneUiShapes.pill,

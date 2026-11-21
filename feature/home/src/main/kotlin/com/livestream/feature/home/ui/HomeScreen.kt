@@ -121,6 +121,7 @@ fun HomeScreen(
                     onToggleOsd = { playerViewModel.toggleOsd() },
                     onRetry = { playerViewModel.retry() },
                     onSwitchSource = { playerViewModel.switchNextSource() },
+                    onSelectSource = { playerViewModel.selectSource(it) },
                     onCategorySelected = { channelViewModel.selectCategory(it) },
                     onChannelSelected = {
                         homeViewModel.playChannel(it)
@@ -148,6 +149,8 @@ fun HomeScreen(
                     onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    onProbeCustomSources = { settingsViewModel.probeCustomSources() },
+                    onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -191,6 +194,8 @@ fun HomeScreen(
                     onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    onProbeCustomSources = { settingsViewModel.probeCustomSources() },
+                    onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -205,6 +210,7 @@ fun HomeScreen(
                     onToggleOsd = { playerViewModel.toggleOsd() },
                     onRetry = { playerViewModel.retry() },
                     onSwitchSource = { playerViewModel.switchNextSource() },
+                    onSelectSource = { playerViewModel.selectSource(it) },
                     onCategorySelected = { channelViewModel.selectCategory(it) },
                     onChannelSelected = {
                         homeViewModel.playChannel(it)
@@ -234,6 +240,8 @@ fun HomeScreen(
                     onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    onProbeCustomSources = { settingsViewModel.probeCustomSources() },
+                    onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -293,6 +301,8 @@ fun HomeScreen(
                     onCycleAspectRatio = { settingsViewModel.cycleVideoAspectRatio() },
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
+                    onProbeCustomSources = { settingsViewModel.probeCustomSources() },
+                    onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )

@@ -102,6 +102,9 @@ fun TvLayout(
     onCycleAspectRatio: () -> Unit = {},
     onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onRefreshAllCustomSources: () -> Unit = {},
+    onSelectSource: (Int) -> Unit = {},
+    onProbeCustomSources: () -> Unit = {},
+    onRemoveUnavailableCustomChannels: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -414,7 +417,9 @@ fun TvLayout(
             onClearAllCustomSources = onClearAllCustomSources,
             onAspectRatioSelected = onAspectRatioSelected,
             onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
-            onRefreshAllCustomSources = onRefreshAllCustomSources
+            onRefreshAllCustomSources = onRefreshAllCustomSources,
+            onProbeCustomSources = onProbeCustomSources,
+            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
         )
 
         // 5. 模态浮层：综合播放菜单（集成信号源切换、画面比例与今日节目单）
@@ -430,7 +435,8 @@ fun TvLayout(
             totalSources = playerUiState.totalSources,
             availableSources = playerUiState.availableSources,
             sourceLatenciesMs = playerUiState.sourceLatenciesMs,
-            onSwitchSource = onSwitchSource
+            onSwitchSource = onSwitchSource,
+            onSelectSource = onSelectSource
         )
     }
 }

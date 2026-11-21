@@ -168,4 +168,16 @@ http://example.com/hunan.m3u8"""
         assertTrue(listResp.isSuccessful)
         assertTrue(listResp.body!!.string().contains(""""success":true"""))
     }
+
+    @Test
+    fun `web console html includes local M3U file upload input`() = runBlocking {
+        server.start { Result.success(1) }
+        val port = server.currentPort!!
+
+        val htmlReq = Request.Builder().url("http://127.0.0.1:$port/").get().build()
+        val html = okHttpClient.newCall(htmlReq).execute().body!!.string()
+        assertTrue(html.contains("""<input type="file""""))
+        assertTrue(html.contains(".m3u,.m3u8"))
+        assertTrue(html.contains("FileReader"))
+    }
 }

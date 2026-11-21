@@ -773,10 +773,12 @@ private const val HTML_PAGE = """<!DOCTYPE html>
           <h2>推送 M3U 播放列表</h2>
           <span class="sub-hint">自动识别 XMLTV 节目单</span>
         </div>
-        <p class="sub-hint" style="margin-bottom:8px;">支持推送 M3U 订阅链接（http/https）或直接粘贴 #EXTM3U 文本内容。</p>
-        <textarea id="content" placeholder="输入 M3U 订阅网址 (如 https://example.com/tv.m3u)&#10;或直接粘贴 #EXTM3U 文本内容..."></textarea>
+        <p class="sub-hint" style="margin-bottom:8px;">支持推送 M3U 订阅链接（http/https）、上传本地 M3U 文件或粘贴 #EXTM3U 文本内容。</p>
+        <input type="file" id="m3uFileInput" accept=".m3u,.m3u8,.txt" style="display:none" onchange="handleM3uFileSelect(event)">
+        <textarea id="content" placeholder="输入 M3U 订阅网址 (如 https://example.com/tv.m3u)&#10;或直接粘贴 #EXTM3U 文本内容，也可点击下方选择本地文件..."></textarea>
         <div class="btn-group">
-          <button class="btn-secondary" onclick="pasteContent()">粘贴剪贴板</button>
+          <button class="btn-secondary" onclick="document.getElementById('m3uFileInput').click()">选择文件</button>
+          <button class="btn-secondary" onclick="pasteContent()">粘贴</button>
           <button class="btn-primary" id="submitBtn" onclick="sendToTv()">推送到电视</button>
         </div>
       </div>
@@ -819,6 +821,23 @@ private const val HTML_PAGE = """<!DOCTYPE html>
       } catch(e) {
         alert('请长按输入框进行粘贴');
       }
+    }
+    function handleM3uFileSelect(event) {
+      var file = event.target && event.target.files && event.target.files[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) {
+        showToast('文件过大（超过 8MB 上限）', false);
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('content').value = (e.target && e.target.result) || '';
+        showToast('已载入 ' + file.name + '，点击“推送到电视”导入', true);
+      };
+      reader.onerror = function() {
+        showToast('读取本地文件失败', false);
+      };
+      reader.readAsText(file, 'UTF-8');
     }
     async function sendToTv() {
       var content = document.getElementById('content').value.trim();

@@ -113,6 +113,9 @@ fun TabletDualPaneLayout(
     onCycleAspectRatio: () -> Unit = {},
     onRefreshCustomPlaylistSource: (CustomPlaylistSource) -> Unit = {},
     onRefreshAllCustomSources: () -> Unit = {},
+    onSelectSource: (Int) -> Unit = {},
+    onProbeCustomSources: () -> Unit = {},
+    onRemoveUnavailableCustomChannels: () -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -469,7 +472,9 @@ fun TabletDualPaneLayout(
             onClearAllCustomSources = onClearAllCustomSources,
             onAspectRatioSelected = onAspectRatioSelected,
             onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
-            onRefreshAllCustomSources = onRefreshAllCustomSources
+            onRefreshAllCustomSources = onRefreshAllCustomSources,
+            onProbeCustomSources = onProbeCustomSources,
+            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
         )
 
         // 5. 综合播放菜单弹窗（集成信号源切换、画面比例与今日节目单）
@@ -485,7 +490,8 @@ fun TabletDualPaneLayout(
             totalSources = playerUiState.totalSources,
             availableSources = playerUiState.availableSources,
             sourceLatenciesMs = playerUiState.sourceLatenciesMs,
-            onSwitchSource = onSwitchSource
+            onSwitchSource = onSwitchSource,
+            onSelectSource = onSelectSource
         )
     }
 }

@@ -381,4 +381,78 @@ class SettingsViewModelTest {
         assertEquals(806, saved[0].channelNumber)
         assertEquals(807, saved[1].channelNumber)
     }
+
+    @Test
+    fun `probeCustomSources detects unavailable channels and removeUnavailableCustomChannels cleans them up`() = runTest(testDispatcher) {
+        val chOk = com.livestream.core.model.Channel(id = "u_ok", name = "正常台", channelNumber = 801, categoryId = "custom_1")
+        val chDead = com.livestream.core.model.Channel(id = "u_dead", name = "失效台", channelNumber = 802, categoryId = "custom_1")
+        io.mockk.every { channelRepository.observeCustomChannels() } returns kotlinx.coroutines.flow.flowOf(listOf(chOk, chDead))
+
+        val srcOk = com.livestream.core.model.LiveSource(
+            id = "s_ok", channelId = "u_ok", name = "线路1",
+            protocol = com.livestream.core.model.StreamProtocol.HLS,
+            adapterProviderId = "custom_user_source",
+            url = "https://live.example.com/ok.m3u8"
+        )
+        val srcDead = com.livestream.core.model.LiveSource(
+            id = "s_dead", channelId = "u_dead", name = "线路1",
+            protocol = com.livestream.core.model.StreamProtocol.HLS,
+            adapterProviderId = "custom_user_source",
+            url = "https://live.example.com/dead.m3u8"
+        )
+        coEvery { channelRepository.getSourcesForChannelSync("u_ok") } returns listOf(srcOk)
+        coEvery { channelRepository.getSourcesForChannelSync("u_dead") } returns listOf(srcDead)
+
+        val ownerSource = com.livestream.core.model.CustomPlaylistSource(
+            id = "list_1",
+            name = "Test List",
+            url = "https://example.com/list.m3u",
+            channelCount = 2,
+            channelIds = listOf("u_ok", "u_dead")
+        )
+        customSourcesFlow.value = listOf(ownerSource)
+
+        val mockProbe = mockk<com.livestream.core.network.NetworkProbe>()
+        coEvery { mockProbe.probeUrl("https://live.example.com/ok.m3u8", any(), any()) } returns
+            com.livestream.core.network.ProbeResult.Success(35L, 200)
+        coEvery { mockProbe.probeUrl("https://live.example.com/dead.m3u8", any(), any()) } returns
+            com.livestream.core.network.ProbeResult.Failure("HTTP 404")
+
+        val probeVm = SettingsViewModel(
+            userPreferencesRepository = userPreferencesRepository,
+            channelRepository = channelRepository,
+            categoryRepository = categoryRepository,
+            localImportServer = localImportServer,
+            okHttpClient = okHttpClient,
+            dispatchers = dispatchers,
+            epgRepository = null,
+            playbackOrchestrator = null,
+            networkProbe = mockProbe,
+            isTvDevice = false
+        )
+        advanceUntilIdle()
+
+        probeVm.probeCustomSources()
+        advanceUntilIdle()
+
+        org.junit.Assert.assertFalse(probeVm.uiState.value.isProbingSources)
+        assertEquals(setOf("u_dead"), probeVm.uiState.value.unavailableCustomChannelIds)
+        coVerify(exactly = 1) {
+            channelRepository.updateSourceHealth("s_ok", com.livestream.core.model.SourceHealthStatus.HEALTHY, any())
+        }
+        coVerify(exactly = 1) {
+            channelRepository.updateSourceHealth("s_dead", com.livestream.core.model.SourceHealthStatus.UNAVAILABLE, any())
+        }
+
+        probeVm.removeUnavailableCustomChannels()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteChannelsByIds(listOf("u_dead")) }
+        coVerify(exactly = 1) {
+            userPreferencesRepository.saveCustomPlaylistSource(
+                match { it.id == "list_1" && it.channelIds == listOf("u_ok") && it.channelCount == 1 }
+            )
+        }
+        assertEquals(emptySet<String>(), probeVm.uiState.value.unavailableCustomChannelIds)
+    }
 }
