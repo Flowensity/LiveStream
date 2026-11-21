@@ -11,7 +11,12 @@ import dagger.hilt.components.SingletonComponent
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ProbeOkHttpClient
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -29,9 +34,9 @@ abstract class NetworkModule {
         fun provideOkHttpClient(): OkHttpClient {
             return OkHttpClient.Builder()
                 .dns(Ipv4FirstDns())
-                .connectTimeout(3, TimeUnit.SECONDS)
-                .readTimeout(4, TimeUnit.SECONDS)
-                .callTimeout(8, TimeUnit.SECONDS)
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .callTimeout(0, TimeUnit.MILLISECONDS)
                 .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .followRedirects(true)
                 .followSslRedirects(true)
@@ -46,6 +51,17 @@ abstract class NetworkModule {
                     }
                     chain.proceed(request)
                 }
+                .build()
+        }
+
+        @Provides
+        @Singleton
+        @ProbeOkHttpClient
+        fun provideProbeOkHttpClient(baseClient: OkHttpClient): OkHttpClient {
+            return baseClient.newBuilder()
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(4, TimeUnit.SECONDS)
+                .callTimeout(8, TimeUnit.SECONDS)
                 .build()
         }
     }

@@ -1,5 +1,6 @@
 package com.livestream.core.network
 
+import com.livestream.core.network.di.ProbeOkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -20,7 +21,7 @@ sealed interface ProbeResult {
 
 @Singleton
 class NetworkProbe @Inject constructor(
-    private val okHttpClient: OkHttpClient
+    @ProbeOkHttpClient private val okHttpClient: OkHttpClient
 ) {
     companion object {
         private val HLS_RESOLUTION_REGEX = Regex("""RESOLUTION=(\d+)x(\d+)""", RegexOption.IGNORE_CASE)

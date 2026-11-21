@@ -169,4 +169,18 @@ class NetworkProbeTest {
         assertEquals(firstResult.size, secondResult.size)
         assertEquals(1, lookupCount)
     }
+
+    @Test
+    fun `default OkHttpClient has unlimited callTimeout for long-lived streams and downloads`() {
+        val client = com.livestream.core.network.di.NetworkModule.provideOkHttpClient()
+        assertEquals(0, client.callTimeoutMillis)
+        assertTrue(client.readTimeoutMillis >= 10_000)
+
+        val probeClient = com.livestream.core.network.di.NetworkModule.provideProbeOkHttpClient(client)
+        assertEquals(3_000, probeClient.connectTimeoutMillis)
+        assertEquals(4_000, probeClient.readTimeoutMillis)
+        assertEquals(8_000, probeClient.callTimeoutMillis)
+        assertTrue(probeClient.connectionPool === client.connectionPool)
+        assertTrue(probeClient.dns === client.dns)
+    }
 }
