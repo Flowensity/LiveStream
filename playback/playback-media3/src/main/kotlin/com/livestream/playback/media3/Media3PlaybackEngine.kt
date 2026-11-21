@@ -138,27 +138,7 @@ class Media3PlaybackEngine @Inject constructor(
         prepareStartTimeMs = System.currentTimeMillis()
         _engineState.value = EngineState.Preparing
 
-        val mimeType = when (mediaItem.protocol) {
-            StreamProtocol.HLS -> MimeTypes.APPLICATION_M3U8
-            StreamProtocol.DASH -> MimeTypes.APPLICATION_MPD
-            StreamProtocol.PROGRESSIVE_HTTP -> MimeTypes.VIDEO_MP4
-            StreamProtocol.OFFICIAL_WEB -> null
-        }
-
-        val liveConfig = MediaItem.LiveConfiguration.Builder()
-            .setMaxOffsetMs(10000)
-            .build()
-
-        val mediaItemBuilder = MediaItem.Builder()
-            .setUri(Uri.parse(mediaItem.uri))
-            .setMediaId(mediaItem.sourceId)
-            .setLiveConfiguration(liveConfig)
-
-        if (mimeType != null) {
-            mediaItemBuilder.setMimeType(mimeType)
-        }
-
-        val builtItem = mediaItemBuilder.build()
+        val builtItem = buildMedia3Item(mediaItem, maxLiveOffsetMs = 10000L)
 
         try {
             // 解码器热复用：直接 setMediaItem 切换媒体源，不调用 stop()/clearMediaItems() 销毁已初始化的硬件 MediaCodec
@@ -242,29 +222,52 @@ class Media3PlaybackEngine @Inject constructor(
         _player = null
         if (mediaItemToRestore != null) {
             val newPlayer = player
-            val mimeType = when (mediaItemToRestore.protocol) {
-                StreamProtocol.HLS -> MimeTypes.APPLICATION_M3U8
-                StreamProtocol.DASH -> MimeTypes.APPLICATION_MPD
-                StreamProtocol.PROGRESSIVE_HTTP -> MimeTypes.VIDEO_MP4
-                StreamProtocol.OFFICIAL_WEB -> null
-            }
-            val liveConfig = MediaItem.LiveConfiguration.Builder()
-                .setTargetOffsetMs(3000)
-                .setMinOffsetMs(1000)
-                .setMaxOffsetMs(8000)
-                .build()
-            val builder = MediaItem.Builder()
-                .setUri(Uri.parse(mediaItemToRestore.uri))
-                .setMediaId(mediaItemToRestore.sourceId)
-                .setLiveConfiguration(liveConfig)
-            if (mimeType != null) {
-                builder.setMimeType(mimeType)
-            }
+            val builtItem = buildMedia3Item(
+                mediaItem = mediaItemToRestore,
+                targetOffsetMs = 3000L,
+                minOffsetMs = 1000L,
+                maxLiveOffsetMs = 8000L
+            )
             try {
-                newPlayer.setMediaItem(builder.build())
+                newPlayer.setMediaItem(builtItem)
                 newPlayer.playWhenReady = wasPlayWhenReady
                 newPlayer.prepare()
             } catch (_: Throwable) {}
+        }
+    }
+
+    private fun buildMedia3Item(
+        mediaItem: PlaybackMediaItem,
+        targetOffsetMs: Long? = null,
+        minOffsetMs: Long? = null,
+        maxLiveOffsetMs: Long = 10000L
+    ): MediaItem {
+        val liveConfigBuilder = MediaItem.LiveConfiguration.Builder()
+            .setMaxOffsetMs(maxLiveOffsetMs)
+        if (targetOffsetMs != null) {
+            liveConfigBuilder.setTargetOffsetMs(targetOffsetMs)
+        }
+        if (minOffsetMs != null) {
+            liveConfigBuilder.setMinOffsetMs(minOffsetMs)
+        }
+        val builder = MediaItem.Builder()
+            .setUri(Uri.parse(mediaItem.uri))
+            .setMediaId(mediaItem.sourceId)
+            .setLiveConfiguration(liveConfigBuilder.build())
+        val mimeType = resolveMimeType(mediaItem.protocol)
+        if (mimeType != null) {
+            builder.setMimeType(mimeType)
+        }
+        return builder.build()
+    }
+
+    companion object {
+        internal fun resolveMimeType(protocol: StreamProtocol): String? = when (protocol) {
+            StreamProtocol.HLS -> MimeTypes.APPLICATION_M3U8
+            StreamProtocol.DASH -> MimeTypes.APPLICATION_MPD
+            // PROGRESSIVE_HTTP 不强行指定 MP4，允许 Media3 自动嗅探 FLV/TS/MKV/MP4 等容器格式
+            StreamProtocol.PROGRESSIVE_HTTP -> null
+            StreamProtocol.OFFICIAL_WEB -> null
         }
     }
 

@@ -402,6 +402,7 @@ class SettingsViewModel internal constructor(
             }
 
             val existingChannels = channelRepository.getAllChannelsSync()
+            var nextCustomChannelNumber = ((existingChannels.maxOfOrNull { it.channelNumber } ?: 800).coerceAtLeast(800)) + 1
             val matchIndex = ChannelMatchIndex(existingChannels)
             val sourcesByChannelId = parsed.sources.groupBy { it.channelId }
             val matchedSources = mutableListOf<LiveSource>()
@@ -428,7 +429,7 @@ class SettingsViewModel internal constructor(
                         )
                     }
                 } else {
-                    unmatchedChannels.add(parsedCh)
+                    unmatchedChannels.add(parsedCh.copy(channelNumber = nextCustomChannelNumber++))
                     unmatchedSources.addAll(chSources)
                 }
             }
@@ -546,6 +547,18 @@ class SettingsViewModel internal constructor(
     fun deleteSingleCustomChannel(channelId: String) {
         viewModelScope.launch {
             channelRepository.deleteChannelById(channelId)
+            for (source in _uiState.value.customSources) {
+                if (channelId in source.channelIds) {
+                    val updatedChannelIds = source.channelIds.filterNot { it == channelId }
+                    val updatedCount = (source.channelCount - 1).coerceAtLeast(updatedChannelIds.size)
+                    userPreferencesRepository.saveCustomPlaylistSource(
+                        source.copy(
+                            channelIds = updatedChannelIds,
+                            channelCount = updatedCount
+                        )
+                    )
+                }
+            }
         }
     }
 

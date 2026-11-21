@@ -146,4 +146,29 @@ class M3uPlaylistParserTest {
         assertEquals(1, parsed.sources.size)
         assertEquals("https://live.example.com/hunan.m3u8", parsed.sources[0].url)
     }
+
+    @Test
+    fun `test pipe header suffix is sanitized for stream urls while loopback remains rejected`() {
+        assertTrue(
+            M3uPlaylistParser.isSafeAndValidStreamUrl(
+                "http://live.example.com/channel/stream.ts|User-Agent=Mozilla/5.0 (Linux)&Referer=https://live.example.com/"
+            )
+        )
+        assertFalse(
+            M3uPlaylistParser.isSafeAndValidStreamUrl(
+                "http://127.0.0.1:8080/live.ts|User-Agent=Mozilla/5.0"
+            )
+        )
+
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1 group-title="地方台",自定义测试台
+            http://live.example.com/channel/stream.ts|User-Agent=Mozilla/5.0 (Linux)&Referer=https://live.example.com/
+        """.trimIndent()
+
+        val parsed = M3uPlaylistParser.parse(m3u, startingChannelNumber = 850)
+        assertEquals(1, parsed.channels.size)
+        assertEquals(850, parsed.channels[0].channelNumber)
+        assertEquals("http://live.example.com/channel/stream.ts", parsed.sources[0].url)
+    }
 }

@@ -116,4 +116,23 @@ class EntityValidationTest {
         }
         assertEquals(0, sourceInsertionFields.size)
     }
+
+    @Test
+    fun `CategoryDao deleteAllCustomCategories preserves built-in custom category`() {
+        val loader = CategoryDao_Impl::class.java.classLoader!!
+        val implBytes = (1..8)
+            .mapNotNull { idx ->
+                loader.getResourceAsStream("com/livestream/core/database/dao/CategoryDao_Impl\$$idx.class")
+                    ?.use { it.readBytes().toString(Charsets.ISO_8859_1) }
+            }
+            .joinToString("\n")
+        assertTrue(
+            "deleteAllCustomCategories SQL must scope deletion to id LIKE 'custom_%'",
+            implBytes.contains("DELETE FROM categories WHERE id LIKE 'custom_%'")
+        )
+        assertFalse(
+            "deleteAllCustomCategories SQL must not delete built-in category_group = 'CUSTOM'",
+            implBytes.contains("category_group = 'CUSTOM'")
+        )
+    }
 }

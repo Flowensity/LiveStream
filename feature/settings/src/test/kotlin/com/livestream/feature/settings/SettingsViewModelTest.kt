@@ -255,11 +255,30 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `deleteSingleCustomChannel calls channelRepository`() = runTest(testDispatcher) {
+    fun `deleteSingleCustomChannel calls channelRepository and updates owning custom playlist source`() = runTest(testDispatcher) {
+        val ownerSource = com.livestream.core.model.CustomPlaylistSource(
+            id = "src_owner",
+            name = "My List",
+            url = "http://example.com/list.m3u",
+            channelCount = 2,
+            channelIds = listOf("user_ch_123", "user_ch_456")
+        )
+        customSourcesFlow.value = listOf(ownerSource)
+        advanceUntilIdle()
+
         viewModel.deleteSingleCustomChannel("user_ch_123")
         advanceUntilIdle()
 
         coVerify(exactly = 1) { channelRepository.deleteChannelById("user_ch_123") }
+        coVerify(exactly = 1) {
+            userPreferencesRepository.saveCustomPlaylistSource(
+                match {
+                    it.id == "src_owner" &&
+                        it.channelIds == listOf("user_ch_456") &&
+                        it.channelCount == 1
+                }
+            )
+        }
     }
 
     @Test
@@ -335,5 +354,31 @@ class SettingsViewModelTest {
         val result = vm.importM3uInternal("http://127.0.0.1:52026/secret.m3u")
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { strictOkHttp.newCall(any()) }
+    }
+
+    @Test
+    fun `importM3uInternal assigns non-colliding channel numbers above existing custom channels`() = runTest(testDispatcher) {
+        val existing = listOf(
+            com.livestream.core.model.Channel(id = "ch_existing_1", name = "已有自定义A", channelNumber = 805, categoryId = "custom_1")
+        )
+        coEvery { channelRepository.getAllChannelsSync() } returns existing
+
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1 group-title="新组",新导入频道A
+            https://example.com/new_a.m3u8
+            #EXTINF:-1 group-title="新组",新导入频道B
+            https://example.com/new_b.m3u8
+        """.trimIndent()
+
+        val capturedChannels = mutableListOf<List<com.livestream.core.model.Channel>>()
+        coEvery { channelRepository.saveChannels(capture(capturedChannels)) } returns Unit
+
+        val result = viewModel.importM3uInternal(m3u)
+        assertTrue(result.isSuccess)
+        val saved = capturedChannels.flatten()
+        assertEquals(2, saved.size)
+        assertEquals(806, saved[0].channelNumber)
+        assertEquals(807, saved[1].channelNumber)
     }
 }

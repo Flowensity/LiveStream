@@ -47,8 +47,8 @@ object M3uPlaylistParser {
     /**
      * 解析用户导入的 M3U 播放列表内容
      */
-    fun parse(content: String): ParsedPlaylist {
-        return parse(StringReader(content))
+    fun parse(content: String, startingChannelNumber: Int = 801): ParsedPlaylist {
+        return parse(StringReader(content), startingChannelNumber)
     }
 
     /**
@@ -59,7 +59,7 @@ object M3uPlaylistParser {
      * 4. 提取分辨率与运营商标签，为高画质源赋予更高 priority；
      * 5. 相同播放 URL 自动去重。
      */
-    fun parse(reader: Reader): ParsedPlaylist {
+    fun parse(reader: Reader, startingChannelNumber: Int = 801): ParsedPlaylist {
         val channelsMap = LinkedHashMap<String, Channel>()
         val sourcesList = mutableListOf<LiveSource>()
         val channelUrlsMap = mutableMapOf<String, MutableSet<String>>()
@@ -69,6 +69,7 @@ object M3uPlaylistParser {
 
         var currentExtInf: String? = null
         var globalChannelSequence = 1
+        val baseChannelNumber = startingChannelNumber.coerceAtLeast(1)
 
         val buffered = if (reader is BufferedReader) reader else BufferedReader(reader)
         buffered.useLines { lineSeq ->
@@ -86,7 +87,7 @@ object M3uPlaylistParser {
                 } else if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
                     currentExtInf = trimmed
                 } else if (!trimmed.startsWith("#") && currentExtInf != null) {
-                    val streamUrl = trimmed
+                    val streamUrl = stripPipeHeaderSuffix(trimmed)
                     val extInf = currentExtInf!!
                     if (isSafeAndValidStreamUrl(streamUrl)) {
                         val attrs = extractExtInfAttributes(extInf)
@@ -123,7 +124,7 @@ object M3uPlaylistParser {
                             channel = Channel(
                                 id = channelId,
                                 name = cleanedChannelName,
-                                channelNumber = 800 + globalChannelSequence,
+                                channelNumber = baseChannelNumber + (globalChannelSequence - 1),
                                 categoryId = categoryId,
                                 logoUrl = attrs.tvgLogo,
                                 orderIndex = globalChannelSequence,
@@ -317,13 +318,18 @@ object M3uPlaylistParser {
         return noNoise.ifEmpty { raw.trim().uppercase(Locale.ROOT) }
     }
 
+    private fun stripPipeHeaderSuffix(url: String): String {
+        return url.trim().substringBefore('|').trim()
+    }
+
     /**
      * URL 安全检查（阻止本地回环攻击与危险 URI 协议如 file://, content://, javascript://；
      * 允许公网 HTTP/HTTPS 以及家庭局域网 IPTV/UDPXY 代理流如 192.168.x.x, 10.x.x.x）
      */
     fun isSafeAndValidStreamUrl(url: String): Boolean {
         return try {
-            val uri = URI(url)
+            val cleanUrl = stripPipeHeaderSuffix(url)
+            val uri = URI(cleanUrl)
             val scheme = uri.scheme?.lowercase(Locale.ROOT)
             if (scheme != "http" && scheme != "https") {
                 return false
