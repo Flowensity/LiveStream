@@ -34,8 +34,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
-    implementation(project(":core:database"))
-    implementation(project(":core:datastore"))
     implementation(project(":core:network"))
     implementation(project(":domain:channel"))
     implementation(project(":playback:playback-api"))

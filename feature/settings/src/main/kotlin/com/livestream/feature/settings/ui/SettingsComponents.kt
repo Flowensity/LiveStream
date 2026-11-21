@@ -33,7 +33,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.livestream.core.model.ThemeMode
-import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
@@ -49,7 +48,6 @@ fun SettingsContent(
     onToggleSurfaceView: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     firstFocusRequester: FocusRequester? = null,
-    onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
     onEnlargeQrCode: () -> Unit = onOpenImportDialog,
     isTv: Boolean = false
 ) {

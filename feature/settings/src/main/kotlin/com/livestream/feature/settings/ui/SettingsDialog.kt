@@ -152,7 +152,6 @@ fun SettingsDialog(
                 onThemeModeSelected = onThemeModeSelected,
                 onToggleHardwareDecode = onToggleHardwareDecode,
                 onToggleSurfaceView = onToggleSurfaceView,
-                onAspectRatioSelected = onAspectRatioSelected,
                 onEnlargeQrCode = { isQrEnlarged = true },
                 isTv = isTv
             )
@@ -284,7 +283,6 @@ private fun SettingsDrawerPanel(
                     onToggleHardwareDecode = onToggleHardwareDecode,
                     onToggleSurfaceView = onToggleSurfaceView,
                     firstFocusRequester = firstFocusRequester,
-                    onAspectRatioSelected = onAspectRatioSelected,
                     onEnlargeQrCode = onEnlargeQrCode,
                     isTv = isTv
                 )

@@ -29,8 +29,6 @@ dependencies {
     implementation(project(":core:model"))
 
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
-    implementation(libs.retrofit)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

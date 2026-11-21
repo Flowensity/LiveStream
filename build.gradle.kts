@@ -10,6 +10,11 @@ plugins {
 }
 
 subprojects {
+    configurations.configureEach {
+        resolutionStrategy {
+            force("androidx.profileinstaller:profileinstaller:1.3.1")
+        }
+    }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         kotlinOptions {
             val stabilityFile = rootProject.file("compose_stability.conf")

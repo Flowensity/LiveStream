@@ -38,8 +38,6 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
-    implementation(libs.tv.foundation)
-    implementation(libs.tv.material)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
