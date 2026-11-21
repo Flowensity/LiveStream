@@ -183,4 +183,19 @@ class NetworkProbeTest {
         assertTrue(probeClient.connectionPool === client.connectionPool)
         assertTrue(probeClient.dns === client.dns)
     }
+
+    @Test
+    fun `Ipv4FirstDns enforces maxEntries bound without unbounded growth`() {
+        val ipv4 = java.net.InetAddress.getByAddress("example.com", byteArrayOf(93, 184.toByte(), 216.toByte(), 34))
+        val fakeDelegate = object : okhttp3.Dns {
+            override fun lookup(hostname: String): List<java.net.InetAddress> = listOf(ipv4)
+        }
+        val dns = Ipv4FirstDns(delegate = fakeDelegate, cacheTtlMs = 60_000L, maxEntries = 3)
+        dns.lookup("a.example.com")
+        dns.lookup("b.example.com")
+        dns.lookup("c.example.com")
+        dns.lookup("d.example.com")
+
+        assertTrue(dns.cacheSizeForTest() <= 3)
+    }
 }

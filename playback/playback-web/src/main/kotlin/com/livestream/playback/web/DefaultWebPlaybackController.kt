@@ -54,13 +54,14 @@ class DefaultWebPlaybackController @Inject constructor(
     private var loadTimeoutJob: Job? = null
     private var pageFinishedFallbackJob: Job? = null
     private var lastStyleInjectTimeMs: Long = 0L
+    private var isUserPaused: Boolean = false
     private val defaultPosterBitmap: Bitmap by lazy {
         Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     }
 
     companion object {
         private const val PAGE_LOAD_TIMEOUT_MS = 12000L
-        private const val STYLE_INJECT_THROTTLE_MS = 80L
+        private const val STYLE_INJECT_THROTTLE_MS = 250L
         private val BLOCKED_HOST_KEYWORDS = arrayOf(
             "hm.baidu.com",
             "beacon.qq.com",
@@ -100,6 +101,7 @@ class DefaultWebPlaybackController @Inject constructor(
     @SuppressLint("SetJavaScriptEnabled")
     override fun loadOfficialUrl(url: String, container: Any?) {
         val viewGroup = container as? ViewGroup ?: return
+        isUserPaused = false
         val existingWv = webView
         if (existingWv != null && canReusePooledInstance()) {
             if (parentContainer != viewGroup) {
@@ -411,21 +413,30 @@ class DefaultWebPlaybackController @Inject constructor(
     }
 
     private fun injectPlayerStyling(view: WebView?) {
-        val objectFit = when (currentAspectRatio) {
+        if (view == null) return
+        view.evaluateJavascript(buildPlayerStylingScript(currentAspectRatio, isUserPaused), null)
+    }
+
+    internal fun buildPlayerStylingScript(
+        aspectRatio: VideoAspectRatio,
+        isPaused: Boolean
+    ): String {
+        val objectFit = when (aspectRatio) {
             VideoAspectRatio.ORIGINAL -> "contain"
             VideoAspectRatio.SIXTEEN_NINE -> "fill"
             VideoAspectRatio.FOUR_THREE -> "fill"
             VideoAspectRatio.ZOOM_FILL -> "cover"
         }
-        val videoTransform = if (currentAspectRatio == VideoAspectRatio.ZOOM_FILL) {
+        val videoTransform = if (aspectRatio == VideoAspectRatio.ZOOM_FILL) {
             "scale(1.18)"
         } else {
             "none"
         }
-        val js = """
+        return """
             (function() {
                 try {
-                    // 1. 确保 viewport meta 适应当前移动/电视屏幕
+                    window.__livestream_paused = $isPaused;
+
                     var meta = document.querySelector('meta[name="viewport"]');
                     if (!meta) {
                         meta = document.createElement('meta');
@@ -434,7 +445,6 @@ class DefaultWebPlaybackController @Inject constructor(
                     }
                     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
 
-                    // 2. 注入全局 CSS：隐藏无关 UI，打破 890PX/500PX/300PX 容器限制，将 video fixed 撑满视口，消除居中半屏
                     var css = 'html, body { width: 100vw !important; height: 100vh !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; background-color: #000000 !important; } ' +
                         '.header, .header-b, header, .max-footer, .footer, footer, .tv-main-con-r, .tv-zhan, .searchMinHeight > div:not(:first-child), .poster, .moren_cover, .xgplayer-controls, xg-controls, .xgplayer-start, xg-start, .xgplayer-poster, .xg-poster { display: none !important; } ' +
                         '*:not(video) { transform: none !important; filter: none !important; perspective: none !important; } ' +
@@ -488,7 +498,7 @@ class DefaultWebPlaybackController @Inject constructor(
                                 v.addEventListener('playing', notifyReady);
                                 v.addEventListener('timeupdate', notifyReady, { once: true });
                             }
-                            if (v.paused) {
+                            if (v.paused && !window.__livestream_paused) {
                                 v.muted = false;
                                 v.play().catch(function(){});
                             }
@@ -509,7 +519,14 @@ class DefaultWebPlaybackController @Inject constructor(
 
                     if (!window.__livestream_observer && window.MutationObserver) {
                         window.__livestream_observer = new MutationObserver(function() {
-                            applyVideoFix();
+                            if (!window.__ls_raf_pending) {
+                                window.__ls_raf_pending = true;
+                                var schedule = window.requestAnimationFrame || function(cb) { setTimeout(cb, 16); };
+                                schedule(function() {
+                                    window.__ls_raf_pending = false;
+                                    applyVideoFix();
+                                });
+                            }
                         });
                         var target = document.documentElement || document.body;
                         if (target) {
@@ -528,22 +545,22 @@ class DefaultWebPlaybackController @Inject constructor(
                             applyVideoFix();
                             window.dispatchEvent(new Event('resize'));
                             window.__livestream_style_count = (window.__livestream_style_count || 0) + 1;
-                            if (window.__livestream_style_count >= 50) {
+                            if (window.__livestream_style_count >= 15) {
                                 clearInterval(window.__livestream_style_timer);
                                 window.__livestream_style_timer = null;
                             }
-                        }, 60);
+                        }, 200);
                     }
                 } catch(e) {}
             })();
         """.trimIndent()
-        view?.evaluateJavascript(js, null)
     }
 
     override fun pause() {
+        isUserPaused = true
         webView?.let { wv ->
             wv.evaluateJavascript(
-                "(function(){try{var v=document.getElementsByTagName('video');for(var i=0;i<v.length;i++){v[i].pause();}}catch(e){}})();",
+                "(function(){try{window.__livestream_paused=true;var v=document.getElementsByTagName('video');for(var i=0;i<v.length;i++){v[i].pause();}}catch(e){}})();",
                 null
             )
             wv.onPause()
@@ -551,10 +568,11 @@ class DefaultWebPlaybackController @Inject constructor(
     }
 
     override fun resume() {
+        isUserPaused = false
         webView?.let { wv ->
             wv.onResume()
             wv.evaluateJavascript(
-                "(function(){try{var v=document.getElementsByTagName('video');for(var i=0;i<v.length;i++){v[i].play().catch(function(){});}}catch(e){}})();",
+                "(function(){try{window.__livestream_paused=false;var v=document.getElementsByTagName('video');for(var i=0;i<v.length;i++){v[i].play().catch(function(){});}}catch(e){}})();",
                 null
             )
         }

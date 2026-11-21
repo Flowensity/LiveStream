@@ -711,4 +711,27 @@ class PlaybackOrchestratorTest {
         assertEquals("src_2", mainThreadStates.single())
         assertEquals(2, orchestrator.orchestratorState.value.sourceLatenciesMs.size)
     }
+
+    @Test
+    fun `test prewarmedSourcesCache evicts oldest entries beyond bounded capacity`() = runTest(testDispatcher) {
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        for (i in 1..25) {
+            val ch = Channel(id = "ch_$i", name = "Channel $i", channelNumber = i, categoryId = "cctv")
+            coEvery { channelRepository.getSourcesForChannelSync("ch_$i") } returns listOf(
+                sampleSource1.copy(id = "src_$i", channelId = "ch_$i")
+            )
+            orchestrator.previewChannel(ch)
+            advanceUntilIdle()
+        }
+
+        assertTrue(orchestrator.prewarmedCacheSizeForTest() <= DefaultPlaybackOrchestrator.MAX_PREWARMED_CACHE_SIZE)
+    }
 }

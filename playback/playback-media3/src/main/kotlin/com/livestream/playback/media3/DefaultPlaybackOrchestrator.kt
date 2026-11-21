@@ -77,9 +77,23 @@ class DefaultPlaybackOrchestrator @Inject constructor(
     private var currentSourceIndex: Int = 0
     private var currentRetryCount: Int = 0
     private val attemptedSourceIdsInSession = mutableSetOf<String>()
-    private val sourceLatencyCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private val sourceRealResolutionCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Int>>()
-    private val prewarmedSourcesCache = java.util.concurrent.ConcurrentHashMap<String, List<LiveSource>>()
+    private val sourceLatencyCache = createBoundedLruMap<String, Long>(MAX_SOURCE_METRIC_CACHE_SIZE)
+    private val sourceRealResolutionCache = createBoundedLruMap<String, Pair<Int, Int>>(MAX_SOURCE_METRIC_CACHE_SIZE)
+    private val prewarmedSourcesCache = createBoundedLruMap<String, List<LiveSource>>(MAX_PREWARMED_CACHE_SIZE)
+
+    private fun <K, V> createBoundedLruMap(maxSize: Int): MutableMap<K, V> {
+        return java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<K, V>(16, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean {
+                    return size > maxSize
+                }
+            }
+        )
+    }
+
+    private fun <K, V> Map<K, V>.snapshot(): Map<K, V> = synchronized(this) { HashMap(this) }
+
+    internal fun prewarmedCacheSizeForTest(): Int = synchronized(prewarmedSourcesCache) { prewarmedSourcesCache.size }
 
     // 缓冲卡死看门狗（多源时超时自动换线，单源时不打断正在进行的缓冲/网页加载）
     internal val watchdog = PlaybackWatchdog(dispatchers) {
@@ -96,6 +110,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
         const val MAX_RETRY_COUNT = 3
         const val MAX_CONCURRENT_PROBES = 3
         const val PREWARM_STABILIZE_DELAY_MS = 1200L
+        const val MAX_PREWARMED_CACHE_SIZE = 16
+        const val MAX_SOURCE_METRIC_CACHE_SIZE = 256
 
         internal fun calculateQualityScore(
             source: LiveSource,
@@ -228,7 +244,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                 _orchestratorState.value = _orchestratorState.value.copy(
                     availableSources = availableSources,
                     currentSourceIndex = currentSourceIndex,
-                    sourceResolutions = sourceRealResolutionCache.toMap(),
+                    sourceResolutions = sourceRealResolutionCache.snapshot(),
                     metrics = _orchestratorState.value.metrics.copy(
                         bitrateBps = metrics.bitrateBps,
                         videoWidth = metrics.videoWidth,
@@ -420,8 +436,8 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                     _orchestratorState.value = _orchestratorState.value.copy(
                         availableSources = availableSources,
                         currentSourceIndex = currentSourceIndex,
-                        sourceLatenciesMs = sourceLatencyCache.toMap(),
-                        sourceResolutions = sourceRealResolutionCache.toMap()
+                        sourceLatenciesMs = sourceLatencyCache.snapshot(),
+                        sourceResolutions = sourceRealResolutionCache.snapshot()
                     )
                 }
             }
@@ -454,7 +470,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
             currentSourceIndex = currentSourceIndex,
             totalSources = availableSources.size,
             availableSources = availableSources,
-            sourceLatenciesMs = sourceLatencyCache.toMap(),
+            sourceLatenciesMs = sourceLatencyCache.snapshot(),
             errorInfo = null
         )
 
@@ -668,7 +684,7 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                     }
                 }
                 _orchestratorState.value = _orchestratorState.value.copy(
-                    sourceLatenciesMs = sourceLatencyCache.toMap()
+                    sourceLatenciesMs = sourceLatencyCache.snapshot()
                 )
                 latencyTracker.recordSwitch(
                     SwitchRecord(

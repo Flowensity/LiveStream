@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -115,5 +116,22 @@ class DefaultWebPlaybackControllerTest {
         controller.reload()
 
         verify(exactly = 0) { mockContainer.addView(any()) }
+    }
+
+    @Test
+    fun `buildPlayerStylingScript uses throttled observer and respects paused flag`() {
+        val playingJs = controller.buildPlayerStylingScript(
+            com.livestream.core.model.VideoAspectRatio.ORIGINAL,
+            isPaused = false
+        )
+        assertTrue(playingJs.contains("requestAnimationFrame"))
+        assertTrue(playingJs.contains("window.__livestream_paused = false"))
+
+        val pausedJs = controller.buildPlayerStylingScript(
+            com.livestream.core.model.VideoAspectRatio.ZOOM_FILL,
+            isPaused = true
+        )
+        assertTrue(pausedJs.contains("window.__livestream_paused = true"))
+        assertTrue(pausedJs.contains("object-fit"))
     }
 }
