@@ -6,22 +6,36 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 
+val LocalDeviceType = staticCompositionLocalOf<DeviceType?> { null }
+
 object DeviceDetector {
 
+    @Volatile
+    private var cachedIsTv: Boolean? = null
+
+    internal fun clearCacheForTest() {
+        cachedIsTv = null
+    }
+
     /**
-     * 判断当前设备是否为 Android TV / 电视盒子
+     * 判断当前设备是否为 Android TV / 电视盒子（结果在进程内缓存，避免高频 IPC 查询）
      */
     fun isTv(context: Context): Boolean {
+        cachedIsTv?.let { return it }
         val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-        if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) {
-            return true
+        val isTvDevice = if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) {
+            true
+        } else {
+            val packageManager = context.packageManager
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+                packageManager.hasSystemFeature("android.hardware.type.television")
         }
-        val packageManager = context.packageManager
-        return packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
-            packageManager.hasSystemFeature("android.hardware.type.television")
+        cachedIsTv = isTvDevice
+        return isTvDevice
     }
 
     /**
@@ -59,6 +73,7 @@ object DeviceDetector {
  */
 @Composable
 fun rememberDeviceType(): DeviceType {
+    LocalDeviceType.current?.let { return it }
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
 

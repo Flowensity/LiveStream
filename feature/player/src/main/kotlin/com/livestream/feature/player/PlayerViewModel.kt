@@ -106,16 +106,30 @@ class PlayerViewModel @Inject constructor(
                     isEpgPollingActive = false
                     if (channelId != null) {
                         val chName = state.currentChannel?.name.orEmpty()
+                        _uiState.update { it.copy(isEpgLoading = true) }
                         epgRefreshJob = viewModelScope.launch {
-                            delay(300L)
-                            refreshEpgUseCase(channelId, chName)
+                            try {
+                                delay(300L)
+                                refreshEpgUseCase(channelId, chName)
+                            } finally {
+                                if (currentObservedChannelId == channelId) {
+                                    _uiState.update { it.copy(isEpgLoading = false) }
+                                }
+                            }
                         }
                         if (shouldPollEpg) {
                             isEpgPollingActive = true
                             startEpgObservation(channelId)
                         }
                     } else {
-                        _uiState.update { it.copy(currentProgram = null, nextProgram = null, dayPrograms = emptyList()) }
+                        _uiState.update {
+                            it.copy(
+                                currentProgram = null,
+                                nextProgram = null,
+                                dayPrograms = emptyList(),
+                                isEpgLoading = false
+                            )
+                        }
                     }
                 } else if (channelId != null) {
                     if (shouldPollEpg && !isEpgPollingActive) {

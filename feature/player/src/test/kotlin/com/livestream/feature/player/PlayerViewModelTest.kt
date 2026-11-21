@@ -221,4 +221,26 @@ class PlayerViewModelTest {
         testScheduler.runCurrent()
         assertEquals(2, currentFlowSubscriptions)
     }
+
+    @Test
+    fun `isEpgLoading reflects refresh in flight and resets to false after refresh completes`() = runTest(testDispatcher) {
+        val channel = Channel(id = "cctv2", name = "CCTV-2", channelNumber = 2, categoryId = "cctv")
+        val refreshGate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { refreshEpgUseCase("cctv2", "CCTV-2") } coAnswers {
+            refreshGate.await()
+            Result.success(0)
+        }
+
+        orchestratorStateFlow.value = OrchestratorState(currentChannel = channel, status = PlaybackStatus.PLAYING)
+        testScheduler.runCurrent()
+
+        // Advance past the 300ms debounce so refreshEpgUseCase is suspended on refreshGate
+        testScheduler.advanceTimeBy(350L)
+        testScheduler.runCurrent()
+        assertTrue(viewModel.uiState.value.isEpgLoading)
+
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+        org.junit.Assert.assertFalse(viewModel.uiState.value.isEpgLoading)
+    }
 }

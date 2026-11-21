@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.livestream.core.ui.device.DeviceType
+import com.livestream.core.ui.device.LocalDeviceType
 import com.livestream.core.ui.device.rememberDeviceType
 import com.livestream.core.ui.theme.AppBackground
 import com.livestream.feature.channel.ChannelViewModel
@@ -102,6 +104,7 @@ fun HomeScreen(
         }
     }
 
+    CompositionLocalProvider(LocalDeviceType provides deviceType) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -146,7 +149,7 @@ fun HomeScreen(
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     webPlaybackController = playerViewModel.webPlaybackController,
-                    modifier = modifier
+                    modifier = Modifier.fillMaxSize()
                 )
             }
             DeviceType.PHONE_LANDSCAPE -> {
@@ -189,7 +192,7 @@ fun HomeScreen(
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     webPlaybackController = playerViewModel.webPlaybackController,
-                    modifier = modifier
+                    modifier = Modifier.fillMaxSize()
                 )
             }
             DeviceType.TABLET -> {
@@ -232,7 +235,7 @@ fun HomeScreen(
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     webPlaybackController = playerViewModel.webPlaybackController,
-                    modifier = modifier
+                    modifier = Modifier.fillMaxSize()
                 )
             }
             DeviceType.TV -> {
@@ -291,7 +294,7 @@ fun HomeScreen(
                     onRefreshCustomPlaylistSource = { settingsViewModel.refreshCustomPlaylistSource(it) },
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     webPlaybackController = playerViewModel.webPlaybackController,
-                    modifier = modifier
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -302,5 +305,6 @@ fun HomeScreen(
             onConfirm = { activity?.finish() },
             onDismiss = { showExitDialog = false }
         )
+    }
     }
 }

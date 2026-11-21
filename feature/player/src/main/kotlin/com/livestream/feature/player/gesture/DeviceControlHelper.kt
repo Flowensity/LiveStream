@@ -3,9 +3,21 @@ package com.livestream.feature.player.gesture
 import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
+import android.provider.Settings
 import kotlin.math.roundToInt
 
 class DeviceControlHelper(private val context: Context) {
+
+    fun resolveInitialBrightness(activity: Activity?): Float {
+        val windowBrightness = activity?.window?.attributes?.screenBrightness ?: -1f
+        if (windowBrightness > 0f) {
+            return windowBrightness.coerceIn(0.05f, 1.0f)
+        }
+        val sysBrightness = runCatching {
+            Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
+        }.getOrDefault(128)
+        return (sysBrightness / 255f).coerceIn(0.05f, 1.0f)
+    }
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val maxVolume = audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15

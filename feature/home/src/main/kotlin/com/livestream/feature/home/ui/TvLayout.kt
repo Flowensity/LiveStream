@@ -422,6 +422,7 @@ fun TvLayout(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
+            isEpgLoading = playerUiState.isEpgLoading,
             onDismiss = onHideEpgSheet,
             aspectRatio = settingsUiState.aspectRatio,
             onAspectRatioSelected = onAspectRatioSelected,

@@ -11,7 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +47,6 @@ class MainActivity : ComponentActivity() {
             android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // 手机端真·沉浸式 Edge-to-Edge 适配
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -60,6 +59,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settingsUiState by settingsViewModel.uiState.collectAsState()
+            val orchestratorState by playbackOrchestrator.orchestratorState.collectAsState()
             val isInPipMode by isInPipModeState
             val isDarkTheme = when (settingsUiState.themeMode) {
                 ThemeMode.DARK -> true
@@ -67,8 +67,22 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
 
+            val keepScreenOn = orchestratorState.status == PlaybackStatus.PLAYING ||
+                orchestratorState.status == PlaybackStatus.BUFFERING ||
+                orchestratorState.status == PlaybackStatus.PREPARING ||
+                orchestratorState.status == PlaybackStatus.RESOLVING ||
+                orchestratorState.status == PlaybackStatus.SWITCHING
+
+            LaunchedEffect(keepScreenOn) {
+                if (keepScreenOn) {
+                    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+
             val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-            SideEffect {
+            LaunchedEffect(isDarkTheme, isLandscape, isInPipMode) {
                 val insetsController = WindowCompat.getInsetsController(window, window.decorView)
                 insetsController.isAppearanceLightStatusBars = !isDarkTheme
                 insetsController.isAppearanceLightNavigationBars = !isDarkTheme

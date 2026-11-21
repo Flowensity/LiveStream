@@ -1,6 +1,8 @@
 package com.livestream.feature.settings.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
@@ -73,8 +75,7 @@ fun SettingsDialog(
     onRefreshAllCustomSources: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    if (!uiState.isSettingsOpen && !uiState.isImportDialogOpen && !uiState.isSourceManagementOpen) return
-
+    val hasAnyOverlay = uiState.isSettingsOpen || uiState.isImportDialogOpen || uiState.isSourceManagementOpen
     val isTv = rememberDeviceType() == DeviceType.TV
     val firstFocusRequester = remember { FocusRequester() }
     val importCancelFocusRequester = remember { FocusRequester() }
@@ -109,23 +110,29 @@ fun SettingsDialog(
 
     Box(modifier = modifier.fillMaxSize()) {
         // 半透明背景遮罩（点击可关闭当前浮层）
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    if (uiState.isSourceManagementOpen) {
-                        onCloseSourceManagement()
-                    } else if (uiState.isImportDialogOpen) {
-                        onCloseImportDialog()
-                    } else {
-                        onCloseSettings()
+        AnimatedVisibility(
+            visible = hasAnyOverlay,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        if (uiState.isSourceManagementOpen) {
+                            onCloseSourceManagement()
+                        } else if (uiState.isImportDialogOpen) {
+                            onCloseImportDialog()
+                        } else {
+                            onCloseSettings()
+                        }
                     }
-                }
-        )
+            )
+        }
 
         // 1. 右侧设置抽屉面板
         AnimatedVisibility(

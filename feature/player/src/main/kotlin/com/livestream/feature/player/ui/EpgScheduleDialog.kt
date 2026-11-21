@@ -2,6 +2,8 @@ package com.livestream.feature.player.ui
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
@@ -76,6 +78,7 @@ fun EpgScheduleDialog(
     programs: List<EpgProgram>,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    isEpgLoading: Boolean = false,
     aspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL,
     onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
     activeSourceIndex: Int = 0,
@@ -84,8 +87,6 @@ fun EpgScheduleDialog(
     sourceLatenciesMs: Map<String, Long> = emptyMap(),
     onSwitchSource: () -> Unit = {}
 ) {
-    if (!visible) return
-
     val configuration = LocalConfiguration.current
     val deviceType = rememberDeviceType()
     val isTv = deviceType == DeviceType.TV
@@ -108,6 +109,7 @@ fun EpgScheduleDialog(
 
     // 自动滚动节目单至当前正在播出的节目，并在 TV 端将初始焦点落在首项控制卡片上
     LaunchedEffect(visible, programs, isTv) {
+        if (!visible) return@LaunchedEffect
         if (programs.isNotEmpty()) {
             val targetIdx = if (currentIndex >= 0) currentIndex else 0
             listState.scrollToItem(maxOf(0, targetIdx - 1))
@@ -122,15 +124,21 @@ fun EpgScheduleDialog(
 
     Box(modifier = modifier.fillMaxSize()) {
         // 半透明背景遮罩（点击可关闭）
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { onDismiss() }
-        )
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onDismiss() }
+            )
+        }
 
         AnimatedVisibility(
             visible = visible,
@@ -322,16 +330,10 @@ fun EpgScheduleDialog(
                                         .background(OneUiTheme.colors.cardBackground, cardShape)
                                 ) {
                                     if (programs.isEmpty()) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "正在获取最新节目排期...",
-                                                color = OneUiTheme.colors.textSecondary,
-                                                fontSize = 12.5.sp
-                                            )
-                                        }
+                                        EpgEmptyState(
+                                            isLoading = isEpgLoading,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     } else {
                                         LazyColumn(
                                             state = listState,
@@ -445,6 +447,7 @@ fun EpgScheduleDialog(
                             todayStr = todayStr,
                             timeFormat = timeFormat,
                             cardShape = cardShape,
+                            isLoading = isEpgLoading,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
@@ -759,6 +762,7 @@ private fun EpgProgramList(
     todayStr: String,
     timeFormat: SimpleDateFormat,
     cardShape: RoundedCornerShape,
+    isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -792,20 +796,14 @@ private fun EpgProgramList(
         Spacer(modifier = Modifier.height(4.dp))
 
         if (programs.isEmpty()) {
-            Box(
+            EpgEmptyState(
+                isLoading = isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .border(BorderStroke(1.dp, OneUiTheme.colors.borderSubtle), cardShape)
-                    .background(OneUiTheme.colors.cardBackground, cardShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "正在获取最新节目排期...",
-                    color = OneUiTheme.colors.textSecondary,
-                    fontSize = 12.5.sp
-                )
-            }
+                    .background(OneUiTheme.colors.cardBackground, cardShape)
+            )
         } else {
             LazyColumn(
                 state = listState,
@@ -889,5 +887,22 @@ private fun EpgProgramList(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EpgEmptyState(
+    isLoading: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (isLoading) "正在获取最新节目排期..." else "暂无该频道节目单",
+            color = OneUiTheme.colors.textSecondary,
+            fontSize = 12.5.sp
+        )
     }
 }

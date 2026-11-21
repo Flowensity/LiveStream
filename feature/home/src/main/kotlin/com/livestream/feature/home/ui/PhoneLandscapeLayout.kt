@@ -112,7 +112,7 @@ fun PhoneLandscapeLayout(
     }
 
     var gestureHudState by remember { mutableStateOf<GestureHudState>(GestureHudState.Hidden) }
-    var currentBrightness by remember { mutableFloatStateOf(0.7f) }
+    var currentBrightness by remember { mutableFloatStateOf(controlHelper.resolveInitialBrightness(activity)) }
 
     val gestureModifier = Modifier.playerTouchGestures(
         onTap = {
@@ -277,6 +277,7 @@ fun PhoneLandscapeLayout(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
+            isEpgLoading = playerUiState.isEpgLoading,
             onDismiss = onHideEpgSheet,
             aspectRatio = settingsUiState.aspectRatio,
             onAspectRatioSelected = onAspectRatioSelected,

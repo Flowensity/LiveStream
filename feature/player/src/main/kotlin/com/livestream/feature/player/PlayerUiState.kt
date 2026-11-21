@@ -28,5 +28,6 @@ data class PlayerUiState(
     val currentProgram: EpgProgram? = null,
     val nextProgram: EpgProgram? = null,
     val dayPrograms: List<EpgProgram> = emptyList(),
+    val isEpgLoading: Boolean = false,
     val isEpgSheetVisible: Boolean = false
 )

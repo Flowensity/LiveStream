@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -59,6 +60,7 @@ import com.livestream.core.ui.theme.FocusHighlight
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
+import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelDrawer
 import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
@@ -168,16 +170,23 @@ fun TabletDualPaneLayout(
                                 if (categories.size > 1) {
                                     Box(
                                         modifier = Modifier
-                                            .size(28.dp)
+                                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                             .clip(OneUiShapes.pill)
-                                            .background(OneUiTheme.colors.surfacePill)
                                             .clickable {
                                                 val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
                                                 onCategorySelected(categories[prevIdx])
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = "‹", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(OneUiShapes.pill)
+                                                .background(OneUiTheme.colors.surfacePill),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(text = "‹", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
 
@@ -193,43 +202,84 @@ fun TabletDualPaneLayout(
                                 if (categories.size > 1) {
                                     Box(
                                         modifier = Modifier
-                                            .size(28.dp)
+                                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                             .clip(OneUiShapes.pill)
-                                            .background(OneUiTheme.colors.surfacePill)
                                             .clickable {
                                                 val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
                                                 onCategorySelected(categories[nextIdx])
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = "›", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(OneUiShapes.pill)
+                                                .background(OneUiTheme.colors.surfacePill),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(text = "›", color = OneUiTheme.colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
 
                             Box(
                                 modifier = Modifier
+                                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                     .clip(OneUiShapes.pill)
-                                    .background(OneUiTheme.colors.cardSecondary)
-                                    .clickable { onOpenSettings() }
-                                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                                    .clickable { onOpenSettings() },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "设置",
-                                    color = OneUiTheme.colors.textPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.cardSecondary)
+                                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = "设置",
+                                        color = OneUiTheme.colors.textPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        if (categories.size > 1) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            CategoryTabRow(
+                                categories = categories,
+                                selectedCategory = channelUiState.selectedCategory,
+                                onCategorySelected = onCategorySelected,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         // One UI 药丸搜索框
                         OutlinedTextField(
                             value = channelUiState.searchQuery,
                             onValueChange = onSearchQueryChanged,
                             placeholder = { Text("搜索频道...", color = OneUiTheme.colors.textMuted, fontSize = 12.sp) },
+                            trailingIcon = {
+                                if (channelUiState.searchQuery.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(OneUiShapes.pill)
+                                            .clickable { onSearchQueryChanged("") }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "清空",
+                                            color = OneUiTheme.colors.textMuted,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = OneUiTheme.colors.cardSecondary,
@@ -427,6 +477,7 @@ fun TabletDualPaneLayout(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
+            isEpgLoading = playerUiState.isEpgLoading,
             onDismiss = onHideEpgSheet,
             aspectRatio = settingsUiState.aspectRatio,
             onAspectRatioSelected = onAspectRatioSelected,

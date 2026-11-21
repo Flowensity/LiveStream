@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,6 +58,7 @@ import com.livestream.core.model.VideoAspectRatio
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.channel.ChannelUiState
+import com.livestream.feature.channel.ui.CategoryTabRow
 import com.livestream.feature.channel.ui.ChannelListItem
 import com.livestream.feature.player.PlayerUiState
 import com.livestream.feature.player.ui.EpgScheduleDialog
@@ -115,12 +117,7 @@ fun PhonePortraitLayout(
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
-    var isSettingsViewActive by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = isSettingsViewActive) {
-        isSettingsViewActive = false
-        onCloseSettings()
-    }
+    val isSettingsViewActive = settingsUiState.isSettingsOpen
 
     Box(
         modifier = modifier
@@ -226,21 +223,25 @@ fun PhonePortraitLayout(
                         ) {
                             Box(
                                 modifier = Modifier
+                                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                     .clip(OneUiShapes.pill)
-                                    .background(OneUiTheme.colors.cardSecondary)
-                                    .clickable {
-                                        isSettingsViewActive = false
-                                        onCloseSettings()
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                                    .clickable { onCloseSettings() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "‹ 节目列表",
-                                    color = OneUiTheme.colors.accent,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(OneUiShapes.pill)
+                                        .background(OneUiTheme.colors.cardSecondary)
+                                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "‹ 节目列表",
+                                        color = OneUiTheme.colors.accent,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
 
                             Text(
@@ -305,21 +306,28 @@ fun PhonePortraitLayout(
                             if (categories.size > 1) {
                                 Box(
                                     modifier = Modifier
-                                        .size(28.dp)
+                                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                         .clip(OneUiShapes.pill)
-                                        .background(OneUiTheme.colors.surfacePill)
                                         .clickable {
                                             val prevIdx = if (currentCategoryIndex <= 0) categories.size - 1 else currentCategoryIndex - 1
                                             onCategorySelected(categories[prevIdx])
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "‹",
-                                        color = OneUiTheme.colors.textPrimary,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(OneUiShapes.pill)
+                                            .background(OneUiTheme.colors.surfacePill),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "‹",
+                                            color = OneUiTheme.colors.textPrimary,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
 
@@ -342,21 +350,28 @@ fun PhonePortraitLayout(
                             if (categories.size > 1) {
                                 Box(
                                     modifier = Modifier
-                                        .size(28.dp)
+                                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                         .clip(OneUiShapes.pill)
-                                        .background(OneUiTheme.colors.surfacePill)
                                         .clickable {
                                             val nextIdx = if (currentCategoryIndex >= categories.size - 1) 0 else currentCategoryIndex + 1
                                             onCategorySelected(categories[nextIdx])
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "›",
-                                        color = OneUiTheme.colors.textPrimary,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(OneUiShapes.pill)
+                                            .background(OneUiTheme.colors.surfacePill),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "›",
+                                            color = OneUiTheme.colors.textPrimary,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -366,22 +381,36 @@ fun PhonePortraitLayout(
                         // 设置快捷胶囊
                         Box(
                             modifier = Modifier
+                                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                 .clip(OneUiShapes.pill)
-                                .background(OneUiTheme.colors.cardSecondary)
-                                .clickable {
-                                    isSettingsViewActive = true
-                                    onOpenSettings()
-                                }
-                                .padding(horizontal = 14.dp, vertical = 5.dp),
+                                .clickable { onOpenSettings() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "设置",
-                                color = OneUiTheme.colors.textPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(OneUiShapes.pill)
+                                    .background(OneUiTheme.colors.cardSecondary)
+                                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "设置",
+                                    color = OneUiTheme.colors.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
+                    }
+
+                    if (categories.size > 1) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        CategoryTabRow(
+                            categories = categories,
+                            selectedCategory = channelUiState.selectedCategory,
+                            onCategorySelected = onCategorySelected,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -483,6 +512,7 @@ fun PhonePortraitLayout(
             visible = playerUiState.isEpgSheetVisible,
             channel = playerUiState.activeChannel,
             programs = playerUiState.dayPrograms,
+            isEpgLoading = playerUiState.isEpgLoading,
             onDismiss = onHideEpgSheet,
             aspectRatio = settingsUiState.aspectRatio,
             onAspectRatioSelected = onAspectRatioSelected,
