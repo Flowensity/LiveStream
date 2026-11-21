@@ -272,4 +272,29 @@ class ChannelRepositoryImplTest {
 
         coVerify(exactly = 1) { prefs.setPresetSeedVersion(PresetChannelDataProvider.PRESET_DATA_VERSION) }
     }
+
+    @Test
+    fun `recordPlaybackHistory and observeRecentHistoryChannels preserve MRU order and exclude hidden channels`() = runTest(testDispatcher) {
+        val historyDao = mockk<com.livestream.core.database.dao.PlaybackHistoryDao>(relaxed = true)
+        val ch1 = ChannelEntity(id = "cctv1", name = "CCTV-1", channelNumber = 1, categoryId = "cctv")
+        val ch2 = ChannelEntity(id = "cctv2", name = "CCTV-2", channelNumber = 2, categoryId = "cctv")
+        val h2 = com.livestream.core.database.entity.PlaybackHistoryEntity("cctv2", 2000L, "src2")
+        val hMissing = com.livestream.core.database.entity.PlaybackHistoryEntity("hidden_or_deleted", 1500L, "srcX")
+        val h1 = com.livestream.core.database.entity.PlaybackHistoryEntity("cctv1", 1000L, "src1")
+
+        every { historyDao.observeRecentHistory(any()) } returns flowOf(listOf(h2, hMissing, h1))
+        every { channelDao.observeAllVisibleChannels() } returns flowOf(listOf(ch1, ch2))
+
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers, null, historyDao)
+        repo.recordPlaybackHistory("cctv2", "src2")
+        coVerify(exactly = 1) {
+            historyDao.recordPlayback(match { it.channelId == "cctv2" && it.lastSourceId == "src2" })
+        }
+
+        repo.observeRecentHistoryChannels(30).test {
+            val recent = awaitItem()
+            assertEquals(listOf("cctv2", "cctv1"), recent.map { it.id })
+            awaitComplete()
+        }
+    }
 }

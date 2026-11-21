@@ -4,6 +4,8 @@ import com.livestream.core.common.dispatcher.AppDispatchers
 import com.livestream.core.database.dao.CategoryDao
 import com.livestream.core.database.dao.ChannelDao
 import com.livestream.core.database.dao.LiveSourceDao
+import com.livestream.core.database.dao.PlaybackHistoryDao
+import com.livestream.core.database.entity.PlaybackHistoryEntity
 import com.livestream.core.datastore.UserPreferencesDataStore
 import com.livestream.core.model.Channel
 import com.livestream.core.model.LiveSource
@@ -12,6 +14,8 @@ import com.livestream.data.channel.mapper.toEntity
 import com.livestream.data.channel.preset.PresetChannelDataProvider
 import com.livestream.domain.channel.repository.ChannelRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -27,7 +31,8 @@ class ChannelRepositoryImpl @Inject constructor(
     private val liveSourceDao: LiveSourceDao,
     private val categoryDao: CategoryDao,
     private val dispatchers: AppDispatchers,
-    private val userPreferencesDataStore: UserPreferencesDataStore? = null
+    private val userPreferencesDataStore: UserPreferencesDataStore? = null,
+    private val playbackHistoryDao: PlaybackHistoryDao? = null
 ) : ChannelRepository {
 
     constructor(
@@ -35,7 +40,15 @@ class ChannelRepositoryImpl @Inject constructor(
         liveSourceDao: LiveSourceDao,
         categoryDao: CategoryDao,
         dispatchers: AppDispatchers
-    ) : this(channelDao, liveSourceDao, categoryDao, dispatchers, null)
+    ) : this(channelDao, liveSourceDao, categoryDao, dispatchers, null, null)
+
+    constructor(
+        channelDao: ChannelDao,
+        liveSourceDao: LiveSourceDao,
+        categoryDao: CategoryDao,
+        dispatchers: AppDispatchers,
+        userPreferencesDataStore: UserPreferencesDataStore?
+    ) : this(channelDao, liveSourceDao, categoryDao, dispatchers, userPreferencesDataStore, null)
 
     private var hasSeeded = false
     private val seedMutex = kotlinx.coroutines.sync.Mutex()
@@ -61,6 +74,30 @@ class ChannelRepositoryImpl @Inject constructor(
         return channelDao.observeFavoriteChannels()
             .map { list -> list.map { it.toDomain() } }
             .flowOn(dispatchers.io)
+    }
+
+    override fun observeRecentHistoryChannels(limit: Int): Flow<List<Channel>> {
+        val historyDao = playbackHistoryDao ?: return flowOf(emptyList())
+        return combine(
+            historyDao.observeRecentHistory(limit),
+            channelDao.observeAllVisibleChannels()
+        ) { historyList, visibleChannels ->
+            val channelsById = visibleChannels.associateBy { it.id }
+            historyList.mapNotNull { entry -> channelsById[entry.channelId]?.toDomain() }
+        }.flowOn(dispatchers.io)
+    }
+
+    override suspend fun recordPlaybackHistory(channelId: String, sourceId: String?) {
+        val historyDao = playbackHistoryDao ?: return
+        withContext(dispatchers.io) {
+            historyDao.recordPlayback(
+                PlaybackHistoryEntity(
+                    channelId = channelId,
+                    lastPlayedTimestamp = System.currentTimeMillis(),
+                    lastSourceId = sourceId
+                )
+            )
+        }
     }
 
     override fun searchChannels(query: String): Flow<List<Channel>> {

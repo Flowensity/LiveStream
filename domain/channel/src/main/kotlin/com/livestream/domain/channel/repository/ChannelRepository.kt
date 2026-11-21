@@ -15,6 +15,11 @@ interface ChannelRepository {
 
     fun observeFavoriteChannels(): Flow<List<Channel>>
 
+    fun observeRecentHistoryChannels(limit: Int = 30): Flow<List<Channel>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+
+    suspend fun recordPlaybackHistory(channelId: String, sourceId: String? = null) {}
+
     fun searchChannels(query: String): Flow<List<Channel>>
 
     suspend fun getChannelById(channelId: String): Channel?

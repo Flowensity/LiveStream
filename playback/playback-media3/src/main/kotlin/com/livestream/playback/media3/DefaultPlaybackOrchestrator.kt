@@ -682,6 +682,9 @@ class DefaultPlaybackOrchestrator @Inject constructor(
                             com.livestream.core.model.SourceHealthStatus.HEALTHY
                         )
                     }
+                    runCatching {
+                        channelRepository.recordPlaybackHistory(channel.id, source.id)
+                    }
                 }
                 _orchestratorState.value = _orchestratorState.value.copy(
                     sourceLatenciesMs = sourceLatencyCache.snapshot()

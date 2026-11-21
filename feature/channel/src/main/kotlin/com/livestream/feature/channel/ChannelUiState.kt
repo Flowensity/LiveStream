@@ -18,6 +18,12 @@ data class ChannelUiState(
             id = "virtual_all",
             name = "全部频道",
             group = ChannelCategoryGroup.CUSTOM,
+            orderIndex = -3
+        )
+        val RECENT_CATEGORY = ChannelCategory(
+            id = "virtual_recent",
+            name = "最近观看",
+            group = ChannelCategoryGroup.CUSTOM,
             orderIndex = -2
         )
         val FAVORITE_CATEGORY = ChannelCategory(

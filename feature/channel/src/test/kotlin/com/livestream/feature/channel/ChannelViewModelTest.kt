@@ -80,12 +80,24 @@ class ChannelViewModelTest {
     fun `initial categories contains virtual categories plus repo categories`() = runTest(testDispatcher) {
         viewModel.categories.test {
             val initial = awaitItem()
-            val finalCats = if (initial.size == 2) awaitItem() else initial
-            assertEquals(3, finalCats.size)
+            val finalCats = if (initial.size == 3) awaitItem() else initial
+            assertEquals(4, finalCats.size)
             assertEquals(ChannelUiState.ALL_CATEGORY.id, finalCats[0].id)
-            assertEquals(ChannelUiState.FAVORITE_CATEGORY.id, finalCats[1].id)
-            assertEquals("cctv", finalCats[2].id)
+            assertEquals(ChannelUiState.RECENT_CATEGORY.id, finalCats[1].id)
+            assertEquals(ChannelUiState.FAVORITE_CATEGORY.id, finalCats[2].id)
+            assertEquals("cctv", finalCats[3].id)
         }
+    }
+
+    @Test
+    fun `selecting RECENT_CATEGORY observes recent history channels`() = runTest(testDispatcher) {
+        val recentCh = Channel(id = "cctv5", name = "CCTV-5", channelNumber = 5, categoryId = "cctv")
+        coEvery { channelRepository.observeRecentHistoryChannels(any()) } returns flowOf(listOf(recentCh))
+
+        viewModel.selectCategory(ChannelUiState.RECENT_CATEGORY)
+        advanceUntilIdle()
+
+        assertEquals(listOf(recentCh), viewModel.uiState.value.channels)
     }
 
     @Test

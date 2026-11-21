@@ -734,4 +734,26 @@ class PlaybackOrchestratorTest {
 
         assertTrue(orchestrator.prewarmedCacheSizeForTest() <= DefaultPlaybackOrchestrator.MAX_PREWARMED_CACHE_SIZE)
     }
+
+    @Test
+    fun `test playing success records playback history with active channel and source`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getSourcesForChannelSync("cctv1") } returns listOf(sampleSource1)
+
+        val orchestrator = DefaultPlaybackOrchestrator(
+            engine,
+            channelRepository,
+            sourceAdapterRegistry,
+            webPlaybackController,
+            networkMonitor,
+            latencyTracker,
+            testDispatchers
+        )
+        orchestrator.playChannel(sampleChannel1)
+        advanceUntilIdle()
+
+        engineStateFlow.value = EngineState.Playing
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.recordPlaybackHistory("cctv1", "src_1") }
+    }
 }

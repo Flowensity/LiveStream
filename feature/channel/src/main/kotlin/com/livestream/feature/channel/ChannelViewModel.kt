@@ -36,9 +36,15 @@ class ChannelViewModel @Inject constructor(
     private val playbackOrchestrator: PlaybackOrchestrator
 ) : ViewModel() {
 
+    private val virtualCategories = listOf(
+        ChannelUiState.ALL_CATEGORY,
+        ChannelUiState.RECENT_CATEGORY,
+        ChannelUiState.FAVORITE_CATEGORY
+    )
+
     private val _uiState = MutableStateFlow(
         ChannelUiState(
-            categories = listOf(ChannelUiState.ALL_CATEGORY, ChannelUiState.FAVORITE_CATEGORY),
+            categories = virtualCategories,
             selectedCategory = ChannelUiState.ALL_CATEGORY
         )
     )
@@ -49,12 +55,12 @@ class ChannelViewModel @Inject constructor(
 
     val categories: StateFlow<List<ChannelCategory>> = categoryRepository.observeCategories()
         .map { dbCategories ->
-            listOf(ChannelUiState.ALL_CATEGORY, ChannelUiState.FAVORITE_CATEGORY) + dbCategories
+            virtualCategories + dbCategories
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = listOf(ChannelUiState.ALL_CATEGORY, ChannelUiState.FAVORITE_CATEGORY)
+            initialValue = virtualCategories
         )
 
     init {
@@ -85,6 +91,7 @@ class ChannelViewModel @Inject constructor(
                 } else {
                     when (category.id) {
                         ChannelUiState.ALL_CATEGORY.id -> channelRepository.observeAllVisibleChannels()
+                        ChannelUiState.RECENT_CATEGORY.id -> channelRepository.observeRecentHistoryChannels()
                         ChannelUiState.FAVORITE_CATEGORY.id -> channelRepository.observeFavoriteChannels()
                         else -> channelRepository.observeChannelsByCategory(category.id)
                     }
