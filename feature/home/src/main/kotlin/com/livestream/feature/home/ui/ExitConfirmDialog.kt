@@ -48,6 +48,11 @@ import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import kotlinx.coroutines.delay
 
+internal fun shouldResetConfirmFocusOnVisibleChange(visible: Boolean): Boolean =
+    if (visible) false else true
+
+internal fun shouldRequestExitDialogFocus(visible: Boolean): Boolean = visible
+
 /**
  * 现代 One UI 规范二次退出确认弹窗 (312dp 居中毛玻璃卡片)
  */
@@ -70,8 +75,9 @@ fun ExitConfirmDialog(
         exit = fadeOut(),
         modifier = modifier
     ) {
-        LaunchedEffect(Unit) {
-            isConfirmFocused = false
+        LaunchedEffect(visible) {
+            if (!shouldRequestExitDialogFocus(visible)) return@LaunchedEffect
+            isConfirmFocused = shouldResetConfirmFocusOnVisibleChange(visible)
             try {
                 cancelFocusRequester.requestFocus()
             } catch (_: Exception) {

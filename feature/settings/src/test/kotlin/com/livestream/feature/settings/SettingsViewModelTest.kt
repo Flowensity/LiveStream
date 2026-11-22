@@ -11,6 +11,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -442,6 +443,62 @@ class SettingsViewModelTest {
 
         io.mockk.verify(exactly = 1) { mockOrch.playChannel(presetCh) }
         coVerify(exactly = 1) { userPreferencesRepository.setLastPlayedChannelId("cctv_600001859") }
+    }
+
+    @Test
+    fun `rapidly deleting two playlists sharing custom channels wipes all custom channels when last playlist is deleted`() = runTest(testDispatcher) {
+        val source1 = com.livestream.core.model.CustomPlaylistSource(
+            id = "rapid_1",
+            name = "Playlist 1",
+            url = "https://example.com/1.m3u",
+            channelCount = 1,
+            channelIds = listOf("user_ch_shared")
+        )
+        val source2 = com.livestream.core.model.CustomPlaylistSource(
+            id = "rapid_2",
+            name = "Playlist 2",
+            url = "https://example.com/2.m3u",
+            channelCount = 1,
+            channelIds = listOf("user_ch_shared")
+        )
+        customSourcesFlow.value = listOf(source1, source2)
+        advanceUntilIdle()
+
+        // Both deletions are invoked back-to-back before customSourcesFlow re-emits from DataStore
+        viewModel.deleteCustomPlaylistSource(source1)
+        viewModel.deleteCustomPlaylistSource(source2)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteAllCustomChannelsAndSources() }
+        coVerify(exactly = 1) { userPreferencesRepository.clearCustomPlaylistSources() }
+    }
+
+    @Test
+    fun `cancelling in-flight import via clearAllCustomSources does not swallow CancellationException into importError or save stale channels`() = runTest(testDispatcher) {
+        coEvery { channelRepository.getAllChannelsSync() } coAnswers {
+            kotlinx.coroutines.delay(500)
+            emptyList()
+        }
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1 group-title="测试",测试台
+            https://example.com/test.m3u8
+        """.trimIndent()
+
+        // Simulate LocalImportServer or concurrent importM3uInternal in flight while clearAllCustomSources runs
+        val directImportJob = kotlinx.coroutines.CoroutineScope(testDispatcher).launch {
+            viewModel.importM3uInternal(m3u)
+        }
+        viewModel.onImportTextChanged(m3u)
+        viewModel.importM3uContent()
+        testScheduler.advanceTimeBy(100)
+
+        viewModel.clearAllCustomSources()
+        advanceUntilIdle()
+        directImportJob.join()
+
+        org.junit.Assert.assertNull(viewModel.uiState.value.importError)
+        coVerify(exactly = 0) { channelRepository.saveChannels(any()) }
     }
 
     @Test

@@ -114,4 +114,17 @@ class HomeViewModelTest {
         // 最终只执行 1 次实际播放
         coVerify(exactly = 1) { playbackOrchestrator.playChannel(any()) }
     }
+
+    @Test
+    fun `ExitConfirmDialog resets confirm focus state whenever visible transitions to true even during exit animation`() {
+        org.junit.Assert.assertFalse(
+            com.livestream.feature.home.ui.shouldResetConfirmFocusOnVisibleChange(visible = true)
+        )
+        org.junit.Assert.assertTrue(
+            com.livestream.feature.home.ui.shouldRequestExitDialogFocus(visible = true)
+        )
+        org.junit.Assert.assertFalse(
+            com.livestream.feature.home.ui.shouldRequestExitDialogFocus(visible = false)
+        )
+    }
 }
