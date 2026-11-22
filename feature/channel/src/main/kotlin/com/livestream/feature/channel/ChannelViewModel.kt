@@ -64,10 +64,19 @@ class ChannelViewModel @Inject constructor(
         )
 
     init {
-        // 观察分类变化
+        // 观察分类变化（当选中的自定义分类被删除时自动回退至「全部频道」）
         viewModelScope.launch {
             categories.collectLatest { cats ->
-                _uiState.update { it.copy(categories = cats) }
+                val currentSelected = _selectedCategory.value
+                val validSelected = if (cats.any { it.id == currentSelected.id }) {
+                    currentSelected
+                } else {
+                    ChannelUiState.ALL_CATEGORY
+                }
+                if (validSelected.id != currentSelected.id) {
+                    _selectedCategory.value = validSelected
+                }
+                _uiState.update { it.copy(categories = cats, selectedCategory = validSelected) }
             }
         }
 

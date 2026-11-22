@@ -31,4 +31,7 @@ interface CategoryDao {
 
     @Query("DELETE FROM categories WHERE id LIKE 'custom_%'")
     suspend fun deleteAllCustomCategories(): Int
+
+    @Query("DELETE FROM categories WHERE id LIKE 'custom_%' AND id NOT IN (SELECT DISTINCT category_id FROM channels)")
+    suspend fun deleteOrphanedCustomCategories(): Int
 }

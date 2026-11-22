@@ -213,6 +213,7 @@ class ChannelRepositoryImpl @Inject constructor(
         withContext(dispatchers.io) {
             channelDao.deleteChannelById(channelId)
             liveSourceDao.deleteSourcesByChannelId(channelId)
+            categoryDao.deleteOrphanedCustomCategories()
         }
     }
 
@@ -223,6 +224,7 @@ class ChannelRepositoryImpl @Inject constructor(
                 channelDao.deleteChannelsByIds(chunk)
                 liveSourceDao.deleteSourcesByChannelIds(chunk)
             }
+            categoryDao.deleteOrphanedCustomCategories()
         }
     }
 

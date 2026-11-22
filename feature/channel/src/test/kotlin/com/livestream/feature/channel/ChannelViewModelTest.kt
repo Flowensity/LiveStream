@@ -155,4 +155,31 @@ class ChannelViewModelTest {
         verify(exactly = 0) { searchChannelsUseCase("cc") }
         verify(exactly = 1) { searchChannelsUseCase("cctv") }
     }
+
+    @Test
+    fun `when selected custom category is removed from categories flow, selectedCategory resets to ALL_CATEGORY`() = runTest(testDispatcher) {
+        val customCat = ChannelCategory(id = "custom_999", name = "测试分组", group = ChannelCategoryGroup.CUSTOM, orderIndex = 1000)
+        val categoriesFlow = MutableStateFlow(listOf(testCategory, customCat))
+        coEvery { categoryRepository.observeCategories() } returns categoriesFlow
+        coEvery { channelRepository.observeChannelsByCategory("custom_999") } returns flowOf(emptyList())
+
+        val vm = ChannelViewModel(
+            channelRepository = channelRepository,
+            categoryRepository = categoryRepository,
+            toggleFavoriteUseCase = toggleFavoriteUseCase,
+            searchChannelsUseCase = searchChannelsUseCase,
+            playbackOrchestrator = playbackOrchestrator
+        )
+        advanceUntilIdle()
+
+        vm.selectCategory(customCat)
+        advanceUntilIdle()
+        assertEquals("custom_999", vm.uiState.value.selectedCategory?.id)
+
+        // Remove customCat
+        categoriesFlow.value = listOf(testCategory)
+        advanceUntilIdle()
+
+        assertEquals(ChannelUiState.ALL_CATEGORY.id, vm.uiState.value.selectedCategory?.id)
+    }
 }

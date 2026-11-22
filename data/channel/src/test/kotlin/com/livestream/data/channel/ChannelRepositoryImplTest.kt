@@ -331,4 +331,19 @@ class ChannelRepositoryImplTest {
             awaitComplete()
         }
     }
+
+    @Test
+    fun `deleteChannelById and deleteChannelsByIds clean up orphaned custom categories`() = runTest(testDispatcher) {
+        val repo = ChannelRepositoryImpl(channelDao, liveSourceDao, categoryDao, testDispatchers)
+
+        repo.deleteChannelById("user_ch_1")
+        coVerify(exactly = 1) { channelDao.deleteChannelById("user_ch_1") }
+        coVerify(exactly = 1) { liveSourceDao.deleteSourcesByChannelId("user_ch_1") }
+        coVerify(exactly = 1) { categoryDao.deleteOrphanedCustomCategories() }
+
+        repo.deleteChannelsByIds(listOf("user_ch_2", "user_ch_3"))
+        coVerify(exactly = 1) { channelDao.deleteChannelsByIds(listOf("user_ch_2", "user_ch_3")) }
+        coVerify(exactly = 1) { liveSourceDao.deleteSourcesByChannelIds(listOf("user_ch_2", "user_ch_3")) }
+        coVerify(exactly = 2) { categoryDao.deleteOrphanedCustomCategories() }
+    }
 }

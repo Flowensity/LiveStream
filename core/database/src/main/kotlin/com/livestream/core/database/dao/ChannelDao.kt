@@ -51,13 +51,13 @@ interface ChannelDao {
     @Query("DELETE FROM channels WHERE id = :channelId")
     suspend fun deleteChannelById(channelId: String)
 
-    @Query("SELECT * FROM channels WHERE id LIKE 'user_ch_%' ORDER BY channel_number ASC")
+    @Query("SELECT * FROM channels WHERE id LIKE 'user_ch_%' OR category_id LIKE 'custom_%' ORDER BY channel_number ASC")
     fun observeCustomChannels(): Flow<List<ChannelEntity>>
 
-    @Query("SELECT * FROM channels WHERE id LIKE 'user_ch_%' ORDER BY channel_number ASC")
+    @Query("SELECT * FROM channels WHERE id LIKE 'user_ch_%' OR category_id LIKE 'custom_%' ORDER BY channel_number ASC")
     suspend fun getCustomChannelsSync(): List<ChannelEntity>
 
-    @Query("DELETE FROM channels WHERE id LIKE 'user_ch_%'")
+    @Query("DELETE FROM channels WHERE id LIKE 'user_ch_%' OR category_id LIKE 'custom_%'")
     suspend fun deleteAllCustomChannels(): Int
 
     @Query("DELETE FROM channels WHERE id IN (:channelIds)")
