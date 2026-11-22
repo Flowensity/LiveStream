@@ -31,6 +31,7 @@ class UserPreferencesDataStore @Inject constructor(
         val LAST_PLAYED_CHANNEL_ID = stringPreferencesKey("last_played_channel_id")
         val HARDWARE_DECODE_PREFERRED = booleanPreferencesKey("hardware_decode_preferred")
         val SURFACE_VIEW_PREFERRED = booleanPreferencesKey("surface_view_preferred")
+        val PIP_ENABLED = booleanPreferencesKey("pip_enabled")
         val SWITCH_CHANNEL_TIMEOUT_MS = longPreferencesKey("switch_channel_timeout_ms")
         val TV_KEY_MAPPING_SCHEME = stringPreferencesKey("tv_key_mapping_scheme")
         val THEME_MODE = stringPreferencesKey("theme_mode")
@@ -71,6 +72,7 @@ class UserPreferencesDataStore @Inject constructor(
             val lastChannel = preferences[PreferencesKeys.LAST_PLAYED_CHANNEL_ID]
             val hwDecode = preferences[PreferencesKeys.HARDWARE_DECODE_PREFERRED] ?: true
             val surfaceView = preferences[PreferencesKeys.SURFACE_VIEW_PREFERRED] ?: true
+            val pipEnabled = preferences[PreferencesKeys.PIP_ENABLED] ?: false
             val timeout = preferences[PreferencesKeys.SWITCH_CHANNEL_TIMEOUT_MS] ?: 5000L
             val mappingSchemeStr = preferences[PreferencesKeys.TV_KEY_MAPPING_SCHEME]
             val mappingScheme = when (mappingSchemeStr) {
@@ -93,6 +95,7 @@ class UserPreferencesDataStore @Inject constructor(
                 lastPlayedChannelId = lastChannel,
                 isHardwareDecodePreferred = hwDecode,
                 isSurfaceViewPreferred = surfaceView,
+                isPipEnabled = pipEnabled,
                 channelSwitchTimeoutMs = timeout,
                 tvKeyMappingScheme = mappingScheme,
                 themeMode = themeMode,
@@ -121,6 +124,12 @@ class UserPreferencesDataStore @Inject constructor(
     suspend fun setSurfaceViewPreferred(preferred: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.SURFACE_VIEW_PREFERRED] = preferred
+        }
+    }
+
+    suspend fun setPipEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PIP_ENABLED] = enabled
         }
     }
 

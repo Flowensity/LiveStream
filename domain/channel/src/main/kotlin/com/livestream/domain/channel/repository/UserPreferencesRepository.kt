@@ -19,6 +19,8 @@ interface UserPreferencesRepository {
 
     suspend fun setSurfaceViewPreferred(preferred: Boolean)
 
+    suspend fun setPipEnabled(enabled: Boolean) {}
+
     suspend fun setSwitchChannelTimeoutMs(timeoutMs: Long)
 
     suspend fun setTvKeyMappingScheme(scheme: TvKeyMappingScheme)

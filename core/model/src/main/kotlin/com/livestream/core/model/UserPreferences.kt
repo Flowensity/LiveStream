@@ -46,6 +46,7 @@ data class UserPreferences(
     val lastPlayedChannelId: String? = null,
     val isHardwareDecodePreferred: Boolean = true,
     val isSurfaceViewPreferred: Boolean = true,
+    val isPipEnabled: Boolean = false,
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,

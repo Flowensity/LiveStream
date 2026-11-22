@@ -2,6 +2,7 @@ package com.livestream.core.datastore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
@@ -11,6 +12,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,6 +32,7 @@ class UserPreferencesDataStoreTest {
             assertEquals("cctv", item.defaultCategoryId)
             assertTrue(item.isHardwareDecodePreferred)
             assertTrue(item.isSurfaceViewPreferred)
+            assertFalse(item.isPipEnabled)
             assertEquals(5000L, item.channelSwitchTimeoutMs)
             assertEquals(TvKeyMappingScheme.CLASSIC, item.tvKeyMappingScheme)
             awaitComplete()
@@ -41,7 +44,8 @@ class UserPreferencesDataStoreTest {
         val customPrefs = preferencesOf(
             stringPreferencesKey("default_category_id") to "satellite",
             stringPreferencesKey("last_played_channel_id") to "cctv1",
-            stringPreferencesKey("tv_key_mapping_scheme") to "MINIMAL"
+            stringPreferencesKey("tv_key_mapping_scheme") to "MINIMAL",
+            booleanPreferencesKey("pip_enabled") to true
         )
         every { dataStore.data } returns flowOf(customPrefs)
 
@@ -52,6 +56,7 @@ class UserPreferencesDataStoreTest {
             assertEquals("satellite", item.defaultCategoryId)
             assertEquals("cctv1", item.lastPlayedChannelId)
             assertEquals(TvKeyMappingScheme.MINIMAL, item.tvKeyMappingScheme)
+            assertTrue(item.isPipEnabled)
             awaitComplete()
         }
     }

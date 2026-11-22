@@ -31,6 +31,10 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         dataStore.setSurfaceViewPreferred(preferred)
     }
 
+    override suspend fun setPipEnabled(enabled: Boolean) {
+        dataStore.setPipEnabled(enabled)
+    }
+
     override suspend fun setSwitchChannelTimeoutMs(timeoutMs: Long) {
         dataStore.setSwitchChannelTimeoutMs(timeoutMs)
     }
