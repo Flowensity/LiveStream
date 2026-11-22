@@ -147,6 +147,9 @@ class SettingsViewModel internal constructor(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
     private var serverStartJob: Job? = null
+    private var importJob: Job? = null
+    private var epgImportJob: Job? = null
+    private var probeJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -155,6 +158,7 @@ class SettingsViewModel internal constructor(
                     current.copy(
                         isHardwareDecodePreferred = prefs.isHardwareDecodePreferred,
                         isSurfaceViewPreferred = prefs.isSurfaceViewPreferred,
+                        isPipEnabled = prefs.isPipEnabled,
                         aspectRatio = prefs.aspectRatio,
                         channelSwitchTimeoutMs = prefs.channelSwitchTimeoutMs,
                         tvKeyMappingScheme = prefs.tvKeyMappingScheme,
@@ -234,6 +238,12 @@ class SettingsViewModel internal constructor(
     fun setSurfaceViewPreferred(preferred: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setSurfaceViewPreferred(preferred)
+        }
+    }
+
+    fun setPipEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setPipEnabled(enabled)
         }
     }
 
@@ -398,23 +408,42 @@ class SettingsViewModel internal constructor(
                 return@withContext Result.failure(Exception("未解析到有效频道，请检查链接或 M3U 格式"))
             }
 
-            // 若是刷新已有订阅源，先清理该源旧频道与关联源，避免残留失效记录
-            if (existingSourceToReplace != null) {
-                if (existingSourceToReplace.channelIds.isNotEmpty()) {
-                    channelRepository.deleteChannelsByIds(existingSourceToReplace.channelIds)
-                }
-                if (existingSourceToReplace.matchedSourceIds.isNotEmpty()) {
-                    channelRepository.deleteSourcesByIds(existingSourceToReplace.matchedSourceIds)
-                }
+            // 若是刷新已有订阅源或重复导入同一订阅 URL，先清理该源独有的旧频道与关联源，避免残留失效记录
+            val currentSources = _uiState.value.customSources
+            val effectiveSourceToReplace = existingSourceToReplace ?: if (downloadUrl.startsWith("http")) {
+                currentSources.find { it.url == downloadUrl }
+            } else {
+                null
             }
+            val otherSources = if (effectiveSourceToReplace != null) {
+                currentSources.filterNot { it.id == effectiveSourceToReplace.id }
+            } else {
+                currentSources
+            }
+            val retainedByOthersChannelIds = otherSources.flatMapTo(HashSet()) { it.channelIds }
+            val retainedByOthersSourceIds = otherSources.flatMapTo(HashSet()) { it.matchedSourceIds }
+            val replacedDeletedChannelIds = HashSet<String>()
 
-            if (parsed.categories.isNotEmpty()) {
-                categoryRepository.saveCategories(parsed.categories)
+            if (effectiveSourceToReplace != null) {
+                val channelsToDelete = effectiveSourceToReplace.channelIds.filterNot { it in retainedByOthersChannelIds }
+                if (channelsToDelete.isNotEmpty()) {
+                    channelRepository.deleteChannelsByIds(channelsToDelete)
+                    replacedDeletedChannelIds.addAll(channelsToDelete)
+                }
+                val sourcesToDelete = effectiveSourceToReplace.matchedSourceIds.filterNot { it in retainedByOthersSourceIds }
+                if (sourcesToDelete.isNotEmpty()) {
+                    channelRepository.deleteSourcesByIds(sourcesToDelete)
+                }
             }
 
             val existingChannels = channelRepository.getAllChannelsSync()
+                .filterNot { it.id in replacedDeletedChannelIds }
             var nextCustomChannelNumber = ((existingChannels.maxOfOrNull { it.channelNumber } ?: 800).coerceAtLeast(800)) + 1
-            val matchIndex = ChannelMatchIndex(existingChannels)
+            // 仅与内置预设频道进行匹配聚合，严禁将已入库的自定义频道误判为内置频道
+            val presetChannels = existingChannels.filterNot {
+                it.id.startsWith("user_ch_") || it.categoryId.startsWith("custom_")
+            }
+            val matchIndex = ChannelMatchIndex(presetChannels)
             val sourcesByChannelId = parsed.sources.groupBy { it.channelId }
             val matchedSources = mutableListOf<LiveSource>()
             val unmatchedChannels = mutableListOf<Channel>()
@@ -445,6 +474,12 @@ class SettingsViewModel internal constructor(
                 }
             }
 
+            val usedCategoryIds = unmatchedChannels.mapTo(HashSet()) { it.categoryId }
+            val categoriesToSave = parsed.categories.filter { it.id in usedCategoryIds }
+            if (categoriesToSave.isNotEmpty()) {
+                categoryRepository.saveCategories(categoriesToSave)
+            }
+
             if (unmatchedChannels.isNotEmpty()) {
                 channelRepository.saveChannels(unmatchedChannels)
             }
@@ -453,18 +488,18 @@ class SettingsViewModel internal constructor(
                 channelRepository.saveSources(allSourcesToSave)
             }
 
-            val sourceTitle = existingSourceToReplace?.name ?: when {
+            val sourceTitle = effectiveSourceToReplace?.name ?: when {
                 downloadUrl.startsWith("http") -> {
                     val candidate = downloadUrl.substringAfterLast('/').substringBefore('?')
                     if (candidate.isNotBlank() && candidate.contains(".")) candidate else "网络订阅源"
                 }
                 else -> "文本导入源"
             }
-            val effectiveEpgUrl = parsed.epgUrl ?: existingSourceToReplace?.epgUrl.orEmpty()
+            val effectiveEpgUrl = parsed.epgUrl ?: effectiveSourceToReplace?.epgUrl.orEmpty()
             val record = CustomPlaylistSource(
-                id = existingSourceToReplace?.id ?: UUID.randomUUID().toString(),
+                id = effectiveSourceToReplace?.id ?: UUID.randomUUID().toString(),
                 name = sourceTitle,
-                url = if (downloadUrl.startsWith("http")) downloadUrl else existingSourceToReplace?.url.orEmpty(),
+                url = if (downloadUrl.startsWith("http")) downloadUrl else effectiveSourceToReplace?.url.orEmpty(),
                 channelCount = parsed.channels.size,
                 channelIds = unmatchedChannels.map { it.id },
                 matchedSourceIds = matchedSources.map { it.id },
@@ -475,7 +510,8 @@ class SettingsViewModel internal constructor(
 
             // 若播放列表头部包含 x-tvg-url / url-tvg，后台异步拉取 XMLTV 节目单入库
             if (effectiveEpgUrl.isNotBlank() && epgRepository != null) {
-                viewModelScope.launch(dispatchers.io) {
+                epgImportJob?.cancel()
+                epgImportJob = viewModelScope.launch(dispatchers.io) {
                     val allNow = channelRepository.getAllChannelsSync()
                     epgRepository.importXmltvFromUrl(effectiveEpgUrl, allNow)
                 }
@@ -509,7 +545,8 @@ class SettingsViewModel internal constructor(
             return
         }
 
-        viewModelScope.launch {
+        importJob?.cancel()
+        importJob = viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, importError = null) }
             importM3uInternal(content)
         }
@@ -517,7 +554,8 @@ class SettingsViewModel internal constructor(
 
     fun refreshCustomPlaylistSource(source: CustomPlaylistSource) {
         if (source.url.isBlank() || _uiState.value.refreshingSourceId != null) return
-        viewModelScope.launch {
+        importJob?.cancel()
+        importJob = viewModelScope.launch {
             _uiState.update { it.copy(refreshingSourceId = source.id, importError = null) }
             importM3uInternal(source.url, existingSourceToReplace = source)
         }
@@ -526,7 +564,8 @@ class SettingsViewModel internal constructor(
     fun refreshAllCustomSources() {
         val networkSources = _uiState.value.customSources.filter { it.url.startsWith("http") }
         if (networkSources.isEmpty() || _uiState.value.refreshingSourceId != null) return
-        viewModelScope.launch {
+        importJob?.cancel()
+        importJob = viewModelScope.launch {
             for (src in networkSources) {
                 _uiState.update { it.copy(refreshingSourceId = src.id) }
                 importM3uInternal(src.url, existingSourceToReplace = src)
@@ -544,14 +583,49 @@ class SettingsViewModel internal constructor(
     }
 
     fun deleteCustomPlaylistSource(source: CustomPlaylistSource) {
+        importJob?.cancel()
+        epgImportJob?.cancel()
+        probeJob?.cancel()
         viewModelScope.launch {
-            if (source.channelIds.isNotEmpty()) {
-                channelRepository.deleteChannelsByIds(source.channelIds)
+            val remainingSources = _uiState.value.customSources.filterNot { it.id == source.id }
+            if (remainingSources.isEmpty()) {
+                channelRepository.deleteAllCustomChannelsAndSources()
+                userPreferencesRepository.clearCustomPlaylistSources()
+                _uiState.update {
+                    it.copy(
+                        isImporting = false,
+                        refreshingSourceId = null,
+                        isProbingSources = false,
+                        importSuccessCount = null,
+                        importError = null,
+                        unavailableCustomChannelIds = emptySet(),
+                        sourceHealthSummary = null
+                    )
+                }
+                recoverPlaybackIfCurrentChannelDeleted()
+            } else {
+                val retainedChannelIds = remainingSources.flatMapTo(HashSet()) { it.channelIds }
+                val retainedMatchedSourceIds = remainingSources.flatMapTo(HashSet()) { it.matchedSourceIds }
+                val channelsToDelete = source.channelIds.filterNot { it in retainedChannelIds }
+                val sourcesToDelete = source.matchedSourceIds.filterNot { it in retainedMatchedSourceIds }
+
+                if (channelsToDelete.isNotEmpty()) {
+                    channelRepository.deleteChannelsByIds(channelsToDelete)
+                }
+                if (sourcesToDelete.isNotEmpty()) {
+                    channelRepository.deleteSourcesByIds(sourcesToDelete)
+                }
+                userPreferencesRepository.removeCustomPlaylistSource(source.id)
+                _uiState.update {
+                    it.copy(
+                        isImporting = false,
+                        refreshingSourceId = null,
+                        isProbingSources = false,
+                        unavailableCustomChannelIds = it.unavailableCustomChannelIds - channelsToDelete.toSet()
+                    )
+                }
+                recoverPlaybackIfCurrentChannelDeleted(channelsToDelete.toSet())
             }
-            if (source.matchedSourceIds.isNotEmpty()) {
-                channelRepository.deleteSourcesByIds(source.matchedSourceIds)
-            }
-            userPreferencesRepository.removeCustomPlaylistSource(source.id)
         }
     }
 
@@ -559,6 +633,7 @@ class SettingsViewModel internal constructor(
         viewModelScope.launch {
             channelRepository.deleteChannelById(channelId)
             syncCustomSourcesAfterChannelDeletion(setOf(channelId))
+            recoverPlaybackIfCurrentChannelDeleted(setOf(channelId))
         }
     }
 
@@ -566,7 +641,8 @@ class SettingsViewModel internal constructor(
         val channels = _uiState.value.customChannels
         if (channels.isEmpty() || _uiState.value.isProbingSources) return
 
-        viewModelScope.launch(dispatchers.io) {
+        probeJob?.cancel()
+        probeJob = viewModelScope.launch(dispatchers.io) {
             _uiState.update { it.copy(isProbingSources = true, sourceHealthSummary = "正在检测 ${channels.size} 个自定义频道的线路连通性...") }
             val probe = networkProbe ?: NetworkProbe(okHttpClient)
             val semaphore = Semaphore(6)
@@ -648,16 +724,44 @@ class SettingsViewModel internal constructor(
     }
 
     fun clearAllCustomSources() {
+        importJob?.cancel()
+        epgImportJob?.cancel()
+        probeJob?.cancel()
         viewModelScope.launch {
             channelRepository.deleteAllCustomChannelsAndSources()
             userPreferencesRepository.clearCustomPlaylistSources()
             _uiState.update {
                 it.copy(
+                    isImporting = false,
+                    refreshingSourceId = null,
+                    isProbingSources = false,
                     importSuccessCount = null,
                     importError = null,
                     unavailableCustomChannelIds = emptySet(),
                     sourceHealthSummary = null
                 )
+            }
+            recoverPlaybackIfCurrentChannelDeleted()
+        }
+    }
+
+    private suspend fun recoverPlaybackIfCurrentChannelDeleted(deletedChannelIds: Set<String>? = null) {
+        val orchestrator = playbackOrchestrator ?: return
+        val currentCh = orchestrator.orchestratorState.value.currentChannel ?: return
+        val isDeleted = if (deletedChannelIds != null) {
+            currentCh.id in deletedChannelIds
+        } else {
+            currentCh.id.startsWith("user_ch_") ||
+                currentCh.categoryId.startsWith("custom_") ||
+                channelRepository.getChannelById(currentCh.id) == null
+        }
+        if (isDeleted) {
+            val fallback = channelRepository.getAllChannelsSync()
+                .filter { !it.isHidden && (deletedChannelIds == null || it.id !in deletedChannelIds) }
+                .minByOrNull { it.channelNumber }
+            if (fallback != null) {
+                orchestrator.playChannel(fallback)
+                userPreferencesRepository.setLastPlayedChannelId(fallback.id)
             }
         }
     }

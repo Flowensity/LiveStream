@@ -10,6 +10,7 @@ import com.livestream.core.model.VideoAspectRatio
 data class SettingsUiState(
     val isHardwareDecodePreferred: Boolean = true,
     val isSurfaceViewPreferred: Boolean = true,
+    val isPipEnabled: Boolean = false,
     val aspectRatio: VideoAspectRatio = VideoAspectRatio.ORIGINAL,
     val channelSwitchTimeoutMs: Long = 5000L,
     val tvKeyMappingScheme: TvKeyMappingScheme = TvKeyMappingScheme.CLASSIC,

@@ -291,6 +291,15 @@ class SettingsViewModelTest {
             channelIds = listOf("ch_1", "ch_2"),
             matchedSourceIds = listOf("matched_src_1", "matched_src_2")
         )
+        val otherSource = com.livestream.core.model.CustomPlaylistSource(
+            id = "test_src_2",
+            name = "Other Playlist",
+            url = "http://example.com/other.m3u",
+            channelCount = 1,
+            channelIds = listOf("ch_3")
+        )
+        customSourcesFlow.value = listOf(source, otherSource)
+        advanceUntilIdle()
 
         viewModel.deleteCustomPlaylistSource(source)
         advanceUntilIdle()
@@ -298,6 +307,141 @@ class SettingsViewModelTest {
         coVerify(exactly = 1) { channelRepository.deleteChannelsByIds(listOf("ch_1", "ch_2")) }
         coVerify(exactly = 1) { channelRepository.deleteSourcesByIds(listOf("matched_src_1", "matched_src_2")) }
         coVerify(exactly = 1) { userPreferencesRepository.removeCustomPlaylistSource("test_src_1") }
+    }
+
+    @Test
+    fun `isPipEnabled defaults to false and setPipEnabled updates repository`() = runTest(testDispatcher) {
+        advanceUntilIdle()
+        org.junit.Assert.assertFalse(viewModel.uiState.value.isPipEnabled)
+
+        viewModel.setPipEnabled(true)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { userPreferencesRepository.setPipEnabled(true) }
+    }
+
+    @Test
+    fun `re-importing M3U when custom channels already exist in DB does not match custom channels as presets`() = runTest(testDispatcher) {
+        val existingCustomChannel = com.livestream.core.model.Channel(
+            id = "user_ch_existing",
+            name = "凤凰中文",
+            channelNumber = 801,
+            categoryId = "custom_123"
+        )
+        coEvery { channelRepository.getAllChannelsSync() } returns listOf(existingCustomChannel)
+
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1 group-title="港澳台",凤凰中文
+            https://example.com/fhzw.m3u8
+        """.trimIndent()
+
+        val savedPlaylistSlot = mutableListOf<com.livestream.core.model.CustomPlaylistSource>()
+        coEvery { userPreferencesRepository.saveCustomPlaylistSource(capture(savedPlaylistSlot)) } returns Unit
+
+        val res = viewModel.importM3uInternal(m3u)
+        assertTrue(res.isSuccess)
+        assertTrue(savedPlaylistSlot.isNotEmpty())
+        assertEquals(1, savedPlaylistSlot.last().channelIds.size)
+        assertTrue(savedPlaylistSlot.last().matchedSourceIds.isEmpty())
+    }
+
+    @Test
+    fun `deleteCustomPlaylistSource wipes all custom channels and sources when deleting the last playlist`() = runTest(testDispatcher) {
+        val onlySource = com.livestream.core.model.CustomPlaylistSource(
+            id = "only_src",
+            name = "Only Playlist",
+            url = "https://example.com/only.m3u",
+            channelCount = 2,
+            channelIds = listOf("user_ch_1", "user_ch_2")
+        )
+        customSourcesFlow.value = listOf(onlySource)
+        advanceUntilIdle()
+
+        viewModel.deleteCustomPlaylistSource(onlySource)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteAllCustomChannelsAndSources() }
+        coVerify(exactly = 1) { userPreferencesRepository.clearCustomPlaylistSources() }
+    }
+
+    @Test
+    fun `deleteCustomPlaylistSource retains shared channels owned by another remaining playlist`() = runTest(testDispatcher) {
+        val source1 = com.livestream.core.model.CustomPlaylistSource(
+            id = "src_1",
+            name = "Playlist 1",
+            url = "https://example.com/1.m3u",
+            channelCount = 2,
+            channelIds = listOf("user_ch_shared", "user_ch_only1"),
+            matchedSourceIds = listOf("matched_shared", "matched_only1")
+        )
+        val source2 = com.livestream.core.model.CustomPlaylistSource(
+            id = "src_2",
+            name = "Playlist 2",
+            url = "https://example.com/2.m3u",
+            channelCount = 1,
+            channelIds = listOf("user_ch_shared"),
+            matchedSourceIds = listOf("matched_shared")
+        )
+        customSourcesFlow.value = listOf(source1, source2)
+        advanceUntilIdle()
+
+        viewModel.deleteCustomPlaylistSource(source1)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { channelRepository.deleteChannelsByIds(listOf("user_ch_only1")) }
+        coVerify(exactly = 1) { channelRepository.deleteSourcesByIds(listOf("matched_only1")) }
+        coVerify(exactly = 1) { userPreferencesRepository.removeCustomPlaylistSource("src_1") }
+    }
+
+    @Test
+    fun `deleting custom playlist while one of its custom channels is playing switches playback to first preset channel`() = runTest(testDispatcher) {
+        val activeCustomCh = com.livestream.core.model.Channel(
+            id = "user_ch_playing",
+            name = "自定义台",
+            channelNumber = 801,
+            categoryId = "custom_1"
+        )
+        val presetCh = com.livestream.core.model.Channel(
+            id = "cctv_600001859",
+            name = "CCTV-1 综合",
+            channelNumber = 1,
+            categoryId = "cctv"
+        )
+        val orchState = MutableStateFlow(com.livestream.playback.api.OrchestratorState(currentChannel = activeCustomCh))
+        val mockOrch = mockk<com.livestream.playback.api.PlaybackOrchestrator>(relaxed = true) {
+            io.mockk.every { orchestratorState } returns orchState
+        }
+        coEvery { channelRepository.getChannelById("user_ch_playing") } returns null
+        coEvery { channelRepository.getAllChannelsSync() } returns listOf(presetCh)
+
+        val onlySource = com.livestream.core.model.CustomPlaylistSource(
+            id = "src_active",
+            name = "Active List",
+            url = "https://example.com/active.m3u",
+            channelCount = 1,
+            channelIds = listOf("user_ch_playing")
+        )
+        customSourcesFlow.value = listOf(onlySource)
+
+        val vmWithOrch = SettingsViewModel(
+            userPreferencesRepository = userPreferencesRepository,
+            channelRepository = channelRepository,
+            categoryRepository = categoryRepository,
+            localImportServer = localImportServer,
+            okHttpClient = okHttpClient,
+            dispatchers = dispatchers,
+            epgRepository = null,
+            playbackOrchestrator = mockOrch,
+            networkProbe = null,
+            isTvDevice = false
+        )
+        advanceUntilIdle()
+
+        vmWithOrch.deleteCustomPlaylistSource(onlySource)
+        advanceUntilIdle()
+
+        io.mockk.verify(exactly = 1) { mockOrch.playChannel(presetCh) }
+        coVerify(exactly = 1) { userPreferencesRepository.setLastPlayedChannelId("cctv_600001859") }
     }
 
     @Test
