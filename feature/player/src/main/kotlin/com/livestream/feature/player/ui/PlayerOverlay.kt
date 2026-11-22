@@ -66,7 +66,8 @@ fun PlayerOverlay(
     osdFocusedIndex: Int = -1,
     aspectRatio: VideoAspectRatio = uiState.aspectRatio,
     onCycleAspectRatio: (() -> Unit)? = null,
-    onOpenSettings: (() -> Unit)? = null
+    onOpenSettings: (() -> Unit)? = null,
+    isExitDialogVisible: Boolean = false
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         // 1. 换台与缓冲平滑过渡加载指示器
@@ -89,10 +90,12 @@ fun PlayerOverlay(
         if (uiState.status == PlaybackStatus.ERROR && uiState.error != null) {
             val errCardShape = OneUiShapes.dialog
             val retryFocusRequester = remember { FocusRequester() }
-            LaunchedEffect(uiState.status, uiState.error) {
-                try {
-                    retryFocusRequester.requestFocus()
-                } catch (_: Exception) {}
+            LaunchedEffect(uiState.status, uiState.error, isExitDialogVisible) {
+                if (!isExitDialogVisible) {
+                    try {
+                        retryFocusRequester.requestFocus()
+                    } catch (_: Exception) {}
+                }
             }
             Box(
                 modifier = Modifier

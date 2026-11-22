@@ -39,7 +39,23 @@ class MainActivity : ComponentActivity() {
     private val channelViewModel: ChannelViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
     private var pausedByLifecycle = false
+    private var isExitingApp = false
     private val isInPipModeState = mutableStateOf(false)
+
+    companion object {
+        internal fun shouldEnterPip(
+            isPipEnabled: Boolean,
+            isExitingApp: Boolean,
+            isFinishing: Boolean,
+            isDestroyed: Boolean,
+            status: PlaybackStatus
+        ): Boolean {
+            if (!isPipEnabled || isExitingApp || isFinishing || isDestroyed) return false
+            return status == PlaybackStatus.PLAYING ||
+                status == PlaybackStatus.BUFFERING ||
+                status == PlaybackStatus.READY
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,9 +113,23 @@ class MainActivity : ComponentActivity() {
                     playerViewModel = playerViewModel,
                     channelViewModel = channelViewModel,
                     settingsViewModel = settingsViewModel,
-                    isInPipMode = isInPipMode
+                    isInPipMode = isInPipMode,
+                    onExitApp = { exitApplication() }
                 )
             }
+        }
+    }
+
+    private fun exitApplication() {
+        isExitingApp = true
+        runCatching {
+            playbackOrchestrator.detachOutput()
+            playbackOrchestrator.release()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            finishAndRemoveTask()
+        } else {
+            finishAffinity()
         }
     }
 
@@ -113,10 +143,14 @@ class MainActivity : ComponentActivity() {
         if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
 
         val status = playbackOrchestrator.orchestratorState.value.status
-        val isActivePlayback = status == PlaybackStatus.PLAYING ||
-            status == PlaybackStatus.BUFFERING ||
-            status == PlaybackStatus.READY
-        if (!isActivePlayback) return
+        val eligible = shouldEnterPip(
+            isPipEnabled = settingsViewModel.uiState.value.isPipEnabled,
+            isExitingApp = isExitingApp,
+            isFinishing = isFinishing,
+            isDestroyed = isDestroyed,
+            status = status
+        )
+        if (!eligible) return
 
         runCatching {
             val metrics = playbackOrchestrator.orchestratorState.value.metrics

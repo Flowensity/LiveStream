@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,7 @@ import com.livestream.core.ui.component.TvFocusableBox
 import com.livestream.core.ui.theme.OneUiShapes
 import com.livestream.core.ui.theme.OneUiTheme
 import com.livestream.feature.settings.SettingsUiState
+import kotlinx.coroutines.delay
 
 /**
  * 自定义源与自定义频道管理弹窗：
@@ -59,6 +61,16 @@ internal fun SourceManagementDialog(
 ) {
     val sourceDialogShape = OneUiShapes.dialog
     var confirmClearAll by remember { mutableStateOf(false) }
+    val confirmClearFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(confirmClearAll) {
+        if (confirmClearAll) {
+            delay(80)
+            try {
+                confirmClearFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
 
     Box(
         modifier = modifier
@@ -241,7 +253,8 @@ internal fun SourceManagementDialog(
                                     unfocusedBackgroundColor = OneUiTheme.colors.danger,
                                     focusedBackgroundColor = OneUiTheme.colors.danger,
                                     focusedBorderColor = Color.White,
-                                    focusedBorderWidth = 1.5.dp
+                                    focusedBorderWidth = 1.5.dp,
+                                    modifier = Modifier.focusRequester(confirmClearFocusRequester)
                                 ) { _ ->
                                     Text(
                                         text = "确认清空",

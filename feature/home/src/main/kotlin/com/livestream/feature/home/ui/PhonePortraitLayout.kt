@@ -106,6 +106,7 @@ fun PhonePortraitLayout(
     onSelectSource: (Int) -> Unit = {},
     onProbeCustomSources: () -> Unit = {},
     onRemoveUnavailableCustomChannels: () -> Unit = {},
+    onTogglePipMode: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -259,6 +260,7 @@ fun PhonePortraitLayout(
                             onThemeModeSelected = onThemeModeSelected,
                             onToggleHardwareDecode = onToggleHardwareDecode,
                             onToggleSurfaceView = onToggleSurfaceView,
+                            onTogglePipMode = onTogglePipMode,
                             isTv = false
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -486,7 +488,8 @@ fun PhonePortraitLayout(
             onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
             onRefreshAllCustomSources = onRefreshAllCustomSources,
             onProbeCustomSources = onProbeCustomSources,
-            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
+            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels,
+            onTogglePipMode = onTogglePipMode
         )
 
         // 综合播放设置与节目单抽屉

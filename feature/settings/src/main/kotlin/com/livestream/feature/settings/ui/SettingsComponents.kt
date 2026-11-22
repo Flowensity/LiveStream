@@ -47,6 +47,7 @@ fun SettingsContent(
     onToggleHardwareDecode: (Boolean) -> Unit,
     onToggleSurfaceView: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onTogglePipMode: (Boolean) -> Unit = {},
     firstFocusRequester: FocusRequester? = null,
     onEnlargeQrCode: () -> Unit = onOpenImportDialog,
     isTv: Boolean = false
@@ -236,30 +237,32 @@ fun SettingsContent(
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.SemiBold
                         )
+                        val hasCustomData = uiState.customChannels.isNotEmpty() || uiState.customSources.isNotEmpty()
                         Text(
-                            text = if (uiState.customChannels.isNotEmpty()) {
+                            text = if (hasCustomData) {
                                 "已导入 ${uiState.customChannels.size} 个频道 · ${uiState.customSources.size} 个列表源"
                             } else {
                                 "检测线路连通性、刷新订阅或清理自定义频道"
                             },
-                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                            color = if (hasCustomData) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
                             fontSize = 11.5.sp,
                             lineHeight = 15.sp,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
+                    val hasCustomData = uiState.customChannels.isNotEmpty() || uiState.customSources.isNotEmpty()
                     Box(
                         modifier = Modifier
                             .clip(OneUiShapes.pill)
                             .background(
-                                if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accentSoft
+                                if (hasCustomData) OneUiTheme.colors.accentSoft
                                 else OneUiTheme.colors.surfacePill
                             )
                             .padding(horizontal = 12.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = if (uiState.customChannels.isNotEmpty()) "管理" else "查看",
-                            color = if (uiState.customChannels.isNotEmpty()) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
+                            text = if (hasCustomData) "管理" else "查看",
+                            color = if (hasCustomData) OneUiTheme.colors.accent else OneUiTheme.colors.textSecondary,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -311,9 +314,16 @@ fun SettingsContent(
             }
         }
 
-        // 4. 解码与渲染卡片
-        SettingsSectionTitle("解码与渲染")
+        // 4. 播放与解码渲染卡片
+        SettingsSectionTitle("播放与解码")
         OneUiGroupCard {
+            SettingToggleRow(
+                title = "画中画模式",
+                subtitle = "返回桌面或切换应用时自动进入悬浮小窗继续播放（默认关闭）",
+                checked = uiState.isPipEnabled,
+                onCheckedChange = onTogglePipMode
+            )
+            OneUiCardDivider()
             SettingToggleRow(
                 title = "硬件加速解码",
                 subtitle = "优先使用 GPU 硬件解码，画面更流畅；若遇黑屏或花屏可关闭",

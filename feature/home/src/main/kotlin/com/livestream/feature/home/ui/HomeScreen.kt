@@ -1,6 +1,9 @@
 package com.livestream.feature.home.ui
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -42,14 +45,15 @@ fun HomeScreen(
     channelViewModel: ChannelViewModel,
     settingsViewModel: SettingsViewModel,
     modifier: Modifier = Modifier,
-    isInPipMode: Boolean = false
+    isInPipMode: Boolean = false,
+    onExitApp: (() -> Unit)? = null
 ) {
     val playerUiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val channelUiState by channelViewModel.uiState.collectAsStateWithLifecycle()
     val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
     val deviceType = rememberDeviceType()
-    val activity = LocalContext.current as? Activity
+    val context = LocalContext.current
 
     var showExitDialog by remember { mutableStateOf(false) }
 
@@ -151,6 +155,7 @@ fun HomeScreen(
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     onProbeCustomSources = { settingsViewModel.probeCustomSources() },
                     onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
+                    onTogglePipMode = { settingsViewModel.setPipEnabled(it) },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -197,6 +202,7 @@ fun HomeScreen(
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     onProbeCustomSources = { settingsViewModel.probeCustomSources() },
                     onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
+                    onTogglePipMode = { settingsViewModel.setPipEnabled(it) },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -243,6 +249,7 @@ fun HomeScreen(
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     onProbeCustomSources = { settingsViewModel.probeCustomSources() },
                     onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
+                    onTogglePipMode = { settingsViewModel.setPipEnabled(it) },
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -305,6 +312,8 @@ fun HomeScreen(
                     onRefreshAllCustomSources = { settingsViewModel.refreshAllCustomSources() },
                     onProbeCustomSources = { settingsViewModel.probeCustomSources() },
                     onRemoveUnavailableCustomChannels = { settingsViewModel.removeUnavailableCustomChannels() },
+                    onTogglePipMode = { settingsViewModel.setPipEnabled(it) },
+                    isExitDialogVisible = showExitDialog,
                     webPlaybackController = playerViewModel.webPlaybackController,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -314,9 +323,29 @@ fun HomeScreen(
         // 退出确认二次弹窗
         ExitConfirmDialog(
             visible = showExitDialog,
-            onConfirm = { activity?.finish() },
+            onConfirm = {
+                showExitDialog = false
+                if (onExitApp != null) {
+                    onExitApp()
+                } else {
+                    val activity = context.findActivity()
+                    if (activity != null) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            activity.finishAndRemoveTask()
+                        } else {
+                            activity.finishAffinity()
+                        }
+                    }
+                }
+            },
             onDismiss = { showExitDialog = false }
         )
     }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

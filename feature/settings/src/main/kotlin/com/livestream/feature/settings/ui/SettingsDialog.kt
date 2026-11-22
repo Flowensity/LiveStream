@@ -75,6 +75,7 @@ fun SettingsDialog(
     onRefreshAllCustomSources: () -> Unit = {},
     onProbeCustomSources: () -> Unit = {},
     onRemoveUnavailableCustomChannels: () -> Unit = {},
+    onTogglePipMode: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hasAnyOverlay = uiState.isSettingsOpen || uiState.isImportDialogOpen || uiState.isSourceManagementOpen
@@ -152,6 +153,7 @@ fun SettingsDialog(
                 onThemeModeSelected = onThemeModeSelected,
                 onToggleHardwareDecode = onToggleHardwareDecode,
                 onToggleSurfaceView = onToggleSurfaceView,
+                onTogglePipMode = onTogglePipMode,
                 onEnlargeQrCode = { isQrEnlarged = true },
                 isTv = isTv
             )
@@ -207,7 +209,7 @@ private fun SettingsDrawerPanel(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onToggleHardwareDecode: (Boolean) -> Unit,
     onToggleSurfaceView: (Boolean) -> Unit,
-    onAspectRatioSelected: (VideoAspectRatio) -> Unit = {},
+    onTogglePipMode: (Boolean) -> Unit = {},
     onEnlargeQrCode: () -> Unit = {},
     isTv: Boolean = false
 ) {
@@ -282,6 +284,7 @@ private fun SettingsDrawerPanel(
                     onThemeModeSelected = onThemeModeSelected,
                     onToggleHardwareDecode = onToggleHardwareDecode,
                     onToggleSurfaceView = onToggleSurfaceView,
+                    onTogglePipMode = onTogglePipMode,
                     firstFocusRequester = firstFocusRequester,
                     onEnlargeQrCode = onEnlargeQrCode,
                     isTv = isTv

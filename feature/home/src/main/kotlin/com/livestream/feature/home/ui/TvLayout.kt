@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -105,6 +106,8 @@ fun TvLayout(
     onSelectSource: (Int) -> Unit = {},
     onProbeCustomSources: () -> Unit = {},
     onRemoveUnavailableCustomChannels: () -> Unit = {},
+    onTogglePipMode: (Boolean) -> Unit = {},
+    isExitDialogVisible: Boolean = false,
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -120,14 +123,16 @@ fun TvLayout(
         settingsUiState.isSourceManagementOpen,
         channelUiState.isDrawerOpen,
         playerUiState.isEpgSheetVisible,
-        isErrorVisible
+        isErrorVisible,
+        isExitDialogVisible
     ) {
         if (!settingsUiState.isSettingsOpen &&
             !settingsUiState.isImportDialogOpen &&
             !settingsUiState.isSourceManagementOpen &&
             !channelUiState.isDrawerOpen &&
             !playerUiState.isEpgSheetVisible &&
-            !isErrorVisible
+            !isErrorVisible &&
+            !isExitDialogVisible
         ) {
             try {
                 focusRequester.requestFocus()
@@ -145,9 +150,11 @@ fun TvLayout(
         modifier = modifier
             .fillMaxSize()
             .background(AppBackground)
+            .focusProperties { canFocus = !isExitDialogVisible }
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { keyEvent ->
+                if (isExitDialogVisible) return@onKeyEvent false
                 if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
 
                 // 侧边栏展开时：左右方向键切换分类（搜索框输入非空时保留给光标移动），返回键/退出键关闭侧边栏
@@ -340,7 +347,10 @@ fun TvLayout(
                 controller = webPlaybackController,
                 url = webUrl,
                 aspectRatio = settingsUiState.aspectRatio,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusProperties { canFocus = false },
+                overlayModifier = Modifier.focusProperties { canFocus = false },
                 onContainerClick = {
                     if (channelUiState.isDrawerOpen) {
                         onCloseDrawer()
@@ -361,6 +371,7 @@ fun TvLayout(
                 videoHeight = playerUiState.metrics.videoHeight,
                 modifier = Modifier
                     .fillMaxSize()
+                    .focusProperties { canFocus = false }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
@@ -385,7 +396,8 @@ fun TvLayout(
             osdFocusedIndex = if (playerUiState.isOsdVisible) osdFocusIndex else -1,
             aspectRatio = settingsUiState.aspectRatio,
             onCycleAspectRatio = onCycleAspectRatio,
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            isExitDialogVisible = isExitDialogVisible
         )
 
         // 3. 顶层侧边栏：频道分类与列表抽屉
@@ -419,7 +431,8 @@ fun TvLayout(
             onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
             onRefreshAllCustomSources = onRefreshAllCustomSources,
             onProbeCustomSources = onProbeCustomSources,
-            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
+            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels,
+            onTogglePipMode = onTogglePipMode
         )
 
         // 5. 模态浮层：综合播放菜单（集成信号源切换、画面比例与今日节目单）

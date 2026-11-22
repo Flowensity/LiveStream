@@ -96,6 +96,7 @@ fun PhoneLandscapeLayout(
     onSelectSource: (Int) -> Unit = {},
     onProbeCustomSources: () -> Unit = {},
     onRemoveUnavailableCustomChannels: () -> Unit = {},
+    onTogglePipMode: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     webPlaybackController: WebPlaybackController? = null
 ) {
@@ -292,7 +293,8 @@ fun PhoneLandscapeLayout(
             onRefreshCustomPlaylistSource = onRefreshCustomPlaylistSource,
             onRefreshAllCustomSources = onRefreshAllCustomSources,
             onProbeCustomSources = onProbeCustomSources,
-            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels
+            onRemoveUnavailableCustomChannels = onRemoveUnavailableCustomChannels,
+            onTogglePipMode = onTogglePipMode
         )
 
         // 7. 综合播放设置与今日节目单抽屉
